@@ -1,0 +1,34 @@
+@import url("https://fonts.googleapis.com/css2?family=Forum&display=swap");
+@import "tailwindcss";
+
+:root {
+  --ink-black: #001524;
+  --stormy-teal: #15616d;
+  --papaya-whip: #ffecd1;
+  --vivid-tangerine: #ff7d00;
+  --brandy: #78290f;
+  --background: #ffffff;
+  --foreground: #001524;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-ink-black: var(--ink-black);
+  --color-stormy-teal: var(--stormy-teal);
+  --color-papaya-whip: var(--papaya-whip);
+  --color-vivid-tangerine: var(--vivid-tangerine);
+  --color-brandy: var(--brandy);
+  --font-forum: "Forum", serif;
+  --font-sans: ui-sans-serif, system-ui, sans-serif;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+}
+
+.font-forum {
+  font-family: "Forum", serif;
+}
