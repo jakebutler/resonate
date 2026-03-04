@@ -8,17 +8,22 @@ import { Calendar } from "@/components/Calendar/Calendar";
 import { BlogPostEditor } from "@/components/BlogPostEditor/BlogPostEditor";
 import { LinkedInPostEditor } from "@/components/LinkedInPostEditor/LinkedInPostEditor";
 import { CreatePostModal } from "@/components/CreatePostModal/CreatePostModal";
+import { ContentLibrary } from "@/components/ContentLibrary/ContentLibrary";
 import { UserButton } from "@clerk/nextjs";
-import { FileText, Linkedin, CalendarDays, Edit3, Settings } from "lucide-react";
+import { FileText, Linkedin, CalendarDays, Edit3, Settings, CalendarRange, Library } from "lucide-react";
 import Link from "next/link";
 
 type Filter = "all" | "blog" | "linkedin";
+type View = "calendar" | "library";
+type TimePeriod = "all" | "this-month" | "last-3-months" | "this-year";
 
 export default function Dashboard() {
   const stats = useQuery(api.posts.getStats);
   const allPosts = useQuery(api.posts.list, {});
 
   const [filter, setFilter] = useState<Filter>("all");
+  const [activeView, setActiveView] = useState<View>("calendar");
+  const [timePeriod, setTimePeriod] = useState<TimePeriod>("all");
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [createDate, setCreateDate] = useState<string | null>(null);
   const [blogEditorOpen, setBlogEditorOpen] = useState(false);
@@ -108,40 +113,100 @@ export default function Dashboard() {
           />
         </div>
 
-        {/* Calendar header */}
-        <div className="flex items-end justify-between mb-4">
-          <div>
-            <h1 className="font-forum text-3xl text-[#001524]">Publishing Calendar</h1>
-            <p className="text-sm text-gray-500 mt-0.5">Manage your upcoming content</p>
-          </div>
-
-          {/* Filter tabs */}
-          <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-xl p-1">
-            {(["all", "blog", "linkedin"] as Filter[]).map((f) => (
+        {/* View header */}
+        <div className="flex items-center justify-between mb-4">
+          {/* Left: view switcher + title */}
+          <div className="flex items-center gap-4">
+            {/* View switcher */}
+            <div className="flex items-center gap-0.5 bg-white border border-gray-200 rounded-xl p-1">
               <button
-                key={f}
-                onClick={() => setFilter(f)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors capitalize ${
-                  filter === f
+                onClick={() => setActiveView("calendar")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  activeView === "calendar"
                     ? "bg-[#001524] text-white"
                     : "text-gray-500 hover:text-[#001524]"
                 }`}
               >
-                {f === "blog" && <FileText size={13} />}
-                {f === "linkedin" && <Linkedin size={13} />}
-                {f === "all" ? "All" : f === "blog" ? "Blog" : "LinkedIn"}
+                <CalendarRange size={13} />
+                Calendar
               </button>
-            ))}
+              <button
+                onClick={() => setActiveView("library")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  activeView === "library"
+                    ? "bg-[#001524] text-white"
+                    : "text-gray-500 hover:text-[#001524]"
+                }`}
+              >
+                <Library size={13} />
+                Library
+              </button>
+            </div>
+            <div>
+              <h1 className="font-forum text-2xl text-[#001524]">
+                {activeView === "calendar" ? "Publishing Calendar" : "Content Library"}
+              </h1>
+            </div>
+          </div>
+
+          {/* Right: filters */}
+          <div className="flex items-center gap-2">
+            {/* Time period filter — library only */}
+            {activeView === "library" && (
+              <div className="flex items-center gap-0.5 bg-white border border-gray-200 rounded-xl p-1">
+                {(["all", "this-month", "last-3-months", "this-year"] as TimePeriod[]).map((tp) => (
+                  <button
+                    key={tp}
+                    onClick={() => setTimePeriod(tp)}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                      timePeriod === tp
+                        ? "bg-[#001524] text-white"
+                        : "text-gray-500 hover:text-[#001524]"
+                    }`}
+                  >
+                    {tp === "all" ? "All time" : tp === "this-month" ? "This month" : tp === "last-3-months" ? "Last 3 months" : "This year"}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Type filter */}
+            <div className="flex items-center gap-0.5 bg-white border border-gray-200 rounded-xl p-1">
+              {(["all", "blog", "linkedin"] as Filter[]).map((f) => (
+                <button
+                  key={f}
+                  onClick={() => setFilter(f)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors capitalize ${
+                    filter === f
+                      ? "bg-[#001524] text-white"
+                      : "text-gray-500 hover:text-[#001524]"
+                  }`}
+                >
+                  {f === "blog" && <FileText size={13} />}
+                  {f === "linkedin" && <Linkedin size={13} />}
+                  {f === "all" ? "All" : f === "blog" ? "Blog" : "LinkedIn"}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
-        {/* Calendar */}
-        <Calendar
-          posts={allPosts || []}
-          filter={filter}
-          onCreatePost={handleDayClick}
-          onEditPost={handleEditPost}
-        />
+        {/* Main view */}
+        {activeView === "calendar" ? (
+          <Calendar
+            posts={allPosts || []}
+            filter={filter}
+            onCreatePost={handleDayClick}
+            onEditPost={handleEditPost}
+          />
+        ) : (
+          <ContentLibrary
+            posts={allPosts || []}
+            filter={filter}
+            timePeriod={timePeriod}
+            onEditPost={handleEditPost}
+          />
+        )}
       </main>
 
       {/* Modals & editors */}
