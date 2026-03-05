@@ -51,9 +51,9 @@ describe('streamCortexChat', () => {
 
   it('forwards custom model argument', async () => {
     vi.mocked(fetch).mockResolvedValueOnce(new Response(new ReadableStream(), { status: 200 }))
-    await streamCortexChat([{ role: 'user', content: 'test' }], 'claude-opus-4-6')
+    await streamCortexChat([{ role: 'user', content: 'test' }], 'claude-opus-4.6')
     const body = JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string)
-    expect(body.model).toBe('claude-opus-4-6')
+    expect(body.model).toBe('claude-opus-4.6')
   })
 
   it('sets stream: true in request body', async () => {
