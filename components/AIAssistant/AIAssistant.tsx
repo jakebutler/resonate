@@ -65,11 +65,20 @@ export function AIAssistant({ onUsePost }: AIAssistantProps) {
         const chunk = decoder.decode(value, { stream: true });
         const lines = chunk.split("\n").filter((l) => l.startsWith("data: "));
 
+        let streamError: Error | null = null;
         for (const line of lines) {
           const data = line.slice(6);
           if (data === "[DONE]") break;
           try {
             const json = JSON.parse(data);
+            // Responses API: signal stream end
+            if (json.type === "response.completed") break;
+            // Responses API: surface errors — store and break so it escapes the inner catch
+            if (json.type === "response.failed") {
+              streamError = new Error(json.response?.error ?? "response.failed");
+              break;
+            }
+            // Responses API delta or Chat Completions delta
             const delta =
               json.type === "response.output_text.delta"
                 ? json.delta
@@ -88,6 +97,7 @@ export function AIAssistant({ onUsePost }: AIAssistantProps) {
             // skip non-JSON lines
           }
         }
+        if (streamError) throw streamError;
       }
     } catch {
       setMessages((prev) => {
