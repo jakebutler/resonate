@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Toggle } from "@/components/ui/Toggle";
-import { FileText, Linkedin, ChevronRight } from "lucide-react";
+import { FileText, Linkedin, ChevronRight, AudioWaveform } from "lucide-react";
 
 const FREQUENCIES = [
   { value: "1x", label: "1× per week" },
@@ -52,7 +52,7 @@ export function SetupPage() {
     <div className="min-h-screen bg-white px-6 py-12 max-w-2xl mx-auto">
       {/* Wordmark */}
       <div className="flex items-center gap-2 mb-10">
-        <span className="text-2xl">♫</span>
+        <AudioWaveform size={22} className="text-[#001524]" />
         <span className="font-forum text-xl font-semibold text-[#001524]">Resonate</span>
       </div>
 
