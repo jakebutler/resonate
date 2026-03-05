@@ -52,7 +52,7 @@ describe('AIAssistant', () => {
     fireEvent.keyDown(screen.getByPlaceholderText(/describe what you want/i), { key: 'Enter' })
 
     await waitFor(() =>
-      expect(screen.getByText(/error:/i)).toBeInTheDocument()
+      expect(screen.getByText(/rate_limit|something went wrong/i)).toBeInTheDocument()
     )
   })
 

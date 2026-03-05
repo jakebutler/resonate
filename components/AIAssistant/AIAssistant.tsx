@@ -127,7 +127,7 @@ export function AIAssistant({ onUsePost }: AIAssistantProps) {
         const updated = [...prev];
         updated[updated.length - 1] = {
           role: "assistant",
-          content: `Error: ${detail}`,
+          content: detail || "Sorry, something went wrong. Please try again.",
         };
         return updated;
       });

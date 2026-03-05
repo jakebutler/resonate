@@ -34,8 +34,8 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error("Cortex error [model=%s]:", model ?? "default", message);
-    return new Response(message, { status: 500 });
+    const detail = err instanceof Error ? err.message : String(err);
+    console.error("Cortex error [model=%s]:", model ?? "default", detail);
+    return new Response("The AI service encountered an error. Please try again.", { status: 500 });
   }
 }
