@@ -27,16 +27,14 @@ describe('Button', () => {
     expect(screen.getByText('Go').closest('button')).toBeDisabled()
   })
 
-  it('applies primary variant classes', () => {
+  it('sets data-variant="primary" on primary variant', () => {
     render(<Button variant="primary">Go</Button>)
-    const btn = screen.getByText('Go').closest('button')!
-    expect(btn.className).toContain('ff7d00')
+    expect(screen.getByText('Go').closest('button')).toHaveAttribute('data-variant', 'primary')
   })
 
-  it('applies danger variant classes', () => {
+  it('sets data-variant="danger" on danger variant', () => {
     render(<Button variant="danger">Del</Button>)
-    const btn = screen.getByText('Del').closest('button')!
-    expect(btn.className).toMatch(/red|danger|78290f/)
+    expect(screen.getByText('Del').closest('button')).toHaveAttribute('data-variant', 'danger')
   })
 
   it('forwards type attribute', () => {

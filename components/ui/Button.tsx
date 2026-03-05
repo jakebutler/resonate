@@ -33,6 +33,7 @@ export function Button({
 
   return (
     <button
+      data-variant={variant}
       className={`${base} ${sizes[size]} ${variants[variant]} ${className}`}
       {...props}
     >

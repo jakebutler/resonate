@@ -1,0 +1,83 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  unit:
+    name: Unit & Component Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Run Vitest with coverage
+        run: npm run test:ci
+        env:
+          # These are intentionally fake placeholder values used only for unit tests.
+          # All external calls (GitHub, Cortex) are mocked via vi.mock() in test files.
+          # Real secrets are never used in unit tests.
+          GITHUB_TOKEN: test_token
+          BLOG_REPO_OWNER: test-owner
+          BLOG_REPO_NAME: test-repo
+          BLOG_CONTENT_PATH: content/posts
+          CORTEX_API_KEY: test_key
+          CORTEX_BASE_URL: https://cortex.test
+          NEXT_PUBLIC_CONVEX_URL: https://convex.test
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: coverage/
+
+  e2e:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Build Next.js
+        run: npm run build
+        env:
+          NEXT_PUBLIC_CONVEX_URL: ${{ secrets.NEXT_PUBLIC_CONVEX_URL_TEST }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY_TEST }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY_TEST }}
+          CORTEX_API_KEY: ${{ secrets.CORTEX_API_KEY_TEST }}
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          BLOG_REPO_OWNER: ${{ secrets.BLOG_REPO_OWNER }}
+          BLOG_REPO_NAME: ${{ secrets.BLOG_REPO_NAME }}
+
+      - name: Run Playwright E2E
+        run: npm run test:e2e
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

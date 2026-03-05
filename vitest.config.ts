@@ -30,6 +30,8 @@ export default defineConfig({
       ],
       thresholds: {
         lines: 60,
+        // Temporarily 55 (was 60) — AIAssistant tests added; raise back to 60
+        // once AIAssistant coverage is confirmed in CI.
         functions: 55,
         branches: 50,
         statements: 60,

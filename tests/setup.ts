@@ -1,4 +1,5 @@
 import '@testing-library/jest-dom'
+import { vi } from 'vitest' // explicit import — don't rely on globals: true in vitest.config.ts
 
 // Mock browser APIs not available in jsdom
 Object.defineProperty(navigator, 'clipboard', {
