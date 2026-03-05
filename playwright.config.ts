@@ -13,6 +13,9 @@ export default defineConfig({
     screenshot: 'only-on-failure',
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  // NOTE: 'npm run start' serves the compiled Next.js build.
+  // Run 'npm run build' before running E2E tests locally for the first time,
+  // or whenever you change production code. The CI workflow handles this automatically.
   webServer: {
     command: 'npm run start',
     url: 'http://localhost:3000',

@@ -19,16 +19,13 @@ describe('Calendar', () => {
 
   it('navigates to previous month on left chevron click', () => {
     render(<Calendar posts={[]} filter="all" onCreatePost={vi.fn()} onEditPost={vi.fn()} />)
-    const [prevBtn] = screen.getAllByRole('button')
-    fireEvent.click(prevBtn)
+    fireEvent.click(screen.getByRole('button', { name: 'Previous month' }))
     expect(screen.getByText('February 2026')).toBeInTheDocument()
   })
 
   it('navigates to next month on right chevron click', () => {
     render(<Calendar posts={[]} filter="all" onCreatePost={vi.fn()} onEditPost={vi.fn()} />)
-    const buttons = screen.getAllByRole('button')
-    // prev=buttons[0], next=buttons[1], then day + buttons follow
-    fireEvent.click(buttons[1])
+    fireEvent.click(screen.getByRole('button', { name: 'Next month' }))
     expect(screen.getByText('April 2026')).toBeInTheDocument()
   })
 

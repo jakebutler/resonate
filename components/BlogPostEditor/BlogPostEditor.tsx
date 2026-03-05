@@ -41,7 +41,9 @@ export function BlogPostEditor({ open, postId, initialDate, onClose, onSaved }: 
   const [saving, setSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Prefill date when opening for new post from calendar
+  // NOTE: This useEffect is intentionally duplicated in LinkedInPostEditor.tsx.
+  // Both editors prefill scheduledDate when opened from the calendar.
+  // If a third editor is added, extract to a shared hook.
   useEffect(() => {
     if (open && !postId) {
       setScheduledDate(initialDate || "");

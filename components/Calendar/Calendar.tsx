@@ -77,6 +77,7 @@ export function Calendar({ posts, filter, onCreatePost, onEditPost }: CalendarPr
       <div className="flex items-center gap-3 mb-4">
         <button
           onClick={prevMonth}
+          aria-label="Previous month"
           className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-600"
         >
           <ChevronLeft size={18} />
@@ -84,6 +85,7 @@ export function Calendar({ posts, filter, onCreatePost, onEditPost }: CalendarPr
         <span className="font-semibold text-[#001524]">{monthLabel}</span>
         <button
           onClick={nextMonth}
+          aria-label="Next month"
           className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-600"
         >
           <ChevronRight size={18} />
