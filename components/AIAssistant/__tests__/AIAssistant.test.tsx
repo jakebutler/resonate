@@ -84,6 +84,15 @@ describe('AIAssistant', () => {
     expect(trigger).toHaveAttribute('aria-expanded', 'true')
   })
 
+  it('closes model menu on Escape key', () => {
+    render(<AIAssistant onUsePost={vi.fn()} />)
+    const trigger = screen.getByRole('button', { name: /select ai model/i })
+    fireEvent.click(trigger)
+    expect(screen.getByRole('listbox')).toBeInTheDocument()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
+  })
+
   it('shows Sonnet 4.6 as the default model', () => {
     render(<AIAssistant onUsePost={vi.fn()} />)
     expect(screen.getByText('Sonnet 4.6')).toBeInTheDocument()

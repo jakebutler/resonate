@@ -27,6 +27,7 @@ export function AIAssistant({ onUsePost }: AIAssistantProps) {
   const [modelMenuOpen, setModelMenuOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const modelMenuRef = useRef<HTMLDivElement>(null);
+  const modelTriggerRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -34,13 +35,24 @@ export function AIAssistant({ onUsePost }: AIAssistantProps) {
 
   useEffect(() => {
     if (!modelMenuOpen) return;
-    function handleClickOutside(e: MouseEvent) {
+    function handleKeyOrClick(e: KeyboardEvent | MouseEvent) {
+      if (e instanceof KeyboardEvent) {
+        if (e.key === "Escape") {
+          setModelMenuOpen(false);
+          modelTriggerRef.current?.focus();
+        }
+        return;
+      }
       if (modelMenuRef.current && !modelMenuRef.current.contains(e.target as Node)) {
         setModelMenuOpen(false);
       }
     }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("mousedown", handleKeyOrClick);
+    document.addEventListener("keydown", handleKeyOrClick);
+    return () => {
+      document.removeEventListener("mousedown", handleKeyOrClick);
+      document.removeEventListener("keydown", handleKeyOrClick);
+    };
   }, [modelMenuOpen]);
 
   const sendMessage = async () => {
@@ -219,6 +231,7 @@ export function AIAssistant({ onUsePost }: AIAssistantProps) {
           {/* Model selector */}
           <div className="relative pl-4" ref={modelMenuRef}>
             <button
+              ref={modelTriggerRef}
               onClick={() => setModelMenuOpen((o) => !o)}
               aria-haspopup="listbox"
               aria-expanded={modelMenuOpen}
