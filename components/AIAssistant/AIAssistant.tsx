@@ -70,7 +70,10 @@ export function AIAssistant({ onUsePost }: AIAssistantProps) {
           if (data === "[DONE]") break;
           try {
             const json = JSON.parse(data);
-            const delta = json.choices?.[0]?.delta?.content;
+            const delta =
+              json.type === "response.output_text.delta"
+                ? json.delta
+                : json.choices?.[0]?.delta?.content;
             if (delta) {
               setMessages((prev) => {
                 const updated = [...prev];

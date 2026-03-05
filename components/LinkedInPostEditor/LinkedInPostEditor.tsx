@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
@@ -38,6 +38,13 @@ export function LinkedInPostEditor({ open, postId, initialDate, onClose, onSaved
   const [externalUrl, setExternalUrl] = useState("");
   const [linkedBlogPostId, setLinkedBlogPostId] = useState<string>("");
   const [saving, setSaving] = useState(false);
+
+  // Prefill date when opening for new post from calendar
+  useEffect(() => {
+    if (open && !postId) {
+      setScheduledDate(initialDate || "");
+    }
+  }, [open, initialDate, postId]);
 
   // Sync from existing
   useState(() => {

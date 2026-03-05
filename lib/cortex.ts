@@ -24,7 +24,7 @@ export async function streamCortexChat(
   messages: ChatMessage[],
   model = "claude-3-5-sonnet"
 ): Promise<ReadableStream> {
-  const response = await fetch(`${CORTEX_BASE_URL}/v1/chat/completions`, {
+  const response = await fetch(`${CORTEX_BASE_URL}/v1/responses`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${CORTEX_API_KEY}`,
@@ -33,10 +33,8 @@ export async function streamCortexChat(
     body: JSON.stringify({
       model,
       stream: true,
-      messages: [
-        { role: "system", content: LINKEDIN_SYSTEM_PROMPT },
-        ...messages,
-      ],
+      instructions: LINKEDIN_SYSTEM_PROMPT,
+      input: messages,
     }),
   });
 

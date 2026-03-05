@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
@@ -40,6 +40,13 @@ export function BlogPostEditor({ open, postId, initialDate, onClose, onSaved }: 
   const [githubPrUrl, setGithubPrUrl] = useState("");
   const [saving, setSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Prefill date when opening for new post from calendar
+  useEffect(() => {
+    if (open && !postId) {
+      setScheduledDate(initialDate || "");
+    }
+  }, [open, initialDate, postId]);
 
   // Sync from existing post
   useState(() => {
