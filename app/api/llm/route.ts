@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { streamCortexChat, type ChatMessage } from "@/lib/cortex";
+import { MODEL_IDS } from "@/lib/models";
 import { auth } from "@clerk/nextjs/server";
 
 export const runtime = "nodejs";
@@ -17,6 +18,9 @@ export async function POST(req: NextRequest) {
   }
   if (model !== undefined && typeof model !== "string") {
     return new Response("model must be a string", { status: 400 });
+  }
+  if (model !== undefined && !MODEL_IDS.has(model)) {
+    return new Response(`"${model}" is not a supported model`, { status: 400 });
   }
 
   try {
