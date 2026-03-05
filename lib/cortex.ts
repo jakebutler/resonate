@@ -1,11 +1,15 @@
 export const CORTEX_BASE_URL = process.env.CORTEX_BASE_URL || "https://cortex.corvolabs.com";
 
-if (!process.env.CORTEX_API_KEY) {
-  throw new Error("Missing required environment variable: CORTEX_API_KEY");
+if (!process.env.CORTEX_API_KEY && !process.env.OPENAI_API_KEY) {
+  throw new Error("Missing required environment variable: CORTEX_API_KEY or OPENAI_API_KEY");
 }
-export const CORTEX_API_KEY = process.env.CORTEX_API_KEY;
 
-export const LINKEDIN_SYSTEM_PROMPT = `You are an expert LinkedIn content writer for Corvo Labs, an AI consulting agency. 
+// Use OpenAI directly if OPENAI_API_KEY is set (for testing/fallback)
+const USE_OPENAI = !!process.env.OPENAI_API_KEY;
+const API_KEY = USE_OPENAI ? process.env.OPENAI_API_KEY! : process.env.CORTEX_API_KEY!;
+const BASE_URL = USE_OPENAI ? "https://api.openai.com" : CORTEX_BASE_URL;
+
+export const LINKEDIN_SYSTEM_PROMPT = `You are an expert LinkedIn content writer for Corvo Labs, an AI consulting agency.
 Your role is to help craft compelling, professional LinkedIn posts that:
 - Sound authentic and conversational, not corporate or generic
 - Share genuine insights about AI, consulting, and technology
@@ -15,7 +19,7 @@ Your role is to help craft compelling, professional LinkedIn posts that:
 - End with a clear call to action or thought-provoking question when appropriate
 - Maintain a confident but approachable tone
 
-When given an idea or draft, transform it into a polished LinkedIn post. 
+When given an idea or draft, transform it into a polished LinkedIn post.
 If the user references a blog post, include a natural mention of it and encourage readers to check it out.
 Always stay within LinkedIn's 3,000 character limit.`;
 
@@ -26,24 +30,29 @@ export interface ChatMessage {
 
 export async function streamCortexChat(
   messages: ChatMessage[],
-  model = "claude-3-5-sonnet"
+  model?: string
 ): Promise<ReadableStream> {
-  const response = await fetch(`${CORTEX_BASE_URL}/v1/responses`, {
+  const resolvedModel = model ?? (USE_OPENAI ? "gpt-4o" : "claude-sonnet-4-6");
+
+  const response = await fetch(`${BASE_URL}/v1/chat/completions`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${CORTEX_API_KEY}`,
+      Authorization: `Bearer ${API_KEY}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model,
+      model: resolvedModel,
       stream: true,
-      instructions: LINKEDIN_SYSTEM_PROMPT,
-      input: messages,
+      messages: [
+        { role: "system", content: LINKEDIN_SYSTEM_PROMPT },
+        ...messages,
+      ],
     }),
   });
 
   if (!response.ok) {
-    throw new Error(`Cortex API error: ${response.status}`);
+    const text = await response.text();
+    throw new Error(`LLM API error: ${response.status} ${text}`);
   }
 
   return response.body!;

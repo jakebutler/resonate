@@ -78,9 +78,11 @@ export function AIAssistant({ onUsePost }: AIAssistantProps) {
               streamError = new Error(json.response?.error ?? "response.failed");
               break;
             }
-            // Responses API delta or Chat Completions delta
+            // Anthropic native, OpenAI Responses API, or OpenAI Chat Completions delta
             const delta =
-              json.type === "response.output_text.delta"
+              json.type === "content_block_delta" && json.delta?.type === "text_delta"
+                ? json.delta.text
+                : json.type === "response.output_text.delta"
                 ? json.delta
                 : json.choices?.[0]?.delta?.content;
             if (delta) {
