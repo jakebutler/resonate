@@ -12,6 +12,13 @@ export async function POST(req: NextRequest) {
 
   const { messages, model } = await req.json();
 
+  if (!Array.isArray(messages)) {
+    return new Response("messages must be an array", { status: 400 });
+  }
+  if (model !== undefined && typeof model !== "string") {
+    return new Response("model must be a string", { status: 400 });
+  }
+
   try {
     const stream = await streamCortexChat(messages as ChatMessage[], model);
 

@@ -46,4 +46,19 @@ describe('POST /api/llm', () => {
     const res = await POST(makeRequest({ messages: [] }) as any)
     expect(res.status).toBe(500)
   })
+
+  it('returns 400 when messages is missing', async () => {
+    const res = await POST(makeRequest({}) as any)
+    expect(res.status).toBe(400)
+  })
+
+  it('returns 400 when messages is not an array', async () => {
+    const res = await POST(makeRequest({ messages: 'not-an-array' }) as any)
+    expect(res.status).toBe(400)
+  })
+
+  it('returns 400 when model is provided but not a string', async () => {
+    const res = await POST(makeRequest({ messages: [], model: 42 }) as any)
+    expect(res.status).toBe(400)
+  })
 })
