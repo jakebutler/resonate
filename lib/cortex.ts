@@ -1,5 +1,9 @@
 export const CORTEX_BASE_URL = process.env.CORTEX_BASE_URL || "https://cortex.corvolabs.com";
-export const CORTEX_API_KEY = process.env.CORTEX_API_KEY!;
+
+if (!process.env.CORTEX_API_KEY) {
+  throw new Error("Missing required environment variable: CORTEX_API_KEY");
+}
+export const CORTEX_API_KEY = process.env.CORTEX_API_KEY;
 
 export const LINKEDIN_SYSTEM_PROMPT = `You are an expert LinkedIn content writer for Corvo Labs, an AI consulting agency. 
 Your role is to help craft compelling, professional LinkedIn posts that:

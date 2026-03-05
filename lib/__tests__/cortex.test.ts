@@ -76,3 +76,14 @@ describe('streamCortexChat', () => {
       .rejects.toThrow('Cortex API error: 503')
   })
 })
+
+describe('module initialization', () => {
+  it('throws when CORTEX_API_KEY is not set', async () => {
+    const saved = process.env.CORTEX_API_KEY
+    delete process.env.CORTEX_API_KEY
+    vi.resetModules()
+    await expect(import('@/lib/cortex')).rejects.toThrow('Missing required environment variable: CORTEX_API_KEY')
+    process.env.CORTEX_API_KEY = saved
+    vi.resetModules()
+  })
+})
