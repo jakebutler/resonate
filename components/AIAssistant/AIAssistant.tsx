@@ -220,28 +220,38 @@ export function AIAssistant({ onUsePost }: AIAssistantProps) {
           <div className="relative pl-4" ref={modelMenuRef}>
             <button
               onClick={() => setModelMenuOpen((o) => !o)}
+              aria-haspopup="listbox"
+              aria-expanded={modelMenuOpen}
+              aria-label={`Select AI model. Current: ${selectedModel.label}`}
               className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 transition-colors"
             >
               {selectedModel.label}
               <ChevronUp
                 size={13}
+                aria-hidden="true"
                 className={`transition-transform ${modelMenuOpen ? "" : "rotate-180"}`}
               />
             </button>
             {modelMenuOpen && (
-              <div className="absolute bottom-full mb-2 left-0 bg-[#1a1a2e] rounded-xl shadow-xl py-1.5 z-10 min-w-[160px]">
+              <div
+                role="listbox"
+                aria-label="AI model options"
+                className="absolute bottom-full mb-2 left-0 bg-[#1a1a2e] rounded-xl shadow-xl py-1.5 z-10 min-w-[160px]"
+              >
                 {MODELS.map((m) => (
                   <button
                     key={m.id}
+                    role="option"
+                    aria-selected={selectedModel.id === m.id}
                     onClick={() => {
                       setSelectedModel(m);
                       setModelMenuOpen(false);
                     }}
-                    className="w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 flex items-center justify-between transition-colors"
+                    className="w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 focus-visible:bg-white/10 focus-visible:outline-none flex items-center justify-between transition-colors"
                   >
                     {m.label}
                     {selectedModel.id === m.id && (
-                      <Check size={13} className="text-[#4f46e5]" />
+                      <Check size={13} aria-hidden="true" className="text-[#4f46e5]" />
                     )}
                   </button>
                 ))}

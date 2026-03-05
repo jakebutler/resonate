@@ -70,6 +70,20 @@ describe('AIAssistant', () => {
     await waitFor(() => expect(screen.getByText('Legacy')).toBeInTheDocument())
   })
 
+  it('model selector button has aria-haspopup and aria-expanded attributes', () => {
+    render(<AIAssistant onUsePost={vi.fn()} />)
+    const trigger = screen.getByRole('button', { name: /select ai model/i })
+    expect(trigger).toHaveAttribute('aria-haspopup', 'listbox')
+    expect(trigger).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  it('aria-expanded becomes true when model menu is open', () => {
+    render(<AIAssistant onUsePost={vi.fn()} />)
+    const trigger = screen.getByRole('button', { name: /select ai model/i })
+    fireEvent.click(trigger)
+    expect(trigger).toHaveAttribute('aria-expanded', 'true')
+  })
+
   it('shows Sonnet 4.6 as the default model', () => {
     render(<AIAssistant onUsePost={vi.fn()} />)
     expect(screen.getByText('Sonnet 4.6')).toBeInTheDocument()
