@@ -4,8 +4,8 @@ if (!process.env.CORTEX_API_KEY && !process.env.OPENAI_API_KEY) {
   throw new Error("Missing required environment variable: CORTEX_API_KEY or OPENAI_API_KEY");
 }
 
-// Use OpenAI directly if OPENAI_API_KEY is set (for testing/fallback)
-const USE_OPENAI = !!process.env.OPENAI_API_KEY;
+// Prefer Cortex when available; fall back to OpenAI directly only when no Cortex key is set
+const USE_OPENAI = !process.env.CORTEX_API_KEY && !!process.env.OPENAI_API_KEY;
 const API_KEY = USE_OPENAI ? process.env.OPENAI_API_KEY! : process.env.CORTEX_API_KEY!;
 const BASE_URL = USE_OPENAI ? "https://api.openai.com" : CORTEX_BASE_URL;
 
@@ -32,7 +32,7 @@ export async function streamCortexChat(
   messages: ChatMessage[],
   model?: string
 ): Promise<ReadableStream> {
-  const resolvedModel = model ?? (USE_OPENAI ? "gpt-4o" : "claude-sonnet-4-6");
+  const resolvedModel = model ?? (USE_OPENAI ? "gpt-4o" : "claude-sonnet-4.6");
 
   const response = await fetch(`${BASE_URL}/v1/chat/completions`, {
     method: "POST",

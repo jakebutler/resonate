@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Send, Sparkles, Copy, CheckCheck } from "lucide-react";
+import { Sparkles, Copy, CheckCheck, Check, ChevronUp } from "lucide-react";
 
 interface Message {
   role: "user" | "assistant";
@@ -15,6 +15,19 @@ interface AIAssistantProps {
 const GREETING =
   "Hi! I'm here to help you craft the perfect LinkedIn post. Tell me about what you'd like to share — a company update, industry insight, or perhaps a thought leadership piece?";
 
+type ModelOption = { label: string; id: string };
+
+const MODELS: ModelOption[] = [
+  { label: "Opus 4.6",      id: "claude-opus-4.6"    },
+  { label: "Sonnet 4.6",    id: "claude-sonnet-4.6"  },
+  { label: "GPT-5.2",       id: "gpt-5.2"            },
+  { label: "GPT-5.2 mini",  id: "openai/gpt-5-mini"  },
+  { label: "GPT-5 nano",    id: "openai/gpt-5-nano"  },
+  { label: "GLM-4.7",       id: "glm-4.7"            },
+];
+
+const DEFAULT_MODEL = MODELS[1]; // Sonnet 4.6
+
 export function AIAssistant({ onUsePost }: AIAssistantProps) {
   const [messages, setMessages] = useState<Message[]>([
     { role: "assistant", content: GREETING },
@@ -22,11 +35,25 @@ export function AIAssistant({ onUsePost }: AIAssistantProps) {
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [copied, setCopied] = useState<number | null>(null);
+  const [selectedModel, setSelectedModel] = useState<ModelOption>(DEFAULT_MODEL);
+  const [modelMenuOpen, setModelMenuOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const modelMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, streaming]);
+
+  useEffect(() => {
+    if (!modelMenuOpen) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (modelMenuRef.current && !modelMenuRef.current.contains(e.target as Node)) {
+        setModelMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [modelMenuOpen]);
 
   const sendMessage = async () => {
     const text = input.trim();
@@ -49,10 +76,14 @@ export function AIAssistant({ onUsePost }: AIAssistantProps) {
           messages: newMessages
             .filter((m) => m.role !== "assistant" || m.content !== GREETING)
             .map((m) => ({ role: m.role, content: m.content })),
+          model: selectedModel.id,
         }),
       });
 
-      if (!res.ok) throw new Error("LLM request failed");
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(errText || `Request failed (${res.status})`);
+      }
       if (!res.body) throw new Error("No response body");
 
       const reader = res.body.getReader();
@@ -101,12 +132,14 @@ export function AIAssistant({ onUsePost }: AIAssistantProps) {
         }
         if (streamError) throw streamError;
       }
-    } catch {
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
+      console.error("AI Assistant error:", detail);
       setMessages((prev) => {
         const updated = [...prev];
         updated[updated.length - 1] = {
           role: "assistant",
-          content: "Sorry, I encountered an error. Please try again.",
+          content: `Error: ${detail}`,
         };
         return updated;
       });
@@ -184,7 +217,7 @@ export function AIAssistant({ onUsePost }: AIAssistantProps) {
       </div>
 
       {/* Input */}
-      <div className="flex gap-2 mt-2">
+      <div className="mt-2">
         <input
           type="text"
           value={input}
@@ -192,15 +225,51 @@ export function AIAssistant({ onUsePost }: AIAssistantProps) {
           onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMessage()}
           placeholder="Describe what you want to post about..."
           disabled={streaming}
-          className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#4f46e5] focus:border-transparent disabled:opacity-50"
+          className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#4f46e5] focus:border-transparent disabled:opacity-50"
         />
-        <button
-          onClick={sendMessage}
-          disabled={!input.trim() || streaming}
-          className="w-10 h-10 bg-[#4f46e5] text-white rounded-xl flex items-center justify-center hover:bg-[#4338ca] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-        >
-          <Send size={16} />
-        </button>
+        <div className="flex items-center justify-between mt-1.5">
+          {/* Model selector */}
+          <div className="relative pl-4" ref={modelMenuRef}>
+            <button
+              onClick={() => setModelMenuOpen((o) => !o)}
+              className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 transition-colors"
+            >
+              {selectedModel.label}
+              <ChevronUp
+                size={13}
+                className={`transition-transform ${modelMenuOpen ? "" : "rotate-180"}`}
+              />
+            </button>
+            {modelMenuOpen && (
+              <div className="absolute bottom-full mb-2 left-0 bg-[#1a1a2e] rounded-xl shadow-xl py-1.5 z-10 min-w-[160px]">
+                {MODELS.map((m) => (
+                  <button
+                    key={m.id}
+                    onClick={() => {
+                      setSelectedModel(m);
+                      setModelMenuOpen(false);
+                    }}
+                    className="w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 flex items-center justify-between transition-colors"
+                  >
+                    {m.label}
+                    {selectedModel.id === m.id && (
+                      <Check size={13} className="text-[#4f46e5]" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Send button */}
+          <button
+            onClick={sendMessage}
+            disabled={!input.trim() || streaming}
+            className="px-4 py-1.5 bg-[#4f46e5] text-white rounded-xl text-sm font-medium hover:bg-[#4338ca] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            Send
+          </button>
+        </div>
       </div>
     </div>
   );

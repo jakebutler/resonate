@@ -30,7 +30,8 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (err) {
-    console.error("Cortex error:", err);
-    return new Response("LLM error", { status: 500 });
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("Cortex error [model=%s]:", model ?? "default", message);
+    return new Response(message, { status: 500 });
   }
 }

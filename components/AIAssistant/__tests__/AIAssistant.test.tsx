@@ -52,7 +52,7 @@ describe('AIAssistant', () => {
     fireEvent.keyDown(screen.getByPlaceholderText(/describe what you want/i), { key: 'Enter' })
 
     await waitFor(() =>
-      expect(screen.getByText(/encountered an error/i)).toBeInTheDocument()
+      expect(screen.getByText(/error:/i)).toBeInTheDocument()
     )
   })
 
@@ -68,5 +68,48 @@ describe('AIAssistant', () => {
     fireEvent.keyDown(screen.getByPlaceholderText(/describe what you want/i), { key: 'Enter' })
 
     await waitFor(() => expect(screen.getByText('Legacy')).toBeInTheDocument())
+  })
+
+  it('shows Sonnet 4.6 as the default model', () => {
+    render(<AIAssistant onUsePost={vi.fn()} />)
+    expect(screen.getByText('Sonnet 4.6')).toBeInTheDocument()
+  })
+
+  it('opens model menu and switches to a different model', async () => {
+    render(<AIAssistant onUsePost={vi.fn()} />)
+    fireEvent.click(screen.getByText('Sonnet 4.6'))
+    expect(screen.getByText('Opus 4.6')).toBeInTheDocument()
+    fireEvent.click(screen.getByText('Opus 4.6'))
+    expect(screen.queryByText('GPT-5.2')).not.toBeInTheDocument()
+    expect(screen.getByText('Opus 4.6')).toBeInTheDocument()
+  })
+
+  it('sends the selected model in the request body', async () => {
+    const stream = makeStream(['data: [DONE]\n\n'])
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(stream, { status: 200 }))
+
+    render(<AIAssistant onUsePost={vi.fn()} />)
+
+    // Switch to GPT-5.2
+    fireEvent.click(screen.getByText('Sonnet 4.6'))
+    fireEvent.click(screen.getByText('GPT-5.2'))
+
+    fireEvent.change(screen.getByPlaceholderText(/describe what you want/i), { target: { value: 'test' } })
+    fireEvent.keyDown(screen.getByPlaceholderText(/describe what you want/i), { key: 'Enter' })
+
+    await waitFor(() => expect(fetch).toHaveBeenCalled())
+    const body = JSON.parse(vi.mocked(fetch).mock.calls[0][1]?.body as string)
+    expect(body.model).toBe('gpt-5.2')
+  })
+
+  it('sends message via Send button click', async () => {
+    const stream = makeStream(['data: [DONE]\n\n'])
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(stream, { status: 200 }))
+
+    render(<AIAssistant onUsePost={vi.fn()} />)
+    fireEvent.change(screen.getByPlaceholderText(/describe what you want/i), { target: { value: 'hello' } })
+    fireEvent.click(screen.getByRole('button', { name: /send/i }))
+
+    await waitFor(() => expect(fetch).toHaveBeenCalled())
   })
 })
