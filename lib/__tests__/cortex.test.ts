@@ -27,33 +27,33 @@ describe('streamCortexChat', () => {
     expect(result).toBeInstanceOf(ReadableStream)
   })
 
-  it('sends LINKEDIN_SYSTEM_PROMPT in the instructions field', async () => {
+  it('sends LINKEDIN_SYSTEM_PROMPT as the first system message', async () => {
     vi.mocked(fetch).mockResolvedValueOnce(new Response(new ReadableStream(), { status: 200 }))
     await streamCortexChat([{ role: 'user', content: 'test' }])
     const body = JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string)
-    expect(body.instructions).toBe(LINKEDIN_SYSTEM_PROMPT)
+    expect(body.messages[0]).toEqual({ role: 'system', content: LINKEDIN_SYSTEM_PROMPT })
   })
 
-  it('sends messages in the input field', async () => {
+  it('sends messages in the messages field after the system prompt', async () => {
     const messages = [{ role: 'user' as const, content: 'test' }]
     vi.mocked(fetch).mockResolvedValueOnce(new Response(new ReadableStream(), { status: 200 }))
     await streamCortexChat(messages)
     const body = JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string)
-    expect(body.input).toEqual(messages)
+    expect(body.messages.slice(1)).toEqual(messages)
   })
 
-  it('uses default model "claude-3-5-sonnet" when none provided', async () => {
+  it('uses default model "claude-sonnet-4.6" when none provided', async () => {
     vi.mocked(fetch).mockResolvedValueOnce(new Response(new ReadableStream(), { status: 200 }))
     await streamCortexChat([{ role: 'user', content: 'test' }])
     const body = JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string)
-    expect(body.model).toBe('claude-3-5-sonnet')
+    expect(body.model).toBe('claude-sonnet-4.6')
   })
 
   it('forwards custom model argument', async () => {
     vi.mocked(fetch).mockResolvedValueOnce(new Response(new ReadableStream(), { status: 200 }))
-    await streamCortexChat([{ role: 'user', content: 'test' }], 'claude-opus-4-6')
+    await streamCortexChat([{ role: 'user', content: 'test' }], 'claude-opus-4.6')
     const body = JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string)
-    expect(body.model).toBe('claude-opus-4-6')
+    expect(body.model).toBe('claude-opus-4.6')
   })
 
   it('sets stream: true in request body', async () => {
@@ -70,10 +70,17 @@ describe('streamCortexChat', () => {
     expect(headers['Authorization']).toBe('Bearer test_key')
   })
 
+  it('throws when response body is null', async () => {
+    const nullBodyResponse = new Response(null, { status: 200 })
+    vi.mocked(fetch).mockResolvedValueOnce(nullBodyResponse)
+    await expect(streamCortexChat([{ role: 'user', content: 'test' }]))
+      .rejects.toThrow('No response body')
+  })
+
   it('throws on non-200 response', async () => {
     vi.mocked(fetch).mockResolvedValueOnce(new Response('', { status: 503 }))
     await expect(streamCortexChat([{ role: 'user', content: 'test' }]))
-      .rejects.toThrow('Cortex API error: 503')
+      .rejects.toThrow('LLM API error: 503')
   })
 })
 

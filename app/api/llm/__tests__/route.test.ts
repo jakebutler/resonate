@@ -37,14 +37,26 @@ describe('POST /api/llm', () => {
 
   it('forwards messages and model to streamCortexChat', async () => {
     const messages = [{ role: 'user', content: 'hello' }]
-    await POST(makeRequest({ messages, model: 'claude-opus-4-6' }) as any)
-    expect(streamCortexChat).toHaveBeenCalledWith(messages, 'claude-opus-4-6')
+    await POST(makeRequest({ messages, model: 'claude-opus-4.6' }) as any)
+    expect(streamCortexChat).toHaveBeenCalledWith(messages, 'claude-opus-4.6')
   })
 
-  it('returns 500 when streamCortexChat throws', async () => {
-    vi.mocked(streamCortexChat).mockRejectedValueOnce(new Error('LLM down'))
+  it('returns 400 when model is not in the allowlist', async () => {
+    const res = await POST(makeRequest({ messages: [{ role: 'user', content: 'hi' }], model: 'some-rogue-model' }) as any)
+    expect(res.status).toBe(400)
+    expect(await res.text()).toContain('not a supported model')
+  })
+
+  it('returns 500 with generic message when streamCortexChat throws', async () => {
+    vi.mocked(streamCortexChat).mockRejectedValueOnce(
+      new Error('LLM API error: 500 {"provider":"secret","key":"sk-abc"}')
+    )
     const res = await POST(makeRequest({ messages: [] }) as any)
     expect(res.status).toBe(500)
+    const body = await res.text()
+    expect(body).toBe('The AI service encountered an error. Please try again.')
+    expect(body).not.toContain('secret')
+    expect(body).not.toContain('sk-abc')
   })
 
   it('returns 400 when messages is missing', async () => {
