@@ -55,5 +55,6 @@ export async function streamCortexChat(
     throw new Error(`LLM API error: ${response.status} ${text}`);
   }
 
-  return response.body!;
+  if (!response.body) throw new Error("No response body");
+  return response.body;
 }

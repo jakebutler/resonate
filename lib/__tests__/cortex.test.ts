@@ -70,6 +70,13 @@ describe('streamCortexChat', () => {
     expect(headers['Authorization']).toBe('Bearer test_key')
   })
 
+  it('throws when response body is null', async () => {
+    const nullBodyResponse = new Response(null, { status: 200 })
+    vi.mocked(fetch).mockResolvedValueOnce(nullBodyResponse)
+    await expect(streamCortexChat([{ role: 'user', content: 'test' }]))
+      .rejects.toThrow('No response body')
+  })
+
   it('throws on non-200 response', async () => {
     vi.mocked(fetch).mockResolvedValueOnce(new Response('', { status: 503 }))
     await expect(streamCortexChat([{ role: 'user', content: 'test' }]))
