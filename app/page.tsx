@@ -10,7 +10,7 @@ import { LinkedInPostEditor } from "@/components/LinkedInPostEditor/LinkedInPost
 import { CreatePostModal } from "@/components/CreatePostModal/CreatePostModal";
 import { ContentLibrary } from "@/components/ContentLibrary/ContentLibrary";
 import { UserButton } from "@clerk/nextjs";
-import { FileText, Linkedin, CalendarDays, Edit3, Settings, CalendarRange, Library, AudioWaveform } from "lucide-react";
+import { FileText, Linkedin, CalendarDays, Edit3, Settings, CalendarRange, Library, AudioWaveform, Lightbulb } from "lucide-react";
 import Link from "next/link";
 
 type Filter = "all" | "blog" | "linkedin";
@@ -73,6 +73,13 @@ export default function Dashboard() {
           <span className="font-forum text-lg font-semibold text-[#001524]">Resonate</span>
         </div>
         <div className="flex items-center gap-4">
+          <Link
+            href="/ideas"
+            className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-[#001524] transition-colors"
+          >
+            <Lightbulb size={15} />
+            Ideas
+          </Link>
           <Link
             href="/setup"
             className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-[#001524] transition-colors"
