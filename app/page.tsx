@@ -4,14 +4,13 @@ import { useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
+import { AppHeader } from "@/components/AppHeader/AppHeader";
 import { Calendar } from "@/components/Calendar/Calendar";
 import { BlogPostEditor } from "@/components/BlogPostEditor/BlogPostEditor";
 import { LinkedInPostEditor } from "@/components/LinkedInPostEditor/LinkedInPostEditor";
 import { CreatePostModal } from "@/components/CreatePostModal/CreatePostModal";
 import { ContentLibrary } from "@/components/ContentLibrary/ContentLibrary";
-import { UserButton } from "@clerk/nextjs";
-import { FileText, Linkedin, CalendarDays, Edit3, Settings, CalendarRange, Library, AudioWaveform, Lightbulb } from "lucide-react";
-import Link from "next/link";
+import { FileText, Linkedin, CalendarDays, Edit3, CalendarRange, Library } from "lucide-react";
 
 type Filter = "all" | "blog" | "linkedin";
 type View = "calendar" | "library";
@@ -66,30 +65,7 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-[#fafafa]">
-      {/* Top nav */}
-      <header className="bg-white border-b border-gray-100 px-6 py-3 flex items-center justify-between sticky top-0 z-10">
-        <div className="flex items-center gap-2">
-          <AudioWaveform size={20} className="text-[#001524]" />
-          <span className="font-forum text-lg font-semibold text-[#001524]">Resonate</span>
-        </div>
-        <div className="flex items-center gap-4">
-          <Link
-            href="/ideas"
-            className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-[#001524] transition-colors"
-          >
-            <Lightbulb size={15} />
-            Ideas
-          </Link>
-          <Link
-            href="/setup"
-            className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-[#001524] transition-colors"
-          >
-            <Settings size={15} />
-            Reconfigure
-          </Link>
-          <UserButton afterSignOutUrl="/sign-in" />
-        </div>
-      </header>
+      <AppHeader />
 
       <main className="max-w-7xl mx-auto px-6 py-8">
         {/* Stats row */}
