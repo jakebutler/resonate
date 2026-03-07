@@ -7,11 +7,13 @@ import { Id } from "@/convex/_generated/dataModel";
 import { normalizeIdeaSourceUrl, sanitizeIdeaTags } from "@/lib/ideas";
 import { Archive, Link2, ListTodo, Sparkles } from "lucide-react";
 
+type IdeaStatus = "inbox" | "reviewing" | "ready" | "used" | "archived";
+
 interface IdeaDetailProps {
   open: boolean;
   idea: {
     _id: Id<"ideas">;
-    status: "inbox" | "reviewing" | "ready" | "used" | "archived";
+    status: IdeaStatus;
     tags: string[];
     sourceUrl?: string;
     sourceTitle?: string;
@@ -55,7 +57,7 @@ export function IdeaDetail({
   onCreateBlogPost,
   onCreateLinkedInPost,
 }: IdeaDetailProps) {
-  const [status, setStatus] = useState<IdeaDetailProps["idea"] extends { status: infer T } ? T : never>("inbox");
+  const [status, setStatus] = useState<IdeaStatus>("inbox");
   const [sourceUrl, setSourceUrl] = useState("");
   const [tagsInput, setTagsInput] = useState("");
   const [newEntry, setNewEntry] = useState("");
