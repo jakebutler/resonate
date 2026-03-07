@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { useMutation, useQuery } from "convex/react";
+import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import { IdeasPage } from "@/components/IdeasPage/IdeasPage";
 
 vi.mock("convex/react", () => ({
+  useConvexAuth: vi.fn(),
   useQuery: vi.fn(),
   useMutation: vi.fn(),
 }));
@@ -36,6 +37,10 @@ vi.mock("@/components/LinkedInPostEditor/LinkedInPostEditor", () => ({
 describe("IdeasPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(useConvexAuth).mockReturnValue({
+      isLoading: false,
+      isAuthenticated: true,
+    } as any);
     vi.mocked(useQuery)
       .mockReturnValueOnce([] as any)
       .mockReturnValueOnce(undefined as any)
@@ -72,5 +77,29 @@ describe("IdeasPage", () => {
     });
 
     expect(screen.getByText("Existing idea")).toBeInTheDocument();
+  });
+
+  it("shows a syncing state while Convex auth is still loading", () => {
+    vi.mocked(useConvexAuth).mockReturnValue({
+      isLoading: true,
+      isAuthenticated: false,
+    } as any);
+
+    render(<IdeasPage />);
+
+    expect(screen.getByText("Connecting your ideas workspace…")).toBeInTheDocument();
+  });
+
+  it("shows setup guidance when Clerk is signed in but Convex auth is unavailable", () => {
+    vi.mocked(useConvexAuth).mockReturnValue({
+      isLoading: false,
+      isAuthenticated: false,
+    } as any);
+
+    render(<IdeasPage />);
+
+    expect(
+      screen.getByText("Convex auth is not ready for this session.")
+    ).toBeInTheDocument();
   });
 });

@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useDeferredValue, useMemo, useState } from "react";
-import { useMutation, useQuery } from "convex/react";
+import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { buildIdeaPreview, normalizeIdeaSourceUrl, sanitizeIdeaTags } from "@/lib/ideas";
@@ -35,23 +35,32 @@ export function IdeasPage() {
   const [blogEditorOpen, setBlogEditorOpen] = useState(false);
   const [linkedinEditorOpen, setLinkedinEditorOpen] = useState(false);
 
+  const { isLoading: isConvexAuthLoading, isAuthenticated: isConvexAuthenticated } =
+    useConvexAuth();
   const deferredSearch = useDeferredValue(search);
   const normalizedSourceUrl = useMemo(
     () => normalizeIdeaSourceUrl(sourceUrl),
     [sourceUrl]
   );
 
-  const ideas = useQuery(api.ideas.list, {
-    status: activeStatus === "all" ? undefined : activeStatus,
-    search: deferredSearch.trim() || undefined,
-  });
+  const ideas = useQuery(
+    api.ideas.list,
+    isConvexAuthenticated
+      ? {
+          status: activeStatus === "all" ? undefined : activeStatus,
+          search: deferredSearch.trim() || undefined,
+        }
+      : "skip"
+  );
   const selectedIdea = useQuery(
     api.ideas.getById,
-    selectedIdeaId ? { id: selectedIdeaId } : "skip"
+    isConvexAuthenticated && selectedIdeaId ? { id: selectedIdeaId } : "skip"
   );
   const duplicateIdeas = useQuery(
     api.ideas.findByNormalizedSourceUrl,
-    normalizedSourceUrl ? { normalizedSourceUrl } : "skip"
+    isConvexAuthenticated && normalizedSourceUrl
+      ? { normalizedSourceUrl }
+      : "skip"
   );
   const createIdea = useMutation(api.ideas.create);
   const appendIdeaEntry = useMutation(api.ideas.appendEntry);
@@ -162,6 +171,54 @@ export function IdeasPage() {
       setLinkedinEditorOpen(true);
     }
   };
+
+  if (isConvexAuthLoading) {
+    return (
+      <div className="max-w-5xl mx-auto px-6 py-8">
+        <div className="mb-8">
+          <h1 className="font-forum text-3xl text-[#001524]">
+            Inspiration &amp; Ideas
+          </h1>
+          <p className="mt-2 text-sm text-gray-500">
+            Capture ideas now, refine them later, and turn the best ones into
+            posts.
+          </p>
+        </div>
+
+        <div className="rounded-3xl border border-[#001524]/10 bg-white p-10 text-center text-sm text-gray-500 shadow-sm">
+          Connecting your ideas workspace…
+        </div>
+      </div>
+    );
+  }
+
+  if (!isConvexAuthenticated) {
+    return (
+      <div className="max-w-5xl mx-auto px-6 py-8">
+        <div className="mb-8">
+          <h1 className="font-forum text-3xl text-[#001524]">
+            Inspiration &amp; Ideas
+          </h1>
+          <p className="mt-2 text-sm text-gray-500">
+            Capture ideas now, refine them later, and turn the best ones into
+            posts.
+          </p>
+        </div>
+
+        <div className="rounded-3xl border border-[#78290f]/15 bg-[#ffecd1] p-6 shadow-sm">
+          <p className="text-sm font-medium text-[#78290f]">
+            Convex auth is not ready for this session.
+          </p>
+          <p className="mt-2 text-sm text-[#78290f]/80">
+            You are signed into Resonate, but the Convex backend did not receive
+            an authenticated Clerk token. If this persists, verify the Clerk JWT
+            template named <code>convex</code> and the Convex Clerk auth
+            configuration.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-5xl mx-auto px-6 py-8">
