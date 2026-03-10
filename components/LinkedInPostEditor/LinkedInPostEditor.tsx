@@ -22,6 +22,14 @@ interface LinkedInPostEditorProps {
 type Status = "draft" | "scheduled" | "published";
 type Tab = "write" | "ai";
 
+function todayYMD() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export function LinkedInPostEditor({ open, postId, initialDate, onClose, onSaved }: LinkedInPostEditorProps) {
   const existing = useQuery(api.posts.getById, postId ? { id: postId } : "skip");
   const allPosts = useQuery(api.posts.list, { type: "blog" });
@@ -49,7 +57,7 @@ export function LinkedInPostEditor({ open, postId, initialDate, onClose, onSaved
   }, [open, initialDate, postId]);
 
   // Sync from existing
-  useState(() => {
+  useEffect(() => {
     if (existing) {
       setContent(existing.content);
       setStatus(existing.status);
@@ -67,7 +75,17 @@ export function LinkedInPostEditor({ open, postId, initialDate, onClose, onSaved
       setExternalUrl("");
       setLinkedBlogPostId("");
     }
-  });
+  }, [existing, initialDate, postId]);
+
+  const isLoadingExisting = open && !!postId && existing === undefined;
+  const isPastPost = Boolean(postId && existing?.scheduledDate && existing.scheduledDate < todayYMD());
+
+  useEffect(() => {
+    if (!open) return;
+    if (!postId) {
+      setTab("write");
+    }
+  }, [open, postId]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -106,7 +124,16 @@ export function LinkedInPostEditor({ open, postId, initialDate, onClose, onSaved
     setTab("write");
   };
 
-  const footer = (
+  const linkedBlogPost = (allPosts || []).find((post) => post._id === linkedBlogPostId);
+
+  const footer = isPastPost ? (
+    <>
+      <div />
+      <div className="flex items-center gap-2">
+        <Button variant="secondary" onClick={onClose}>Close</Button>
+      </div>
+    </>
+  ) : (
     <>
       <div>
         {postId && (
@@ -138,11 +165,80 @@ export function LinkedInPostEditor({ open, postId, initialDate, onClose, onSaved
     <SlideOver
       open={open}
       onClose={onClose}
-      title={postId ? "Edit LinkedIn Post" : "New LinkedIn Post"}
+      title={isPastPost ? "View LinkedIn Post" : postId ? "Edit LinkedIn Post" : "New LinkedIn Post"}
       icon={<Linkedin size={16} />}
       footer={footer}
     >
-      <div className="space-y-5">
+      {isLoadingExisting ? (
+        <p className="text-sm text-gray-500">Loading post…</p>
+      ) : !existing && postId ? (
+        <p className="text-sm text-gray-500">Post not found.</p>
+      ) : isPastPost ? (
+        <div className="space-y-5">
+          <div className="grid grid-cols-3 gap-4">
+            <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+              <p className="text-xs uppercase tracking-wide text-gray-400">Publish Date</p>
+              <p className="mt-1 text-sm font-medium text-[#001524]">{scheduledDate || "Not set"}</p>
+            </div>
+            <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+              <p className="text-xs uppercase tracking-wide text-gray-400">Publish Time</p>
+              <p className="mt-1 text-sm font-medium text-[#001524]">{scheduledTime || "Not set"}</p>
+            </div>
+            <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+              <p className="text-xs uppercase tracking-wide text-gray-400">Status</p>
+              <p className="mt-1 text-sm font-medium capitalize text-[#001524]">{status}</p>
+            </div>
+          </div>
+
+          <div>
+            <p className="mb-2 text-sm font-medium text-gray-700">Post Preview</p>
+            <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+              <div className="mb-4 flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#15616d]/10 text-[#15616d]">
+                  <Linkedin size={18} />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-[#001524]">LinkedIn Post</p>
+                  <p className="text-xs text-gray-500">{scheduledDate || "Unscheduled"}</p>
+                </div>
+              </div>
+              {content ? (
+                <p className="whitespace-pre-wrap text-sm leading-6 text-gray-700">{content}</p>
+              ) : (
+                <p className="text-sm italic text-gray-400">No post content saved.</p>
+              )}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+              <p className="text-xs uppercase tracking-wide text-gray-400">Repost</p>
+              <p className="mt-1 text-sm font-medium text-[#001524]">{isRepost ? "Yes" : "No"}</p>
+            </div>
+            <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+              <p className="text-xs uppercase tracking-wide text-gray-400">Linked Blog Post</p>
+              <p className="mt-1 text-sm font-medium text-[#001524]">
+                {linkedBlogPost?.title || "None"}
+              </p>
+            </div>
+          </div>
+
+          {externalUrl && (
+            <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+              <p className="text-xs uppercase tracking-wide text-gray-400">Original Post URL</p>
+              <a
+                href={externalUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-1 block text-sm font-medium text-[#15616d] hover:underline"
+              >
+                {externalUrl}
+              </a>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-5">
         {/* Date + Time */}
         <div className="grid grid-cols-2 gap-4">
           <div>
@@ -285,6 +381,7 @@ export function LinkedInPostEditor({ open, postId, initialDate, onClose, onSaved
           </div>
         )}
       </div>
+      )}
     </SlideOver>
   );
 }

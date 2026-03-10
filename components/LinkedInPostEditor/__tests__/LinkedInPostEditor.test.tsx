@@ -1,7 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useQuery, useMutation } from 'convex/react'
+import { Id } from '@/convex/_generated/dataModel'
 import { LinkedInPostEditor } from '@/components/LinkedInPostEditor/LinkedInPostEditor'
 
 vi.mock('convex/react', () => ({ useQuery: vi.fn(), useMutation: vi.fn() }))
@@ -29,6 +30,10 @@ describe('LinkedInPostEditor', () => {
     vi.clearAllMocks()
     vi.mocked(useQuery).mockReturnValue(undefined)
     vi.mocked(useMutation).mockReturnValue(mockCreate)
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
   it('does not render when open is false', () => {
@@ -74,5 +79,61 @@ describe('LinkedInPostEditor', () => {
     render(<LinkedInPostEditor open={true} onClose={onClose} onSaved={vi.fn()} postId={null} />)
     fireEvent.click(screen.getByText('Cancel'))
     expect(onClose).toHaveBeenCalledOnce()
+  })
+
+  it('hydrates existing post data into the editor', async () => {
+    vi.mocked(useQuery).mockImplementation((fn) => {
+      if (String(fn).includes('getById')) {
+        return {
+          _id: 'post-1',
+          type: 'linkedin',
+          content: 'Existing LinkedIn content',
+          status: 'scheduled',
+          scheduledDate: '2026-03-12',
+          scheduledTime: '14:00',
+          isRepost: true,
+          externalUrl: 'https://www.linkedin.com/posts/example',
+          linkedBlogPostId: 'blog-1',
+        } as never
+      }
+      return [{ _id: 'blog-1', title: 'Linked blog' }] as never
+    })
+
+    render(<LinkedInPostEditor open={true} onClose={vi.fn()} onSaved={vi.fn()} postId={'post-1' as Id<'posts'>} />)
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('Existing LinkedIn content')).toBeInTheDocument()
+      expect(screen.getByDisplayValue('2026-03-12')).toBeInTheDocument()
+      expect(screen.getByDisplayValue('https://www.linkedin.com/posts/example')).toBeInTheDocument()
+    })
+  })
+
+  it('shows preview mode for posts scheduled in the past', async () => {
+    vi.mocked(useQuery).mockImplementation((fn) => {
+      if (String(fn).includes('getById')) {
+        return {
+          _id: 'post-1',
+          type: 'linkedin',
+          content: 'Past LinkedIn content',
+          status: 'published',
+          scheduledDate: '2000-01-01',
+          scheduledTime: '09:00',
+          isRepost: false,
+          linkedBlogPostId: 'blog-1',
+        } as never
+      }
+      return [{ _id: 'blog-1', title: 'Linked blog' }] as never
+    })
+
+    render(<LinkedInPostEditor open={true} onClose={vi.fn()} onSaved={vi.fn()} postId={'post-1' as Id<'posts'>} />)
+
+    await waitFor(() => {
+      expect(screen.getByText('View LinkedIn Post')).toBeInTheDocument()
+      expect(screen.getByText('Post Preview')).toBeInTheDocument()
+      expect(screen.getByText('Past LinkedIn content')).toBeInTheDocument()
+    })
+
+    expect(screen.queryByPlaceholderText(/share with your network/i)).not.toBeInTheDocument()
+    expect(screen.queryByText('AI Assistant')).not.toBeInTheDocument()
   })
 })

@@ -23,6 +23,14 @@ interface BlogPostEditorProps {
 type Tab = "write" | "preview" | "ai";
 type Status = "draft" | "scheduled" | "published";
 
+function todayYMD() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export function BlogPostEditor({ open, postId, initialDate, onClose, onSaved }: BlogPostEditorProps) {
   const existing = useQuery(api.posts.getById, postId ? { id: postId } : "skip");
   const createPost = useMutation(api.posts.create);
@@ -53,7 +61,7 @@ export function BlogPostEditor({ open, postId, initialDate, onClose, onSaved }: 
   }, [open, initialDate, postId]);
 
   // Sync from existing post
-  useState(() => {
+  useEffect(() => {
     if (existing) {
       setTitle(existing.title || "");
       setContent(existing.content);
@@ -71,7 +79,21 @@ export function BlogPostEditor({ open, postId, initialDate, onClose, onSaved }: 
       setFileIds([]);
       setGithubPrUrl("");
     }
-  });
+  }, [existing, initialDate, postId]);
+
+  const isLoadingExisting = open && !!postId && existing === undefined;
+  const isPastPost = Boolean(postId && existing?.scheduledDate && existing.scheduledDate < todayYMD());
+
+  useEffect(() => {
+    if (!open) return;
+    if (isPastPost) {
+      setTab("preview");
+      return;
+    }
+    if (!postId) {
+      setTab("write");
+    }
+  }, [isPastPost, open, postId]);
 
   const handleUpload = async (files: FileList | null) => {
     if (!files) return;
@@ -163,7 +185,14 @@ export function BlogPostEditor({ open, postId, initialDate, onClose, onSaved }: 
     setTab("write");
   };
 
-  const footer = (
+  const footer = isPastPost ? (
+    <>
+      <div />
+      <div className="flex items-center gap-2">
+        <Button variant="secondary" onClick={onClose}>Close</Button>
+      </div>
+    </>
+  ) : (
     <>
       <div>
         {postId && (
@@ -194,11 +223,68 @@ export function BlogPostEditor({ open, postId, initialDate, onClose, onSaved }: 
     <SlideOver
       open={open}
       onClose={onClose}
-      title={postId ? "Edit Blog Post" : "New Blog Post"}
+      title={isPastPost ? "View Blog Post" : postId ? "Edit Blog Post" : "New Blog Post"}
       icon={<FileText size={16} />}
       footer={footer}
     >
-      <div className="space-y-5">
+      {isLoadingExisting ? (
+        <p className="text-sm text-gray-500">Loading post…</p>
+      ) : !existing && postId ? (
+        <p className="text-sm text-gray-500">Post not found.</p>
+      ) : isPastPost ? (
+        <div className="space-y-5">
+          {githubPrUrl && (
+            <a
+              href={githubPrUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 px-4 py-2.5 bg-[#ffecd1] rounded-lg text-sm text-[#78290f] hover:bg-[#ffd9b0] transition-colors"
+            >
+              <ExternalLink size={14} />
+              PR open — review and merge to publish
+            </a>
+          )}
+
+          <div className="space-y-1">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-400">Blog Post</p>
+            <h3 className="text-2xl font-forum text-[#001524]">{title || "Untitled"}</h3>
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+            <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+              <p className="text-xs uppercase tracking-wide text-gray-400">Publish Date</p>
+              <p className="mt-1 text-sm font-medium text-[#001524]">{scheduledDate || "Not set"}</p>
+            </div>
+            <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+              <p className="text-xs uppercase tracking-wide text-gray-400">Publish Time</p>
+              <p className="mt-1 text-sm font-medium text-[#001524]">{scheduledTime || "Not set"}</p>
+            </div>
+            <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+              <p className="text-xs uppercase tracking-wide text-gray-400">Status</p>
+              <p className="mt-1 text-sm font-medium capitalize text-[#001524]">{status}</p>
+            </div>
+          </div>
+
+          <div>
+            <p className="mb-2 text-sm font-medium text-gray-700">Content Preview</p>
+            <div className="min-h-[280px] px-4 py-3 border border-gray-200 rounded-lg prose prose-sm max-w-none">
+              {content ? (
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+              ) : (
+                <p className="text-gray-400 italic">Nothing to preview yet.</p>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+            <p className="text-xs uppercase tracking-wide text-gray-400">Images</p>
+            <p className="mt-1 text-sm font-medium text-[#001524]">
+              {fileIds.length ? `${fileIds.length} attached` : "No images attached"}
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-5">
         {/* GitHub PR banner */}
         {githubPrUrl && (
           <a
@@ -354,6 +440,7 @@ export function BlogPostEditor({ open, postId, initialDate, onClose, onSaved }: 
           )}
         </div>
       </div>
+      )}
     </SlideOver>
   );
 }

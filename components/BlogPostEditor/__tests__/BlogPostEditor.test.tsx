@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useQuery, useMutation } from 'convex/react'
+import { Id } from '@/convex/_generated/dataModel'
 import { BlogPostEditor } from '@/components/BlogPostEditor/BlogPostEditor'
 
 vi.mock('convex/react', () => ({ useQuery: vi.fn(), useMutation: vi.fn() }))
@@ -41,7 +42,10 @@ describe('BlogPostEditor', () => {
       return vi.fn()
     })
   })
-  afterEach(() => vi.unstubAllGlobals())
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
+  })
 
   it('does not render when open is false', () => {
     render(<BlogPostEditor open={false} onClose={vi.fn()} onSaved={vi.fn()} postId={null} />)
@@ -87,5 +91,54 @@ describe('BlogPostEditor', () => {
     render(<BlogPostEditor open={true} onClose={onClose} onSaved={vi.fn()} postId={null} />)
     fireEvent.click(screen.getByText('Cancel'))
     expect(onClose).toHaveBeenCalledOnce()
+  })
+
+  it('hydrates existing post data into the editor', async () => {
+    const existingPost = {
+      _id: 'post-1',
+      type: 'blog',
+      title: 'Existing title',
+      content: 'Existing content',
+      status: 'scheduled',
+      scheduledDate: '2026-03-12',
+      scheduledTime: '14:00',
+      fileIds: [],
+      githubPrUrl: '',
+    }
+    vi.mocked(useQuery).mockReturnValue(existingPost as never)
+
+    render(<BlogPostEditor open={true} onClose={vi.fn()} onSaved={vi.fn()} postId={'post-1' as Id<'posts'>} />)
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('Existing title')).toBeInTheDocument()
+      expect(screen.getByDisplayValue('Existing content')).toBeInTheDocument()
+      expect(screen.getByDisplayValue('2026-03-12')).toBeInTheDocument()
+    })
+  })
+
+  it('shows preview mode for posts scheduled in the past', async () => {
+    const existingPost = {
+      _id: 'post-1',
+      type: 'blog',
+      title: 'Past title',
+      content: 'Past content',
+      status: 'published',
+      scheduledDate: '2000-01-01',
+      scheduledTime: '09:00',
+      fileIds: [],
+      githubPrUrl: '',
+    }
+    vi.mocked(useQuery).mockReturnValue(existingPost as never)
+
+    render(<BlogPostEditor open={true} onClose={vi.fn()} onSaved={vi.fn()} postId={'post-1' as Id<'posts'>} />)
+
+    await waitFor(() => {
+      expect(screen.getByText('View Blog Post')).toBeInTheDocument()
+      expect(screen.getByText('Content Preview')).toBeInTheDocument()
+      expect(screen.getByText('Past content')).toBeInTheDocument()
+    })
+
+    expect(screen.queryByPlaceholderText(/compelling title/i)).not.toBeInTheDocument()
+    expect(screen.queryByPlaceholderText(/write your blog post/i)).not.toBeInTheDocument()
   })
 })
