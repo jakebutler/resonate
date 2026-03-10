@@ -42,6 +42,22 @@ describe('AIAssistant', () => {
     await waitFor(() => expect(screen.getByText('Hello world')).toBeInTheDocument())
   })
 
+  it('handles SSE events that are split across chunk boundaries', async () => {
+    const stream = makeStream([
+      'data: {"type":"response.output_text.delta","de',
+      'lta":"Hello"}\n\n',
+      'data: {"type":"response.output_text.delta","delta":" world"}\n\n',
+      'data: {"type":"response.completed","response":{}}\n\n',
+    ])
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(stream, { status: 200 }))
+
+    render(<AIAssistant onUsePost={vi.fn()} />)
+    fireEvent.change(screen.getByPlaceholderText(/describe what you want/i), { target: { value: 'test' } })
+    fireEvent.keyDown(screen.getByPlaceholderText(/describe what you want/i), { key: 'Enter' })
+
+    await waitFor(() => expect(screen.getByText('Hello world')).toBeInTheDocument())
+  })
+
   it('shows error message when response.failed event received', async () => {
     const stream = makeStream([
       'data: {"type":"response.failed","response":{"error":"rate_limit"}}\n\n',
@@ -161,5 +177,17 @@ describe('AIAssistant', () => {
     fireEvent.click(screen.getByRole('button', { name: /send/i }))
 
     await waitFor(() => expect(fetch).toHaveBeenCalled())
+  })
+
+  it('allows Shift+Enter to insert a line break without sending', async () => {
+    render(<AIAssistant onUsePost={vi.fn()} />)
+
+    const composer = screen.getByPlaceholderText(/describe what you want/i) as HTMLTextAreaElement
+    fireEvent.change(composer, { target: { value: 'First line' } })
+    fireEvent.keyDown(composer, { key: 'Enter', shiftKey: true })
+    fireEvent.change(composer, { target: { value: 'First line\nSecond line' } })
+
+    expect(fetch).not.toHaveBeenCalled()
+    expect(composer.value).toBe('First line\nSecond line')
   })
 })

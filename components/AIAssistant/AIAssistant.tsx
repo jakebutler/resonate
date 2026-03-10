@@ -130,49 +130,76 @@ export function AIAssistant({
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
+      let buffer = "";
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
+      const appendDelta = (delta: string) => {
+        setMessages((prev) => {
+          const updated = [...prev];
+          updated[updated.length - 1] = {
+            role: "assistant",
+            content: updated[updated.length - 1].content + delta,
+          };
+          return updated;
+        });
+      };
 
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split("\n").filter((l) => l.startsWith("data: "));
+      const processEventBlock = (eventBlock: string): { done: boolean; error: Error | null } => {
+        const lines = eventBlock.split("\n").filter((line) => line.startsWith("data: "));
 
-        let streamError: Error | null = null;
         for (const line of lines) {
           const data = line.slice(6);
-          if (data === "[DONE]") break;
+          if (data === "[DONE]") return { done: true, error: null };
           try {
             const json = JSON.parse(data);
-            // Responses API: signal stream end
-            if (json.type === "response.completed") break;
-            // Responses API: surface errors — store and break so it escapes the inner catch
-            if (json.type === "response.failed") {
-              streamError = new Error(json.response?.error ?? "response.failed");
-              break;
+            if (json.type === "response.completed") {
+              return { done: true, error: null };
             }
-            // Anthropic native, OpenAI Responses API, or OpenAI Chat Completions delta
+            if (json.type === "response.failed") {
+              return {
+                done: true,
+                error: new Error(json.response?.error ?? "response.failed"),
+              };
+            }
+
             const delta =
               json.type === "content_block_delta" && json.delta?.type === "text_delta"
                 ? json.delta.text
                 : json.type === "response.output_text.delta"
                 ? json.delta
                 : json.choices?.[0]?.delta?.content;
-            if (delta) {
-              setMessages((prev) => {
-                const updated = [...prev];
-                updated[updated.length - 1] = {
-                  role: "assistant",
-                  content: updated[updated.length - 1].content + delta,
-                };
-                return updated;
-              });
-            }
+            if (delta) appendDelta(delta);
           } catch {
-            // skip non-JSON lines
+            // Ignore incomplete or non-JSON event data.
           }
         }
-        if (streamError) throw streamError;
+
+        return { done: false, error: null };
+      };
+
+      while (true) {
+        const { done, value } = await reader.read();
+        buffer += decoder.decode(value ?? new Uint8Array(), { stream: !done });
+
+        while (true) {
+          const boundary = buffer.indexOf("\n\n");
+          if (boundary === -1) break;
+
+          const eventBlock = buffer.slice(0, boundary);
+          buffer = buffer.slice(boundary + 2);
+
+          const { done: eventDone, error } = processEventBlock(eventBlock);
+          if (error) throw error;
+          if (eventDone) return;
+        }
+
+        if (done) {
+          const remainder = buffer.trim();
+          if (remainder) {
+            const { error } = processEventBlock(remainder);
+            if (error) throw error;
+          }
+          break;
+        }
       }
     } catch (err) {
       const detail = err instanceof Error ? err.message : String(err);
@@ -260,14 +287,19 @@ export function AIAssistant({
 
       {/* Input */}
       <div className="mt-2">
-        <input
-          type="text"
+        <textarea
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMessage()}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              sendMessage();
+            }
+          }}
           placeholder={copy.inputPlaceholder}
           disabled={streaming}
-          className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#4f46e5] focus:border-transparent disabled:opacity-50"
+          rows={3}
+          className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#4f46e5] focus:border-transparent disabled:opacity-50 resize-none"
         />
         <div className="flex items-center justify-between mt-1.5">
           {/* Model selector */}
