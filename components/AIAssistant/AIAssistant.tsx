@@ -4,6 +4,8 @@ import { useState, useRef, useEffect } from "react";
 import { Sparkles, Copy, CheckCheck, Check, ChevronUp } from "lucide-react";
 import { MODELS, DEFAULT_MODEL, type ModelOption } from "@/lib/models";
 
+type AssistantVariant = "blog" | "linkedin";
+
 interface Message {
   role: "user" | "assistant";
   content: string;
@@ -11,19 +13,42 @@ interface Message {
 
 interface AIAssistantProps {
   onUsePost: (content: string) => void;
+  models?: ModelOption[];
+  variant?: AssistantVariant;
 }
 
-const GREETING =
-  "Hi! I'm here to help you craft the perfect LinkedIn post. Tell me about what you'd like to share — a company update, industry insight, or perhaps a thought leadership piece?";
+const ASSISTANT_COPY: Record<
+  AssistantVariant,
+  { greeting: string; headerTitle: string; inputPlaceholder: string }
+> = {
+  linkedin: {
+    greeting:
+      "Hi! I'm here to help you craft the perfect LinkedIn post. Tell me about what you'd like to share — a company update, industry insight, or perhaps a thought leadership piece?",
+    headerTitle: "AI Writing Assistant",
+    inputPlaceholder: "Describe what you want to post about...",
+  },
+  blog: {
+    greeting:
+      "Hi! I'm here to help you shape a strong blog post. Share the topic, angle, and any rough notes, and I can turn them into an outline or draft.",
+    headerTitle: "AI Blog Copilot",
+    inputPlaceholder: "Describe the blog post you want to write...",
+  },
+};
 
-export function AIAssistant({ onUsePost }: AIAssistantProps) {
+export function AIAssistant({
+  onUsePost,
+  models = MODELS,
+  variant = "linkedin",
+}: AIAssistantProps) {
+  const copy = ASSISTANT_COPY[variant];
+  const initialModel = models.find((model) => model.id === DEFAULT_MODEL.id) ?? models[0];
   const [messages, setMessages] = useState<Message[]>([
-    { role: "assistant", content: GREETING },
+    { role: "assistant", content: copy.greeting },
   ]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [copied, setCopied] = useState<number | null>(null);
-  const [selectedModel, setSelectedModel] = useState<ModelOption>(DEFAULT_MODEL);
+  const [selectedModel, setSelectedModel] = useState<ModelOption>(initialModel);
   const [modelMenuOpen, setModelMenuOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const modelMenuRef = useRef<HTMLDivElement>(null);
@@ -32,6 +57,22 @@ export function AIAssistant({ onUsePost }: AIAssistantProps) {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, streaming]);
+
+  useEffect(() => {
+    setMessages([{ role: "assistant", content: copy.greeting }]);
+    setInput("");
+    setStreaming(false);
+    setCopied(null);
+    setModelMenuOpen(false);
+  }, [copy.greeting]);
+
+  useEffect(() => {
+    setSelectedModel((current) => {
+      const stillAvailable = models.find((model) => model.id === current.id);
+      if (stillAvailable) return stillAvailable;
+      return models.find((model) => model.id === DEFAULT_MODEL.id) ?? models[0];
+    });
+  }, [models]);
 
   useEffect(() => {
     if (!modelMenuOpen) return;
@@ -74,9 +115,10 @@ export function AIAssistant({ onUsePost }: AIAssistantProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           messages: newMessages
-            .filter((m) => m.role !== "assistant" || m.content !== GREETING)
+            .filter((m) => m.role !== "assistant" || m.content !== copy.greeting)
             .map((m) => ({ role: m.role, content: m.content })),
           model: selectedModel.id,
+          assistantType: variant,
         }),
       });
 
@@ -159,7 +201,7 @@ export function AIAssistant({ onUsePost }: AIAssistantProps) {
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-3 bg-[#4f46e5] rounded-xl mb-4">
         <Sparkles size={18} className="text-white" />
-        <span className="font-semibold text-white">AI Writing Assistant</span>
+        <span className="font-semibold text-white">{copy.headerTitle}</span>
       </div>
 
       {/* Messages */}
@@ -223,7 +265,7 @@ export function AIAssistant({ onUsePost }: AIAssistantProps) {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMessage()}
-          placeholder="Describe what you want to post about..."
+          placeholder={copy.inputPlaceholder}
           disabled={streaming}
           className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#4f46e5] focus:border-transparent disabled:opacity-50"
         />
@@ -251,7 +293,7 @@ export function AIAssistant({ onUsePost }: AIAssistantProps) {
                 aria-label="AI model options"
                 className="absolute bottom-full mb-2 left-0 bg-[#1a1a2e] rounded-xl shadow-xl py-1.5 z-10 min-w-[160px]"
               >
-                {MODELS.map((m) => (
+                {models.map((m) => (
                   <button
                     key={m.id}
                     role="option"

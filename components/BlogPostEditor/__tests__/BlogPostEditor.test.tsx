@@ -5,6 +5,11 @@ import { useQuery, useMutation } from 'convex/react'
 import { BlogPostEditor } from '@/components/BlogPostEditor/BlogPostEditor'
 
 vi.mock('convex/react', () => ({ useQuery: vi.fn(), useMutation: vi.fn() }))
+vi.mock('@/components/AIAssistant/AIAssistant', () => ({
+  AIAssistant: ({ onUsePost }: { onUsePost: (text: string) => void }) => (
+    <button onClick={() => onUsePost('# Draft from AI')}>use-blog-ai</button>
+  ),
+}))
 vi.mock('@/convex/_generated/api', () => ({
   api: {
     posts: {
@@ -54,6 +59,17 @@ describe('BlogPostEditor', () => {
     fireEvent.click(previewTab)
     // Textarea should be gone after switching to preview
     expect(screen.queryByPlaceholderText(/write your blog post/i)).not.toBeInTheDocument()
+  })
+
+  it('fills content from AI Assistant and switches back to write mode', async () => {
+    render(<BlogPostEditor open={true} onClose={vi.fn()} onSaved={vi.fn()} postId={null} />)
+    fireEvent.click(screen.getByText('AI Assistant'))
+    fireEvent.click(screen.getByText('use-blog-ai'))
+
+    await waitFor(() => {
+      const textarea = screen.getByPlaceholderText(/write your blog post/i) as HTMLTextAreaElement
+      expect(textarea.value).toBe('# Draft from AI')
+    })
   })
 
   it('calls createPost with draft status when Save Draft clicked', async () => {

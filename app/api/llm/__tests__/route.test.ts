@@ -37,8 +37,11 @@ describe('POST /api/llm', () => {
 
   it('forwards messages and model to streamCortexChat', async () => {
     const messages = [{ role: 'user', content: 'hello' }]
-    await POST(makeRequest({ messages, model: 'claude-opus-4.6' }) as any)
-    expect(streamCortexChat).toHaveBeenCalledWith(messages, 'claude-opus-4.6')
+    await POST(makeRequest({ messages, model: 'claude-opus-4.6', assistantType: 'blog' }) as any)
+    expect(streamCortexChat).toHaveBeenCalledWith(messages, {
+      model: 'claude-opus-4.6',
+      assistantType: 'blog',
+    })
   })
 
   it('returns 400 when model is not in the allowlist', async () => {
@@ -72,5 +75,16 @@ describe('POST /api/llm', () => {
   it('returns 400 when model is provided but not a string', async () => {
     const res = await POST(makeRequest({ messages: [], model: 42 }) as any)
     expect(res.status).toBe(400)
+  })
+
+  it('returns 400 when assistantType is provided but not a string', async () => {
+    const res = await POST(makeRequest({ messages: [], assistantType: 42 }) as any)
+    expect(res.status).toBe(400)
+  })
+
+  it('returns 400 when assistantType is not supported', async () => {
+    const res = await POST(makeRequest({ messages: [], assistantType: 'essay' }) as any)
+    expect(res.status).toBe(400)
+    expect(await res.text()).toContain('not a supported assistantType')
   })
 })

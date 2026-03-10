@@ -6,6 +6,8 @@ import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { SlideOver } from "@/components/ui/SlideOver";
 import { Button } from "@/components/ui/Button";
+import { AIAssistant } from "@/components/AIAssistant/AIAssistant";
+import { CLAUDE_MODELS } from "@/lib/models";
 import { FileText, Trash2, Upload, Save, ExternalLink } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -18,7 +20,7 @@ interface BlogPostEditorProps {
   onSaved: () => void;
 }
 
-type Tab = "write" | "preview";
+type Tab = "write" | "preview" | "ai";
 type Status = "draft" | "scheduled" | "published";
 
 export function BlogPostEditor({ open, postId, initialDate, onClose, onSaved }: BlogPostEditorProps) {
@@ -156,6 +158,11 @@ export function BlogPostEditor({ open, postId, initialDate, onClose, onSaved }: 
     onClose();
   };
 
+  const handleUseAIPost = (text: string) => {
+    setContent(text);
+    setTab("write");
+  };
+
   const footer = (
     <>
       <div>
@@ -267,7 +274,7 @@ export function BlogPostEditor({ open, postId, initialDate, onClose, onSaved }: 
           <div className="flex items-center justify-between mb-2">
             <label className="text-sm font-medium text-gray-700">Content</label>
             <div className="flex rounded-lg border border-gray-200 overflow-hidden">
-              {(["write", "preview"] as Tab[]).map((t) => (
+              {(["write", "preview", "ai"] as Tab[]).map((t) => (
                 <button
                   key={t}
                   onClick={() => setTab(t)}
@@ -277,7 +284,7 @@ export function BlogPostEditor({ open, postId, initialDate, onClose, onSaved }: 
                       : "text-gray-500 hover:bg-gray-50"
                   }`}
                 >
-                  {t === "write" ? "Write" : "Preview"}
+                  {t === "write" ? "Write" : t === "preview" ? "Preview" : "AI Assistant"}
                 </button>
               ))}
             </div>
@@ -291,13 +298,21 @@ export function BlogPostEditor({ open, postId, initialDate, onClose, onSaved }: 
               rows={14}
               className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#ff7d00] focus:border-transparent resize-none"
             />
-          ) : (
+          ) : tab === "preview" ? (
             <div className="min-h-[280px] px-4 py-3 border border-gray-200 rounded-lg prose prose-sm max-w-none">
               {content ? (
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
               ) : (
                 <p className="text-gray-400 italic">Nothing to preview yet.</p>
               )}
+            </div>
+          ) : (
+            <div className="h-[440px] flex flex-col">
+              <AIAssistant
+                models={CLAUDE_MODELS}
+                onUsePost={handleUseAIPost}
+                variant="blog"
+              />
             </div>
           )}
         </div>

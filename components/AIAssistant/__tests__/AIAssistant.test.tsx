@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { AIAssistant } from '@/components/AIAssistant/AIAssistant'
+import { CLAUDE_MODELS } from '@/lib/models'
 
 function makeStream(chunks: string[]): ReadableStream {
   return new ReadableStream({
@@ -123,6 +124,32 @@ describe('AIAssistant', () => {
     await waitFor(() => expect(fetch).toHaveBeenCalled())
     const body = JSON.parse(vi.mocked(fetch).mock.calls[0][1]?.body as string)
     expect(body.model).toBe('gpt-5.2')
+    expect(body.assistantType).toBe('linkedin')
+  })
+
+  it('renders blog variant copy and only Claude models when configured', () => {
+    render(<AIAssistant onUsePost={vi.fn()} models={CLAUDE_MODELS} variant="blog" />)
+
+    expect(screen.getByText(/ai blog copilot/i)).toBeInTheDocument()
+    expect(screen.getByPlaceholderText(/describe the blog post you want to write/i)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByText('Sonnet 4.6'))
+    expect(screen.getByText('Opus 4.6')).toBeInTheDocument()
+    expect(screen.queryByText('GPT-5.2')).not.toBeInTheDocument()
+  })
+
+  it('sends blog assistantType when variant is blog', async () => {
+    const stream = makeStream(['data: [DONE]\n\n'])
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(stream, { status: 200 }))
+
+    render(<AIAssistant onUsePost={vi.fn()} models={CLAUDE_MODELS} variant="blog" />)
+    fireEvent.change(screen.getByPlaceholderText(/describe the blog post/i), { target: { value: 'kv cache' } })
+    fireEvent.keyDown(screen.getByPlaceholderText(/describe the blog post/i), { key: 'Enter' })
+
+    await waitFor(() => expect(fetch).toHaveBeenCalled())
+    const body = JSON.parse(vi.mocked(fetch).mock.calls[0][1]?.body as string)
+    expect(body.assistantType).toBe('blog')
+    expect(body.model).toBe('claude-sonnet-4.6')
   })
 
   it('sends message via Send button click', async () => {

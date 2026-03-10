@@ -23,16 +23,39 @@ When given an idea or draft, transform it into a polished LinkedIn post.
 If the user references a blog post, include a natural mention of it and encourage readers to check it out.
 Always stay within LinkedIn's 3,000 character limit.`;
 
+export const BLOG_SYSTEM_PROMPT = `You are an expert blog writing copilot for Corvo Labs, an AI consulting agency.
+Your role is to help draft clear, high-signal blog posts that:
+- Sound credible, practical, and informed by real operator experience
+- Prioritize useful structure, strong arguments, and concrete examples over hype
+- Stay focused on a single thesis unless the user explicitly asks for something broader
+- Use markdown well with descriptive headings, short paragraphs, and occasional bullet lists when they add clarity
+- Surface tradeoffs, risks, and limitations instead of overstating certainty
+- End with a concise conclusion or recommended next step when appropriate
+
+When given an idea, outline, or rough draft, turn it into a polished blog post or a better working draft.
+If details are missing, make reasonable editorial assumptions instead of stalling, but do not invent fake facts, case studies, or citations.`;
+
+export type AssistantType = "linkedin" | "blog";
+
 export interface ChatMessage {
   role: "system" | "user" | "assistant";
   content: string;
 }
 
+const SYSTEM_PROMPTS: Record<AssistantType, string> = {
+  linkedin: LINKEDIN_SYSTEM_PROMPT,
+  blog: BLOG_SYSTEM_PROMPT,
+};
+
 export async function streamCortexChat(
   messages: ChatMessage[],
-  model?: string
+  options?: {
+    assistantType?: AssistantType;
+    model?: string;
+  }
 ): Promise<ReadableStream> {
-  const resolvedModel = model ?? (USE_OPENAI ? "gpt-4o" : "claude-sonnet-4.6");
+  const resolvedModel = options?.model ?? (USE_OPENAI ? "gpt-4o" : "claude-sonnet-4.6");
+  const assistantType = options?.assistantType ?? "linkedin";
 
   const response = await fetch(`${BASE_URL}/v1/chat/completions`, {
     method: "POST",
@@ -44,7 +67,7 @@ export async function streamCortexChat(
       model: resolvedModel,
       stream: true,
       messages: [
-        { role: "system", content: LINKEDIN_SYSTEM_PROMPT },
+        { role: "system", content: SYSTEM_PROMPTS[assistantType] },
         ...messages,
       ],
     }),

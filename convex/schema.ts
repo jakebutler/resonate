@@ -24,7 +24,8 @@ export default defineSchema({
   })
     .index("by_type", ["type"])
     .index("by_status", ["status"])
-    .index("by_scheduled_date", ["scheduledDate"]),
+    .index("by_scheduled_date", ["scheduledDate"])
+    .index("by_external_url", ["externalUrl"]),
 
   settings: defineTable({
     blogEnabled: v.boolean(),

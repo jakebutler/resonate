@@ -9,6 +9,8 @@ export const MODELS: ModelOption[] = [
   { label: "GLM-4.7",       id: "glm-4.7"           },
 ];
 
+export const CLAUDE_MODELS = MODELS.filter((model) => model.id.startsWith("claude-"));
+
 export const MODEL_IDS = new Set(MODELS.map((m) => m.id));
 
 export const DEFAULT_MODEL = MODELS[1]; // Sonnet 4.6

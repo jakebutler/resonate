@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from 'vite
 // cortex.ts reads env vars as module-level constants; re-evaluate after setting them.
 let streamCortexChat: (typeof import('@/lib/cortex'))['streamCortexChat']
 let LINKEDIN_SYSTEM_PROMPT: (typeof import('@/lib/cortex'))['LINKEDIN_SYSTEM_PROMPT']
+let BLOG_SYSTEM_PROMPT: (typeof import('@/lib/cortex'))['BLOG_SYSTEM_PROMPT']
 
 beforeAll(async () => {
   process.env.CORTEX_API_KEY = 'test_key'
@@ -12,6 +13,7 @@ beforeAll(async () => {
   const mod = await import('@/lib/cortex')
   streamCortexChat = mod.streamCortexChat
   LINKEDIN_SYSTEM_PROMPT = mod.LINKEDIN_SYSTEM_PROMPT
+  BLOG_SYSTEM_PROMPT = mod.BLOG_SYSTEM_PROMPT
 })
 
 describe('streamCortexChat', () => {
@@ -51,9 +53,16 @@ describe('streamCortexChat', () => {
 
   it('forwards custom model argument', async () => {
     vi.mocked(fetch).mockResolvedValueOnce(new Response(new ReadableStream(), { status: 200 }))
-    await streamCortexChat([{ role: 'user', content: 'test' }], 'claude-opus-4.6')
+    await streamCortexChat([{ role: 'user', content: 'test' }], { model: 'claude-opus-4.6' })
     const body = JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string)
     expect(body.model).toBe('claude-opus-4.6')
+  })
+
+  it('switches system prompt when blog assistantType is requested', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(new ReadableStream(), { status: 200 }))
+    await streamCortexChat([{ role: 'user', content: 'test' }], { assistantType: 'blog' })
+    const body = JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string)
+    expect(body.messages[0]).toEqual({ role: 'system', content: BLOG_SYSTEM_PROMPT })
   })
 
   it('sets stream: true in request body', async () => {

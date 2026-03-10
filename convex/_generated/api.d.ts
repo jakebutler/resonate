@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as backfill from "../backfill.js";
 import type * as posts from "../posts.js";
 import type * as settings from "../settings.js";
 
@@ -18,6 +19,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  backfill: typeof backfill;
   posts: typeof posts;
   settings: typeof settings;
 }>;
