@@ -1,14 +1,15 @@
-import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
-import { Calendar } from '@/components/Calendar/Calendar'
+import type { Id } from "@/convex/_generated/dataModel"
+import { describe, it, expect, vi, beforeAll, afterAll } from "vitest"
+import { render, screen, fireEvent } from "@testing-library/react"
+import { Calendar } from "@/components/Calendar/Calendar"
 
 // Pin date to March 4 2026 (Wednesday)
 beforeAll(() => vi.setSystemTime(new Date('2026-03-04T12:00:00Z')))
 afterAll(() => vi.useRealTimers())
 
 const mockPosts = [
-  { _id: 'p1' as any, type: 'blog' as const, title: 'My Blog Post', content: '', status: 'scheduled', scheduledDate: '2026-03-04', createdAt: 0, updatedAt: 0 },
-  { _id: 'p2' as any, type: 'linkedin' as const, title: undefined, content: 'LinkedIn text', status: 'draft', scheduledDate: '2026-03-04', createdAt: 0, updatedAt: 0 },
+  { _id: "p1" as Id<"posts">, type: "blog" as const, title: "My Blog Post", content: "", status: "scheduled" as const, scheduledDate: "2026-03-04", createdAt: 0, updatedAt: 0 },
+  { _id: "p2" as Id<"posts">, type: "linkedin" as const, title: undefined, content: "LinkedIn text", status: "draft" as const, scheduledDate: "2026-03-04", createdAt: 0, updatedAt: 0 },
 ]
 
 describe('Calendar', () => {

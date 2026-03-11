@@ -9,12 +9,13 @@ import { BlogPostEditor } from "@/components/BlogPostEditor/BlogPostEditor";
 import { LinkedInPostEditor } from "@/components/LinkedInPostEditor/LinkedInPostEditor";
 import { CreatePostModal } from "@/components/CreatePostModal/CreatePostModal";
 import { ContentLibrary } from "@/components/ContentLibrary/ContentLibrary";
+import { WorkflowBoard } from "@/components/WorkflowBoard/WorkflowBoard";
 import { UserButton } from "@clerk/nextjs";
-import { FileText, Linkedin, CalendarDays, Edit3, Settings, CalendarRange, Library, AudioWaveform } from "lucide-react";
+import { FileText, Linkedin, CalendarDays, Edit3, Settings, CalendarRange, Library, AudioWaveform, Layers3 } from "lucide-react";
 import Link from "next/link";
 
 type Filter = "all" | "blog" | "linkedin";
-type View = "calendar" | "library";
+type View = "calendar" | "library" | "workflow";
 type TimePeriod = "all" | "this-month" | "last-3-months" | "this-year";
 
 export default function Dashboard() {
@@ -141,10 +142,25 @@ export default function Dashboard() {
                 <Library size={13} />
                 Library
               </button>
+              <button
+                onClick={() => setActiveView("workflow")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  activeView === "workflow"
+                    ? "bg-[#001524] text-white"
+                    : "text-gray-500 hover:text-[#001524]"
+                }`}
+              >
+                <Layers3 size={13} />
+                Workflow
+              </button>
             </div>
             <div>
               <h1 className="font-forum text-2xl text-[#001524]">
-                {activeView === "calendar" ? "Publishing Calendar" : "Content Library"}
+                {activeView === "calendar"
+                  ? "Publishing Calendar"
+                  : activeView === "library"
+                  ? "Content Library"
+                  : "Post Workflow"}
               </h1>
             </div>
           </div>
@@ -171,23 +187,25 @@ export default function Dashboard() {
             )}
 
             {/* Type filter */}
-            <div className="flex items-center gap-0.5 bg-white border border-gray-200 rounded-xl p-1">
-              {(["all", "blog", "linkedin"] as Filter[]).map((f) => (
-                <button
-                  key={f}
-                  onClick={() => setFilter(f)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors capitalize ${
-                    filter === f
-                      ? "bg-[#001524] text-white"
-                      : "text-gray-500 hover:text-[#001524]"
-                  }`}
-                >
-                  {f === "blog" && <FileText size={13} />}
-                  {f === "linkedin" && <Linkedin size={13} />}
-                  {f === "all" ? "All" : f === "blog" ? "Blog" : "LinkedIn"}
-                </button>
-              ))}
-            </div>
+            {activeView !== "workflow" && (
+              <div className="flex items-center gap-0.5 bg-white border border-gray-200 rounded-xl p-1">
+                {(["all", "blog", "linkedin"] as Filter[]).map((f) => (
+                  <button
+                    key={f}
+                    onClick={() => setFilter(f)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors capitalize ${
+                      filter === f
+                        ? "bg-[#001524] text-white"
+                        : "text-gray-500 hover:text-[#001524]"
+                    }`}
+                  >
+                    {f === "blog" && <FileText size={13} />}
+                    {f === "linkedin" && <Linkedin size={13} />}
+                    {f === "all" ? "All" : f === "blog" ? "Blog" : "LinkedIn"}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -199,13 +217,15 @@ export default function Dashboard() {
             onCreatePost={handleDayClick}
             onEditPost={handleEditPost}
           />
-        ) : (
+        ) : activeView === "library" ? (
           <ContentLibrary
             posts={allPosts || []}
             filter={filter}
             timePeriod={timePeriod}
             onEditPost={handleEditPost}
           />
+        ) : (
+          <WorkflowBoard />
         )}
       </main>
 

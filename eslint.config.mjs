@@ -8,7 +8,10 @@ const eslintConfig = defineConfig([
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:
+    "convex/_generated/**",
+    "coverage/**",
     ".next/**",
+    ".worktrees/**",
     "out/**",
     "build/**",
     "next-env.d.ts",

@@ -9,7 +9,7 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./tests/setup.ts'],
     include: ['**/__tests__/**/*.{ts,tsx}', '**/*.test.{ts,tsx}'],
-    exclude: ['node_modules', '.next', 'convex/_generated/**', 'e2e/**'],
+    exclude: ['node_modules', '.next', '.worktrees/**', 'convex/_generated/**', 'coverage/**', 'e2e/**'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov', 'html'],
@@ -21,6 +21,7 @@ export default defineConfig({
       ],
       exclude: [
         'convex/_generated/**',
+        '.worktrees/**',
         '**/*.d.ts',
         '**/node_modules/**',
         'app/layout.tsx',
