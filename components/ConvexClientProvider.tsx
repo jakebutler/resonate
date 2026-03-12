@@ -1,14 +1,29 @@
 "use client";
 
+import { useRef } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { ConvexReactClient } from "convex/react";
 import { ConvexProviderWithClerk } from "convex/react-clerk";
 
-const convex = new ConvexReactClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
+export function ConvexClientProvider({
+  children,
+  url,
+}: {
+  children: React.ReactNode;
+  url?: string;
+}) {
+  const clientRef = useRef<ConvexReactClient | null>(null);
 
-export function ConvexClientProvider({ children }: { children: React.ReactNode }) {
+  if (!url) {
+    throw new Error("Missing required environment variable: NEXT_PUBLIC_CONVEX_URL");
+  }
+
+  if (!clientRef.current) {
+    clientRef.current = new ConvexReactClient(url);
+  }
+
   return (
-    <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
+    <ConvexProviderWithClerk client={clientRef.current} useAuth={useAuth}>
       {children}
     </ConvexProviderWithClerk>
   );

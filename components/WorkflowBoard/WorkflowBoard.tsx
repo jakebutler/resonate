@@ -6,13 +6,10 @@ import {
   ArrowRight,
   Bot,
   CheckCircle2,
-  Clock3,
   FileText,
   Layers3,
-  Lightbulb,
   MoreHorizontal,
   Plus,
-  Search,
   Sparkles,
   Timer,
   WandSparkles,
@@ -84,7 +81,6 @@ import {
 } from "@/lib/workflow";
 import {
   canDragToColumn,
-  getReviewColumnBadgeLabel,
   WORKFLOW_COLUMN_OVERFLOW_LIMIT,
   WORKFLOW_REVIEW_COLUMNS,
   type WorkflowReviewColumnKey,
@@ -213,6 +209,19 @@ function formatWorkflowCardDate(timestamp: number) {
 
 function cloneWorkflowCards(cards: WorkflowCardRecord[]) {
   return cards.map((card) => ({ ...card }));
+}
+
+function getDraftCardBody(draft: DraftBoardCard) {
+  const preview = draft.preview.trim();
+  if (preview) return preview;
+
+  const agentSummary = draft.lastAgentSummary?.trim();
+  if (agentSummary) return agentSummary;
+
+  const gateSummary = draft.lastGateSummary?.trim();
+  if (gateSummary) return gateSummary;
+
+  return draft.ideaText.trim();
 }
 
 export function WorkflowBoard() {
@@ -1119,124 +1128,93 @@ function BoardCard({
     event.stopPropagation();
   };
 
+  const cardButtonClass =
+    "border-black/10 bg-white text-[var(--ink-black)] shadow-[0_4px_14px_rgba(0,21,36,0.08)] hover:bg-white";
+  const cardOutlineButtonClass =
+    "border-black/10 bg-white/80 text-[var(--ink-black)] shadow-[0_4px_14px_rgba(0,21,36,0.06)] hover:bg-white";
+  const cardMetaClass =
+    "inline-flex items-center gap-1.5 text-[11px] font-medium tabular-nums text-muted-foreground";
+
   if (card.kind === "idea") {
     const isResearch = card.stage === "research";
-    const supportingBadges = [
-      isResearch ? (
-        <Badge
-          className="rounded-full bg-[#e7f7fa] text-[#15616d]"
-          key="research"
-          variant="secondary"
-        >
-          Research
-        </Badge>
-      ) : null,
-      card.idea.draftCount > 0 ? (
-        <Badge className="rounded-full" key="drafts" variant="outline">
-          {card.idea.draftCount} drafts
-        </Badge>
-      ) : null,
-      card.idea.references.length > 0 ? (
-        <Badge className="rounded-full" key="refs" variant="outline">
-          {card.idea.references.length} refs
-        </Badge>
-      ) : null,
-    ].filter(Boolean);
 
     return (
       <Card
         className={`min-w-0 rounded-[20px] border py-0 shadow-[0_8px_18px_rgba(0,21,36,0.06)] ${
           isResearch
-            ? "border-[#b8dce1] bg-[linear-gradient(180deg,#ffffff_0%,#f4fbfd_100%)]"
-            : "border-[#ffd59c] bg-[linear-gradient(180deg,#ffffff_0%,#fff8ec_100%)]"
+            ? "border-[#b8dce1] bg-[#f4fbfd]"
+            : "border-[#ffd59c] bg-[#fff8ec]"
         }`}
         size="sm"
       >
-        <CardHeader className="gap-3 border-b border-border/70 py-4">
+        <CardHeader className="gap-2.5 border-b border-border/70 px-4 pt-2.5 pb-3">
           <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0 space-y-3">
-              <CardTitle className="pr-2 font-forum text-[1.7rem] leading-[1.02] break-words [overflow-wrap:anywhere] text-[var(--ink-black)]">
-                {card.title}
-              </CardTitle>
-              {supportingBadges.length > 0 ? (
-                <div className="flex flex-wrap items-center gap-2">
-                  {supportingBadges}
-                </div>
-              ) : null}
-            </div>
-
-            <div className="flex shrink-0 items-start gap-2">
-              <span className="inline-flex items-center gap-1 rounded-full bg-white/86 px-2 py-1 text-[11px] font-medium text-muted-foreground ring-1 ring-border/70">
-                <Timer className="size-3" />
-                {formatWorkflowCardDate(card.idea.updatedAt)}
-              </span>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    data-no-dnd="true"
-                    onClick={stopCardAction}
-                    onPointerDown={stopCardAction}
-                    size="icon-sm"
-                    variant="ghost"
-                  >
-                    <MoreHorizontal className="size-4" />
-                    <span className="sr-only">Open idea actions</span>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => onOpenIdea(card.idea._id)}>
-                    Open workspace
+            <span className={cardMetaClass}>
+              <Timer className="size-3" />
+              {formatWorkflowCardDate(card.idea.updatedAt)}
+            </span>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  data-no-dnd="true"
+                  className="text-muted-foreground hover:bg-black/5"
+                  onClick={stopCardAction}
+                  onPointerDown={stopCardAction}
+                  size="icon-sm"
+                  variant="ghost"
+                >
+                  <MoreHorizontal className="size-4" />
+                  <span className="sr-only">Open idea actions</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => onOpenIdea(card.idea._id)}>
+                  Open workspace
+                </DropdownMenuItem>
+                {card.stage === "idea" ? (
+                  <DropdownMenuItem onClick={() => onAdvanceIdea(card.idea._id)}>
+                    Move to Research
                   </DropdownMenuItem>
-                  {card.stage === "idea" ? (
-                    <DropdownMenuItem onClick={() => onAdvanceIdea(card.idea._id)}>
-                      Move to Research
+                ) : null}
+                {onMoveIdeaToBacklog ? (
+                  <DropdownMenuItem onClick={() => onMoveIdeaToBacklog(card.idea._id)}>
+                    Send to Inspiration
+                  </DropdownMenuItem>
+                ) : null}
+                {onArchiveIdea ? (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => onArchiveIdea(card.idea._id)}>
+                      Archive
                     </DropdownMenuItem>
-                  ) : null}
-                  {onMoveIdeaToBacklog ? (
-                    <DropdownMenuItem onClick={() => onMoveIdeaToBacklog(card.idea._id)}>
-                      Send to Inspiration
-                    </DropdownMenuItem>
-                  ) : null}
-                  {onArchiveIdea ? (
-                    <>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => onArchiveIdea(card.idea._id)}>
-                        Archive
-                      </DropdownMenuItem>
-                    </>
-                  ) : null}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
+                  </>
+                ) : null}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
+          <CardTitle
+            className="w-full truncate pr-1 text-sm leading-5 font-medium text-[var(--ink-black)]"
+            title={card.title}
+          >
+            {card.title}
+          </CardTitle>
         </CardHeader>
 
-        <CardContent className="space-y-3 py-4">
-          {isResearch ? (
-            <>
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Search className="size-3.5" />
-                {card.idea.references.length} sources attached
-              </div>
-              {card.idea.lastGateSummary ? (
-                <p className="rounded-2xl bg-[#f9f5ee] px-3 py-2 text-xs text-muted-foreground">
-                  {card.idea.lastGateSummary}
-                </p>
-              ) : null}
-            </>
-          ) : card.idea.title ? (
-            <p className="line-clamp-3 break-words [overflow-wrap:anywhere] text-sm leading-6 text-muted-foreground">
-              {card.idea.text}
-            </p>
-          ) : null}
+        <CardContent className="py-2.5">
+          <p
+            className="line-clamp-3 h-[3.75rem] overflow-hidden break-words text-sm leading-5 text-muted-foreground [overflow-wrap:anywhere]"
+            title={card.idea.text}
+          >
+            {card.idea.text}
+          </p>
         </CardContent>
 
-        <CardFooter className="flex-col items-stretch gap-2 border-t border-border/70 bg-white/95">
+        <CardFooter className="flex-col items-stretch gap-2 border-t border-border/70 bg-transparent">
           {card.stage === "idea" ? (
             <div className="grid w-full grid-cols-[0.92fr_1.08fr] gap-2">
               <Button
                 data-no-dnd="true"
-                className="w-full justify-center"
+                className={`w-full justify-center ${cardButtonClass}`}
                 onClick={(event) => {
                   stopCardAction(event);
                   onOpenIdea(card.idea._id);
@@ -1263,7 +1241,7 @@ function BoardCard({
             <div className="grid w-full gap-2">
               <Button
                 data-no-dnd="true"
-                className="w-full justify-center"
+                className={`w-full justify-center ${cardButtonClass}`}
                 onClick={(event) => {
                   stopCardAction(event);
                   onOpenIdea(card.idea._id);
@@ -1275,7 +1253,7 @@ function BoardCard({
               </Button>
               <Button
                 data-no-dnd="true"
-                className="w-full justify-center"
+                className={`w-full justify-center ${cardOutlineButtonClass}`}
                 onClick={(event) => {
                   stopCardAction(event);
                   onSpawnDraft(card.idea._id, "blog");
@@ -1288,7 +1266,7 @@ function BoardCard({
               </Button>
               <Button
                 data-no-dnd="true"
-                className="w-full justify-center"
+                className={`w-full justify-center ${cardOutlineButtonClass}`}
                 onClick={(event) => {
                   stopCardAction(event);
                   onSpawnDraft(card.idea._id, "linkedin");
@@ -1307,125 +1285,84 @@ function BoardCard({
   }
 
   const nextStage = getNextDraftStage(card.stage);
-  const reviewBadge = getReviewColumnBadgeLabel(card.stage);
   const canPublish = card.stage === "final";
+  const draftBody = getDraftCardBody(card.draft);
 
   return (
     <Card
-      className="min-w-0 rounded-[20px] border border-[#d8dff2]/85 bg-[linear-gradient(180deg,#ffffff_0%,#f8f9ff_100%)] py-0 shadow-[0_8px_18px_rgba(0,21,36,0.06)]"
+      className="min-w-0 rounded-[20px] border border-[#d8dff2]/85 bg-[#f8f9ff] py-0 shadow-[0_8px_18px_rgba(0,21,36,0.06)]"
       size="sm"
     >
-      <CardHeader className="gap-3 border-b border-border/70 py-4">
+        <CardHeader className="gap-2.5 border-b border-border/70 px-4 pt-2.5 pb-3">
         <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 space-y-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge className="rounded-full" variant="secondary">
-                {card.draft.type === "blog" ? "Blog" : "LinkedIn"}
-              </Badge>
-              {reviewBadge ? (
-                <Badge
-                  className="rounded-full bg-[#eef2ff] text-[#4257a0]"
-                  variant="secondary"
-                >
-                  {reviewBadge}
-                </Badge>
-              ) : null}
-              {card.draft.lastGateSummary ? (
-                <Badge
-                  className="rounded-full bg-[#fff7ea] text-[#8b4513]"
-                  variant="secondary"
-                >
-                  Gate note
-                </Badge>
-              ) : null}
-            </div>
-            <CardTitle className="font-forum text-[1.7rem] leading-none break-words [overflow-wrap:anywhere] text-[var(--ink-black)]">
-              {card.draft.title}
-            </CardTitle>
-          </div>
-
-          <div className="flex shrink-0 items-start gap-2">
-            <span className="inline-flex items-center gap-1 rounded-full bg-white/86 px-2 py-1 text-[11px] font-medium text-muted-foreground ring-1 ring-border/70">
-              <Timer className="size-3" />
-              {formatWorkflowCardDate(card.draft.updatedAt)}
-            </span>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  data-no-dnd="true"
-                  onClick={stopCardAction}
-                  onPointerDown={stopCardAction}
-                  size="icon-sm"
-                  variant="ghost"
-                >
-                  <MoreHorizontal className="size-4" />
-                  <span className="sr-only">Open draft actions</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => onOpenDraft(card.draft._id)}>
-                  Open workspace
+          <span className={cardMetaClass}>
+            <Timer className="size-3" />
+            {formatWorkflowCardDate(card.draft.updatedAt)}
+          </span>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                data-no-dnd="true"
+                className="text-muted-foreground hover:bg-black/5"
+                onClick={stopCardAction}
+                onPointerDown={stopCardAction}
+                size="icon-sm"
+                variant="ghost"
+              >
+                <MoreHorizontal className="size-4" />
+                <span className="sr-only">Open draft actions</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => onOpenDraft(card.draft._id)}>
+                Open workspace
+              </DropdownMenuItem>
+              {nextStage ? (
+                <DropdownMenuItem onClick={() => onRunDraftAgent(card.draft)}>
+                  {getStageAgentLabel(nextStage, card.draft.type)}
                 </DropdownMenuItem>
-                {nextStage ? (
-                  <DropdownMenuItem onClick={() => onRunDraftAgent(card.draft)}>
-                    {getStageAgentLabel(nextStage, card.draft.type)}
+              ) : null}
+              {card.stage === "final" ? (
+                <DropdownMenuItem onClick={() => onPublishDraft(card.draft._id)}>
+                  Publish
+                </DropdownMenuItem>
+              ) : nextStage ? (
+                <DropdownMenuItem onClick={() => onAdvanceDraft(card.draft._id)}>
+                  Advance to {STAGE_LABELS[nextStage]}
+                </DropdownMenuItem>
+              ) : null}
+              {onOverflow ? (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={onOverflow}>
+                    View full column
                   </DropdownMenuItem>
-                ) : null}
-                {card.stage === "final" ? (
-                  <DropdownMenuItem onClick={() => onPublishDraft(card.draft._id)}>
-                    Publish
-                  </DropdownMenuItem>
-                ) : nextStage ? (
-                  <DropdownMenuItem onClick={() => onAdvanceDraft(card.draft._id)}>
-                    Advance to {STAGE_LABELS[nextStage]}
-                  </DropdownMenuItem>
-                ) : null}
-                {onOverflow ? (
-                  <>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={onOverflow}>
-                      View full column
-                    </DropdownMenuItem>
-                  </>
-                ) : null}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+                </>
+              ) : null}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
+        <CardTitle
+          className="w-full truncate pr-1 text-sm leading-5 font-medium text-[var(--ink-black)]"
+          title={card.draft.title}
+        >
+          {card.draft.title}
+        </CardTitle>
       </CardHeader>
 
-      <CardContent className="space-y-3 py-4">
-        <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-          {card.draft.ideaTitle ? (
-            <span className="inline-flex items-center gap-1">
-              <Lightbulb className="size-3.5" />
-              {card.draft.ideaTitle}
-            </span>
-          ) : null}
-          {card.draft.scheduledDate ? (
-            <span className="inline-flex items-center gap-1">
-              <Clock3 className="size-3.5" />
-              {card.draft.scheduledDate}
-            </span>
-          ) : null}
-        </div>
-
-        {card.draft.lastAgentSummary ? (
-          <p className="rounded-2xl bg-[#eef8fb] px-3 py-2 text-xs text-[#15616d]">
-            {card.draft.lastAgentSummary}
-          </p>
-        ) : null}
-        {card.draft.lastGateSummary ? (
-          <p className="rounded-2xl bg-[#fff7ea] px-3 py-2 text-xs text-[#8b4513]">
-            {card.draft.lastGateSummary}
-          </p>
-        ) : null}
+      <CardContent className="py-2.5">
+        <p
+          className="line-clamp-3 h-[3.75rem] overflow-hidden break-words text-sm leading-5 text-muted-foreground [overflow-wrap:anywhere]"
+          title={draftBody}
+        >
+          {draftBody}
+        </p>
       </CardContent>
 
-      <CardFooter className="flex-col items-stretch gap-2 border-t border-border/70 bg-white/95">
+      <CardFooter className="flex-col items-stretch gap-2 border-t border-border/70 bg-transparent">
         <Button
           data-no-dnd="true"
-          className="w-full justify-center"
+          className={`w-full justify-center ${cardButtonClass}`}
           onClick={(event) => {
             stopCardAction(event);
             onOpenDraft(card.draft._id);
@@ -1439,7 +1376,7 @@ function BoardCard({
           {nextStage ? (
             <Button
               data-no-dnd="true"
-              className="w-full justify-center"
+              className={`w-full justify-center ${cardOutlineButtonClass}`}
               onClick={(event) => {
                 stopCardAction(event);
                 onRunDraftAgent(card.draft);
