@@ -3,15 +3,22 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import {
+  ArrowDown,
   ArrowRight,
-  BookOpen,
+  BadgeCheck,
   Bot,
+  ChevronDown,
+  ChevronUp,
+  Compass,
   FileText,
   Layers3,
   Lightbulb,
+  MoreHorizontal,
+  PenLine,
   Plus,
   Search,
   Sparkles,
+  Wand2,
 } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -26,6 +33,7 @@ import {
   STAGE_LABELS,
   buildOutlineAgentPrompt,
   buildResearchAgentPrompt,
+  formatWorkflowTitle,
   formatWorkflowTimestamp,
   getStageAgentLabel,
   type ResearchMode,
@@ -34,6 +42,7 @@ import {
 
 type ComposerMode = "new" | "existing";
 type NewIdeaDestination = "idea" | "backlog";
+type StageKey = "idea" | "research" | (typeof DRAFT_STAGES)[number];
 
 type GateState =
   | {
@@ -74,15 +83,103 @@ type IdeaLookupCard = {
   draftCount: number;
 };
 
-const COLUMN_TONES = {
-  idea: "from-[#ffecd1] to-white",
-  research: "from-[#d9f0f2] to-white",
-  outline: "from-[#fff0db] to-white",
-  copyedit: "from-[#f8ece7] to-white",
-  seo: "from-[#e6f3ea] to-white",
-  final: "from-[#e9edf7] to-white",
-  published: "from-[#ececec] to-white",
-} as const;
+type IdeaBoardCard = {
+  _id: Id<"ideas">;
+  title?: string;
+  text: string;
+  references: Array<{ url: string; title?: string }>;
+  draftCount: number;
+  lastResearchRunAt?: number;
+  lastGateSummary?: string;
+  researchObjective?: string;
+  updatedAt: number;
+};
+
+type DraftBoardCard = {
+  _id: Id<"workflowDrafts">;
+  title: string;
+  preview: string;
+  type: "blog" | "linkedin";
+  ideaTitle?: string;
+  scheduledDate?: string;
+  lastAgentSummary?: string;
+  lastGateSummary?: string;
+};
+
+const STAGE_THEME: Record<
+  StageKey,
+  {
+    shell: string;
+    panel: string;
+    chip: string;
+    soft: string;
+    icon: React.ReactNode;
+    eyebrow: string;
+  }
+> = {
+  idea: {
+    shell: "border-[#ffe1b4] bg-[radial-gradient(circle_at_top_left,_rgba(255,236,209,0.95),_rgba(255,255,255,0.94)_58%)]",
+    panel: "border-[#ffd199] bg-white/90",
+    chip: "bg-[#ffecd1] text-[#8b4513]",
+    soft: "bg-[#fff6ea] text-[#8b4513]",
+    icon: <Lightbulb size={18} />,
+    eyebrow: "Select and shape the strongest raw ideas.",
+  },
+  research: {
+    shell: "border-[#bfe1e4] bg-[radial-gradient(circle_at_top_left,_rgba(217,240,242,0.95),_rgba(255,255,255,0.94)_58%)]",
+    panel: "border-[#afd7db] bg-white/90",
+    chip: "bg-[#dff2f4] text-[#135b64]",
+    soft: "bg-[#eef9fa] text-[#135b64]",
+    icon: <Compass size={18} />,
+    eyebrow: "Gather proof, objections, and structure before drafting.",
+  },
+  outline: {
+    shell: "border-[#ffe0b6] bg-[radial-gradient(circle_at_top_left,_rgba(255,240,219,0.95),_rgba(255,255,255,0.94)_58%)]",
+    panel: "border-[#ffd4a0] bg-white/90",
+    chip: "bg-[#fff1de] text-[#9b5b00]",
+    soft: "bg-[#fff8ef] text-[#9b5b00]",
+    icon: <PenLine size={18} />,
+    eyebrow: "Turn research into a real post instance.",
+  },
+  copyedit: {
+    shell: "border-[#edd1c8] bg-[radial-gradient(circle_at_top_left,_rgba(248,236,231,0.96),_rgba(255,255,255,0.94)_58%)]",
+    panel: "border-[#e3c2b7] bg-white/90",
+    chip: "bg-[#f8e8e1] text-[#7e3f2f]",
+    soft: "bg-[#fdf3ef] text-[#7e3f2f]",
+    icon: <Wand2 size={18} />,
+    eyebrow: "Improve flow, clarity, and factual hygiene.",
+  },
+  seo: {
+    shell: "border-[#cfe5d5] bg-[radial-gradient(circle_at_top_left,_rgba(230,243,234,0.96),_rgba(255,255,255,0.94)_58%)]",
+    panel: "border-[#bdd9c6] bg-white/90",
+    chip: "bg-[#e8f5ec] text-[#226141]",
+    soft: "bg-[#f2fbf5] text-[#226141]",
+    icon: <Search size={18} />,
+    eyebrow: "Sharpen hooks, structure, and discoverability.",
+  },
+  final: {
+    shell: "border-[#d7ddf0] bg-[radial-gradient(circle_at_top_left,_rgba(233,237,247,0.96),_rgba(255,255,255,0.94)_58%)]",
+    panel: "border-[#c5cfeb] bg-white/90",
+    chip: "bg-[#edf1fb] text-[#304d8c]",
+    soft: "bg-[#f5f7fd] text-[#304d8c]",
+    icon: <Sparkles size={18} />,
+    eyebrow: "Polish the last editorial details before release.",
+  },
+  published: {
+    shell: "border-[#dadada] bg-[radial-gradient(circle_at_top_left,_rgba(236,236,236,0.96),_rgba(255,255,255,0.94)_58%)]",
+    panel: "border-[#cccccc] bg-white/90",
+    chip: "bg-[#efefef] text-[#434343]",
+    soft: "bg-[#f7f7f7] text-[#434343]",
+    icon: <BadgeCheck size={18} />,
+    eyebrow: "Recent wins stay visible for one week, then clear away.",
+  },
+};
+
+function getPreviewLimit(stage: StageKey) {
+  if (stage === "idea") return 4;
+  if (stage === "published") return 2;
+  return 3;
+}
 
 export function WorkflowBoard() {
   const board = useQuery(api.workflow.getBoard);
@@ -103,8 +200,9 @@ export function WorkflowBoard() {
   const [gateState, setGateState] = useState<GateState | null>(null);
   const [creating, setCreating] = useState(false);
   const [runningAgent, setRunningAgent] = useState(false);
+  const [expandedStages, setExpandedStages] = useState<Partial<Record<StageKey, boolean>>>({});
 
-  const allColumns = useMemo(() => {
+  const allStages = useMemo(() => {
     if (!board) return [];
     return [
       { stage: "idea" as const, cards: board.ideaCards },
@@ -250,108 +348,185 @@ export function WorkflowBoard() {
     setGateState(null);
   };
 
+  const toggleStageExpansion = (stage: StageKey) => {
+    setExpandedStages((current) => ({
+      ...current,
+      [stage]: !current[stage],
+    }));
+  };
+
   return (
     <>
       <section className="space-y-6">
-        <div className="rounded-[28px] bg-[linear-gradient(135deg,#001524_0%,#124559_100%)] px-6 py-6 text-white shadow-[0_24px_80px_rgba(0,21,36,0.18)]">
-          <div className="flex flex-wrap items-end justify-between gap-4">
-            <div className="max-w-2xl">
-              <p className="text-xs uppercase tracking-[0.24em] text-white/60">
-                Post Workflow
-              </p>
-              <h1 className="mt-2 font-forum text-4xl leading-none">
-                Selected ideas become research-backed draft instances.
-              </h1>
-              <p className="mt-3 text-sm leading-6 text-white/75">
-                The board keeps the original idea primitive intact, lets one idea spawn
-                multiple posts, and checks readiness before each rightward move.
-              </p>
-            </div>
+        <div className="overflow-hidden rounded-[32px] border border-[#15384a] bg-[linear-gradient(135deg,#061b29_0%,#0b3147_46%,#15616d_100%)] text-white shadow-[0_30px_90px_rgba(0,21,36,0.18)]">
+          <div className="relative px-4 py-4 md:px-5 md:py-5">
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,236,209,0.16),transparent_24%),radial-gradient(circle_at_bottom_left,rgba(255,255,255,0.08),transparent_36%)]" />
 
-            <div className="flex flex-wrap gap-2">
-              <Button variant="secondary" onClick={() => {
-                setComposerMode("existing");
-                setComposerOpen(true);
-              }}>
-                <Layers3 size={14} />
-                Use Inspiration
-              </Button>
-              <Button variant="primary" onClick={() => {
-                setComposerMode("new");
-                setComposerOpen(true);
-              }}>
-                <Plus size={14} />
-                Add Idea Card
-              </Button>
-            </div>
-          </div>
+            <div className="relative">
+              <p className="text-[11px] uppercase tracking-[0.34em] text-white/58">
+                Editorial Runway
+              </p>
 
-          <div className="mt-6 grid gap-3 md:grid-cols-3">
-            <MetricCard
-              icon={<Lightbulb size={16} />}
-              label="Selected Ideas"
-              value={String(board?.ideaCards.length ?? 0)}
-            />
-            <MetricCard
-              icon={<Search size={16} />}
-              label="Research Cards"
-              value={String(board?.researchCards.length ?? 0)}
-            />
-            <MetricCard
-              icon={<BookOpen size={16} />}
-              label="Inspiration Backlog"
-              value={String(board?.availableIdeas.length ?? 0)}
-            />
+              <div className="mt-3 grid gap-3 lg:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setComposerMode("existing");
+                    setComposerOpen(true);
+                  }}
+                  className="group relative overflow-hidden rounded-[28px] border border-white/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(244,248,250,0.94))] p-5 text-left text-[#001524] shadow-[0_24px_60px_rgba(0,0,0,0.14)] transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_32px_70px_rgba(0,0,0,0.18)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ffecd1] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b3045]"
+                >
+                  <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(21,97,109,0.12),transparent_34%)]" />
+                  <div className="relative flex h-full items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-[#dff2f4] text-[#15616d] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)]">
+                        <Layers3 size={18} />
+                      </span>
+                      <p className="mt-5 text-[11px] uppercase tracking-[0.28em] text-[#15616d]">
+                        From backlog
+                      </p>
+                      <p className="mt-2 text-[1.75rem] font-semibold leading-none tracking-[-0.03em]">
+                        Use Inspiration
+                      </p>
+                      <p className="mt-3 max-w-md text-sm leading-6 text-[#436170]">
+                        Pull a saved spark into the active board and give it a real
+                        next step.
+                      </p>
+                    </div>
+                    <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#d6e7eb] bg-white/80 text-[#15616d] transition-transform duration-200 group-hover:translate-x-1">
+                      <ArrowRight size={17} />
+                    </span>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setComposerMode("new");
+                    setComposerOpen(true);
+                  }}
+                  className="group relative overflow-hidden rounded-[28px] border border-[#ff9d33] bg-[linear-gradient(135deg,#ff7d00_0%,#ff9629_100%)] p-5 text-left text-white shadow-[0_26px_60px_rgba(255,125,0,0.26)] transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_34px_72px_rgba(255,125,0,0.32)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b3045]"
+                >
+                  <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.22),transparent_28%)]" />
+                  <div className="relative flex h-full items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-white/18 shadow-[inset_0_1px_0_rgba(255,255,255,0.35)] backdrop-blur">
+                        <Plus size={18} />
+                      </span>
+                      <p className="mt-5 text-[11px] uppercase tracking-[0.28em] text-white/70">
+                        Fresh card
+                      </p>
+                      <p className="mt-2 text-[1.75rem] font-semibold leading-none tracking-[-0.03em]">
+                        Add Idea Card
+                      </p>
+                      <p className="mt-3 max-w-md text-sm leading-6 text-white/82">
+                        Capture a new angle now and drop it straight into the
+                        workflow without breaking your pace.
+                      </p>
+                    </div>
+                    <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/22 bg-white/14 text-white transition-transform duration-200 group-hover:translate-x-1">
+                      <ArrowRight size={17} />
+                    </span>
+                  </div>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
-        <div className="overflow-x-auto pb-2">
-          <div className="grid min-w-[1280px] grid-cols-7 gap-4">
-            {board === undefined
-              ? ["idea", "research", ...DRAFT_STAGES].map((stage) => (
-                  <div
-                    key={stage}
-                    className="min-h-[320px] animate-pulse rounded-[26px] border border-gray-100 bg-white"
-                  />
-                ))
-              : allColumns.map((column) => (
-                  <BoardColumn
-                    key={column.stage}
-                    stage={column.stage}
-                    cardCount={column.cards.length}
-                  >
-                    {column.stage === "idea" || column.stage === "research"
-                      ? column.cards.map((idea) => (
-                          <IdeaCard
-                            key={idea._id}
-                            idea={idea}
-                            onOpen={() => setIdeaEditorId(idea._id)}
-                            onAdvance={
-                              column.stage === "idea"
-                                ? () => handleAdvanceIdea(idea._id)
-                                : undefined
-                            }
-                            onSpawnBlog={
-                              column.stage === "research"
-                                ? () => handleSpawnDraft(idea._id, "blog")
-                                : undefined
-                            }
-                            onSpawnLinkedIn={
-                              column.stage === "research"
-                                ? () => handleSpawnDraft(idea._id, "linkedin")
-                                : undefined
-                            }
-                          />
-                        ))
-                      : column.cards.map((draft) => (
-                          <DraftCard
-                            key={draft._id}
-                            draft={draft}
-                            onOpen={() => setDraftEditorId(draft._id)}
-                          />
-                        ))}
-                  </BoardColumn>
-                ))}
+        <div className="rounded-[28px] border border-gray-200 bg-[linear-gradient(180deg,#ffffff_0%,#f5f2ea_100%)] px-4 py-5 shadow-[0_18px_60px_rgba(0,21,36,0.06)] md:px-6">
+          <div className="mb-5 flex items-center justify-between gap-4">
+            <div>
+              <p className="text-xs uppercase tracking-[0.22em] text-gray-400">
+                Stage Flow
+              </p>
+              <p className="mt-1 text-sm text-gray-600">
+                Each row previews the current stage. Overflow stays collapsed until
+                you ask for it.
+              </p>
+            </div>
+            <div className="hidden items-center gap-2 rounded-full bg-[#001524] px-3 py-1.5 text-xs text-white md:flex">
+              <ArrowDown size={12} />
+              Top to bottom progression
+            </div>
+          </div>
+
+          <div className="relative">
+            <div className="absolute bottom-0 left-[27px] top-0 hidden w-px bg-[linear-gradient(180deg,rgba(0,21,36,0.04),rgba(0,21,36,0.18),rgba(0,21,36,0.04))] md:block" />
+
+            <div className="space-y-5">
+              {board === undefined
+                ? (["idea", "research", ...DRAFT_STAGES] as StageKey[]).map((stage) => (
+                    <div
+                      key={stage}
+                      className="h-48 animate-pulse rounded-[30px] border border-gray-200 bg-white/80"
+                    />
+                  ))
+                : allStages.map((section, index) => {
+                    const stage = section.stage;
+                    const previewLimit = getPreviewLimit(stage);
+                    const isExpanded = expandedStages[stage] ?? false;
+                    const visibleCards = isExpanded
+                      ? section.cards
+                      : section.cards.slice(0, previewLimit);
+                    const hiddenCount = Math.max(section.cards.length - previewLimit, 0);
+                    const visibleIdeaCards = visibleCards as IdeaBoardCard[];
+                    const visibleDraftCards = visibleCards as DraftBoardCard[];
+
+                    return (
+                      <StageSection
+                        key={stage}
+                        stage={stage}
+                        count={section.cards.length}
+                        hiddenCount={hiddenCount}
+                        expanded={isExpanded}
+                        index={index}
+                        onToggleOverflow={
+                          hiddenCount > 0 ? () => toggleStageExpansion(stage) : undefined
+                        }
+                      >
+                        {section.cards.length === 0 ? (
+                          <EmptyStage stage={stage} />
+                        ) : (
+                          <div className="grid gap-4 xl:grid-cols-2">
+                            {stage === "idea" || stage === "research"
+                              ? visibleIdeaCards.map((idea) => (
+                                  <IdeaCard
+                                    key={idea._id}
+                                    stage={stage}
+                                    idea={idea}
+                                    onOpen={() => setIdeaEditorId(idea._id)}
+                                    onAdvance={
+                                      stage === "idea"
+                                        ? () => handleAdvanceIdea(idea._id)
+                                        : undefined
+                                    }
+                                    onSpawnBlog={
+                                      stage === "research"
+                                        ? () => handleSpawnDraft(idea._id, "blog")
+                                        : undefined
+                                    }
+                                    onSpawnLinkedIn={
+                                      stage === "research"
+                                        ? () => handleSpawnDraft(idea._id, "linkedin")
+                                        : undefined
+                                    }
+                                  />
+                                ))
+                              : visibleDraftCards.map((draft) => (
+                                  <DraftCard
+                                    key={draft._id}
+                                    stage={stage}
+                                    draft={draft}
+                                    onOpen={() => setDraftEditorId(draft._id)}
+                                  />
+                                ))}
+                          </div>
+                        )}
+                      </StageSection>
+                    );
+                  })}
+            </div>
           </div>
         </div>
       </section>
@@ -429,70 +604,106 @@ export function WorkflowBoard() {
   );
 }
 
-function MetricCard({
-  icon,
-  label,
-  value,
+function StageSection({
+  stage,
+  count,
+  hiddenCount,
+  expanded,
+  index,
+  onToggleOverflow,
+  children,
 }: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
+  stage: StageKey;
+  count: number;
+  hiddenCount: number;
+  expanded: boolean;
+  index: number;
+  onToggleOverflow?: () => void;
+  children: React.ReactNode;
 }) {
+  const theme = STAGE_THEME[stage];
+
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/8 px-4 py-4 backdrop-blur">
-      <div className="flex items-center gap-2 text-white/60">{icon}<span className="text-xs uppercase tracking-[0.18em]">{label}</span></div>
-      <p className="mt-3 text-3xl font-semibold text-white">{value}</p>
-    </div>
+    <section
+      className={`relative overflow-hidden rounded-[30px] border px-4 py-4 shadow-[0_14px_40px_rgba(0,21,36,0.05)] md:grid md:grid-cols-[180px_minmax(0,1fr)] md:gap-6 md:px-5 ${theme.shell}`}
+    >
+      <div className="mb-5 md:mb-0">
+        <div className="relative z-10 flex items-start gap-3 md:sticky md:top-24">
+          <div className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/70 bg-white/95 text-[#001524] shadow-sm md:flex">
+            <span className="text-xs font-semibold">{index + 1}</span>
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <div className={`flex h-10 w-10 items-center justify-center rounded-2xl border ${theme.panel} text-[#001524] shadow-sm`}>
+                {theme.icon}
+              </div>
+              <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${theme.chip}`}>
+                {count}
+              </span>
+            </div>
+            <p className="mt-3 text-[11px] uppercase tracking-[0.24em] text-gray-500">
+              {STAGE_LABELS[stage]}
+            </p>
+            <p className="mt-2 text-sm leading-6 text-[#001524]">{theme.eyebrow}</p>
+          </div>
+        </div>
+      </div>
+
+      <div className={`relative rounded-[26px] border px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)] md:px-5 ${theme.panel}`}>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="max-w-2xl">
+            <p className="text-sm leading-6 text-gray-600">{STAGE_DESCRIPTIONS[stage]}</p>
+          </div>
+
+          {hiddenCount > 0 ? (
+            <button
+              type="button"
+              onClick={onToggleOverflow}
+              className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${theme.soft}`}
+            >
+              <MoreHorizontal size={12} />
+              {expanded ? "Show less" : `Show ${hiddenCount} more`}
+              {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            </button>
+          ) : (
+            <div className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs ${theme.soft}`}>
+              <ArrowDown size={12} />
+              {count === 0 ? "Ready for the next card" : "Focused preview"}
+            </div>
+          )}
+        </div>
+
+        <div className="mt-4">{children}</div>
+      </div>
+    </section>
   );
 }
 
-function BoardColumn({
-  stage,
-  cardCount,
-  children,
-}: {
-  stage: "idea" | "research" | (typeof DRAFT_STAGES)[number];
-  cardCount: number;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className={`rounded-[26px] border border-gray-100 bg-[linear-gradient(180deg,var(--tw-gradient-stops))] ${COLUMN_TONES[stage]} p-3 shadow-[0_20px_50px_rgba(0,21,36,0.06)]`}>
-      <div className="rounded-[22px] bg-white/85 p-3 shadow-sm backdrop-blur">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-xs uppercase tracking-[0.22em] text-gray-400">
-              {STAGE_LABELS[stage]}
-            </p>
-            <p className="mt-1 text-sm leading-5 text-gray-600">
-              {STAGE_DESCRIPTIONS[stage]}
-            </p>
-          </div>
-          <span className="rounded-full bg-[#001524] px-2.5 py-1 text-xs font-medium text-white">
-            {cardCount}
-          </span>
-        </div>
+function EmptyStage({ stage }: { stage: StageKey }) {
+  const theme = STAGE_THEME[stage];
 
-        <div className="mt-4 space-y-3">
-          {cardCount === 0 ? (
-            <div className="rounded-2xl border border-dashed border-gray-200 px-3 py-6 text-center text-sm text-gray-500">
-              Nothing here yet.
-            </div>
-          ) : (
-            children
-          )}
-        </div>
+  return (
+    <div className="rounded-[24px] border border-dashed border-gray-300/90 bg-white/70 px-4 py-7 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
+      <div className={`mx-auto flex h-11 w-11 items-center justify-center rounded-2xl ${theme.soft}`}>
+        {theme.icon}
       </div>
+      <p className="mt-3 text-sm font-medium text-[#001524]">Nothing parked here right now.</p>
+      <p className="mt-1 text-sm leading-6 text-gray-500">
+        Keep this lane quiet until a card genuinely earns its way down.
+      </p>
     </div>
   );
 }
 
 function IdeaCard({
+  stage,
   idea,
   onOpen,
   onAdvance,
   onSpawnBlog,
   onSpawnLinkedIn,
 }: {
+  stage: "idea" | "research";
   idea: {
     _id: Id<"ideas">;
     title?: string;
@@ -509,140 +720,146 @@ function IdeaCard({
   onSpawnBlog?: () => void;
   onSpawnLinkedIn?: () => void;
 }) {
+  const theme = STAGE_THEME[stage];
+  const title = formatWorkflowTitle(idea.title, idea.text);
+  const isCompact = stage === "idea";
+
   return (
-    <div className="rounded-[22px] border border-white bg-white p-4 text-left shadow-sm transition-transform hover:-translate-y-0.5 hover:shadow-md">
-      <button type="button" onClick={onOpen} className="block w-full text-left">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="font-forum text-xl text-[#001524]">
-            {idea.title || "Untitled idea"}
-          </p>
-          <p className="mt-2 line-clamp-4 text-sm leading-6 text-gray-600">
-            {idea.text}
-          </p>
-        </div>
-        <div className="rounded-full bg-[#ffecd1] px-2 py-1 text-xs text-[#78290f]">
-          {idea.references.length} refs
-        </div>
-      </div>
-
-      <div className="mt-4 flex flex-wrap gap-2">
-        {idea.researchObjective && (
-          <span className="rounded-full bg-[#eef2ff] px-2.5 py-1 text-xs text-[#3949ab]">
-            angle set
+    <article className="overflow-hidden rounded-[24px] border border-white/80 bg-white shadow-[0_18px_40px_rgba(0,21,36,0.08)]">
+      <div className={`h-1.5 w-full ${stage === "idea" ? "bg-[#ffb351]" : "bg-[#52b4bc]"}`} />
+      <div className="space-y-4 p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className={`font-forum leading-[1.02] text-[#001524] ${isCompact ? "text-[22px]" : "text-[28px]"}`}>
+              {title}
+            </p>
+            {!isCompact && (
+              <p className="mt-2 text-sm leading-7 text-gray-600">{idea.text}</p>
+            )}
+          </div>
+          <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${theme.chip}`}>
+            {idea.references.length} refs
           </span>
-        )}
-        {idea.draftCount > 0 && (
-          <span className="rounded-full bg-[#ecfdf3] px-2.5 py-1 text-xs text-[#15616d]">
-            {idea.draftCount} draft{idea.draftCount === 1 ? "" : "s"}
-          </span>
-        )}
-      </div>
-
-      <div className="mt-4 flex items-center justify-between gap-3 text-xs text-gray-500">
-        <span>Updated {formatWorkflowTimestamp(idea.updatedAt)}</span>
-        {idea.lastResearchRunAt && <span>Research run {formatWorkflowTimestamp(idea.lastResearchRunAt)}</span>}
-      </div>
-
-      {idea.lastGateSummary && (
-        <div className="mt-4 rounded-2xl bg-[#fff7e8] px-3 py-2 text-xs text-[#78290f]">
-          {idea.lastGateSummary}
         </div>
-      )}
-      </button>
 
-      <div className="mt-4 flex flex-wrap gap-2">
-        <Button variant="ghost" size="sm" onClick={onOpen}>
-          Open
-        </Button>
-        {onAdvance && (
-          <Button variant="primary" size="sm" onClick={onAdvance}>
-            <ArrowRight size={14} />
-            Move to Research
-          </Button>
+        <div className="flex flex-wrap gap-2 text-xs">
+          {idea.researchObjective && (
+            <span className="rounded-full bg-[#edf3ff] px-2.5 py-1 text-[#395495]">
+              angle set
+            </span>
+          )}
+          {idea.draftCount > 0 && (
+            <span className="rounded-full bg-[#ecf9f0] px-2.5 py-1 text-[#226141]">
+              {idea.draftCount} draft{idea.draftCount === 1 ? "" : "s"}
+            </span>
+          )}
+          <span className="rounded-full bg-gray-100 px-2.5 py-1 text-gray-600">
+            Updated {formatWorkflowTimestamp(idea.updatedAt)}
+          </span>
+        </div>
+
+        {!isCompact && idea.lastGateSummary && (
+          <div className="rounded-[18px] bg-[#fff6e8] px-3 py-2 text-xs leading-5 text-[#8b4513]">
+            {idea.lastGateSummary}
+          </div>
         )}
-        {onSpawnBlog && (
-          <Button variant="secondary" size="sm" onClick={onSpawnBlog}>
-            <FileText size={14} />
-            Blog Draft
+
+        <div className="flex flex-wrap gap-2 border-t border-gray-100 pt-4">
+          <Button variant="ghost" size="sm" onClick={onOpen}>
+            Open
           </Button>
-        )}
-        {onSpawnLinkedIn && (
-          <Button variant="secondary" size="sm" onClick={onSpawnLinkedIn}>
-            <Sparkles size={14} />
-            LinkedIn Draft
-          </Button>
-        )}
+          {onAdvance && (
+            <Button variant="primary" size="sm" onClick={onAdvance}>
+              <ArrowRight size={14} />
+              Move to Research
+            </Button>
+          )}
+          {onSpawnBlog && (
+            <Button variant="secondary" size="sm" onClick={onSpawnBlog}>
+              <FileText size={14} />
+              Blog Draft
+            </Button>
+          )}
+          {onSpawnLinkedIn && (
+            <Button variant="secondary" size="sm" onClick={onSpawnLinkedIn}>
+              <Sparkles size={14} />
+              LinkedIn Draft
+            </Button>
+          )}
+        </div>
       </div>
-    </div>
+    </article>
   );
 }
 
 function DraftCard({
+  stage,
   draft,
   onOpen,
 }: {
-  draft: {
-    _id: Id<"workflowDrafts">;
-    title: string;
-    preview: string;
-    type: "blog" | "linkedin";
-    ideaTitle?: string;
-    scheduledDate?: string;
-    lastAgentSummary?: string;
-    lastGateSummary?: string;
-  };
+  stage: Exclude<StageKey, "idea" | "research">;
+  draft: DraftBoardCard;
   onOpen: () => void;
 }) {
+  const theme = STAGE_THEME[stage];
+
   return (
-    <div className="rounded-[22px] border border-white bg-white p-4 text-left shadow-sm transition-transform hover:-translate-y-0.5 hover:shadow-md">
-      <button type="button" onClick={onOpen} className="block w-full text-left">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="font-forum text-xl text-[#001524]">{draft.title}</p>
-          <p className="mt-1 text-xs uppercase tracking-[0.2em] text-gray-400">
-            {draft.type === "blog" ? "Blog" : "LinkedIn"}
-          </p>
+    <article className="overflow-hidden rounded-[24px] border border-white/80 bg-white shadow-[0_18px_40px_rgba(0,21,36,0.08)]">
+      <div className={`h-1.5 w-full ${
+        stage === "outline"
+          ? "bg-[#ffbe64]"
+          : stage === "copyedit"
+          ? "bg-[#d69c84]"
+          : stage === "seo"
+          ? "bg-[#7bc18e]"
+          : stage === "final"
+          ? "bg-[#8ea5e6]"
+          : "bg-[#b5b5b5]"
+      }`} />
+      <div className="space-y-4 p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="font-forum text-[28px] leading-[1.02] text-[#001524]">
+              {draft.title}
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2 text-xs uppercase tracking-[0.14em] text-gray-400">
+              <span>{draft.type === "blog" ? "Blog" : "LinkedIn"}</span>
+              {draft.ideaTitle && <span>From {draft.ideaTitle}</span>}
+            </div>
+          </div>
+          {draft.scheduledDate && (
+            <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${theme.chip}`}>
+              {draft.scheduledDate}
+            </span>
+          )}
         </div>
-        {draft.scheduledDate && (
-          <span className="rounded-full bg-[#eef7f7] px-2 py-1 text-xs text-[#15616d]">
-            {draft.scheduledDate}
-          </span>
-        )}
-      </div>
 
-      <p className="mt-3 line-clamp-5 text-sm leading-6 text-gray-600">
-        {draft.preview || "No content preview yet."}
-      </p>
-
-      {draft.ideaTitle && (
-        <p className="mt-3 text-xs text-gray-500">
-          From: {draft.ideaTitle}
+        <p className="text-sm leading-7 text-gray-600">
+          {draft.preview || "No content preview yet."}
         </p>
-      )}
 
-      {(draft.lastAgentSummary || draft.lastGateSummary) && (
-        <div className="mt-4 space-y-2">
-          {draft.lastAgentSummary && (
-            <div className="rounded-2xl bg-[#f1f9fb] px-3 py-2 text-xs text-[#15616d]">
-              {draft.lastAgentSummary}
-            </div>
-          )}
-          {draft.lastGateSummary && (
-            <div className="rounded-2xl bg-[#fff7e8] px-3 py-2 text-xs text-[#78290f]">
-              {draft.lastGateSummary}
-            </div>
-          )}
+        {(draft.lastAgentSummary || draft.lastGateSummary) && (
+          <div className="space-y-2">
+            {draft.lastAgentSummary && (
+              <div className="rounded-[18px] bg-[#eef8fb] px-3 py-2 text-xs leading-5 text-[#15616d]">
+                {draft.lastAgentSummary}
+              </div>
+            )}
+            {draft.lastGateSummary && (
+              <div className="rounded-[18px] bg-[#fff6e8] px-3 py-2 text-xs leading-5 text-[#8b4513]">
+                {draft.lastGateSummary}
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="border-t border-gray-100 pt-4">
+          <Button variant="ghost" size="sm" onClick={onOpen}>
+            Open
+          </Button>
         </div>
-      )}
-      </button>
-
-      <div className="mt-4">
-        <Button variant="ghost" size="sm" onClick={onOpen}>
-          Open
-        </Button>
       </div>
-    </div>
+    </article>
   );
 }
 
@@ -778,7 +995,11 @@ function WorkflowIdeaComposerModal({
               <Button variant="secondary" onClick={onClose}>
                 Cancel
               </Button>
-              <Button variant="primary" onClick={onCreate} disabled={creating || !newIdeaText.trim()}>
+              <Button
+                variant="primary"
+                onClick={onCreate}
+                disabled={creating || !newIdeaText.trim()}
+              >
                 <Plus size={14} />
                 {creating ? "Saving…" : "Create Idea"}
               </Button>

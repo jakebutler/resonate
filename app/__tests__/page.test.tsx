@@ -6,7 +6,7 @@ import Dashboard from "@/app/page"
 
 vi.mock("convex/react", () => ({ useQuery: vi.fn(), useMutation: vi.fn() }))
 vi.mock("@/convex/_generated/api", () => ({
-  api: { posts: { getStats: "posts:getStats", list: "posts:list" } }
+  api: { posts: { list: "posts:list" } }
 }))
 vi.mock("@clerk/nextjs", () => ({
   UserButton: () => <div data-testid="user-button" />,
@@ -53,23 +53,17 @@ vi.mock("next/link", () => ({
   ),
 }))
 
-// stats uses scheduledCount and draftsCount (not scheduled/drafts)
-const mockStats = { blogCount: 5, linkedinCount: 3, scheduledCount: 4, draftsCount: 2 }
-
 describe("Dashboard", () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.mocked(useQuery)
-      .mockReturnValueOnce(mockStats as never) // getStats
-      .mockReturnValueOnce([] as never)         // list
+    vi.mocked(useQuery).mockReturnValue([] as never)
   })
 
-  it("renders stats cards with correct counts", () => {
+  it("does not render the summary stats strip", () => {
     render(<Dashboard />)
-    expect(screen.getByText("5")).toBeInTheDocument()
-    expect(screen.getByText("3")).toBeInTheDocument()
-    expect(screen.getByText("4")).toBeInTheDocument()
-    expect(screen.getByText("2")).toBeInTheDocument()
+    expect(screen.queryByText("Blog Posts")).not.toBeInTheDocument()
+    expect(screen.queryByText("LinkedIn Posts")).not.toBeInTheDocument()
+    expect(screen.getByText("Publishing Calendar")).toBeInTheDocument()
   })
 
   it("shows Calendar by default", () => {

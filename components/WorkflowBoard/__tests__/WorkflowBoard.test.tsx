@@ -168,7 +168,9 @@ describe("WorkflowBoard", () => {
       await screen.findByText("This does not look ready for research yet.")
     ).toBeInTheDocument();
 
-    fireEvent.click(screen.getByText("Move Anyway"));
+    await act(async () => {
+      fireEvent.click(screen.getByText("Move Anyway"));
+    });
 
     expect(advanceIdeaStageMock).toHaveBeenLastCalledWith({
       id: "idea_1",

@@ -11,7 +11,7 @@ import { CreatePostModal } from "@/components/CreatePostModal/CreatePostModal";
 import { ContentLibrary } from "@/components/ContentLibrary/ContentLibrary";
 import { WorkflowBoard } from "@/components/WorkflowBoard/WorkflowBoard";
 import { UserButton } from "@clerk/nextjs";
-import { FileText, Linkedin, CalendarDays, Edit3, Settings, CalendarRange, Library, AudioWaveform, Layers3 } from "lucide-react";
+import { FileText, Linkedin, Settings, CalendarRange, Library, AudioWaveform, Layers3 } from "lucide-react";
 import Link from "next/link";
 
 type Filter = "all" | "blog" | "linkedin";
@@ -19,7 +19,6 @@ type View = "calendar" | "library" | "workflow";
 type TimePeriod = "all" | "this-month" | "last-3-months" | "this-year";
 
 export default function Dashboard() {
-  const stats = useQuery(api.posts.getStats);
   const allPosts = useQuery(api.posts.list, {});
 
   const [filter, setFilter] = useState<Filter>("all");
@@ -65,6 +64,26 @@ export default function Dashboard() {
     setEditorInitialDate(undefined);
   };
 
+  const viewMeta: Record<View, { eyebrow: string; title: string; description: string }> = {
+    calendar: {
+      eyebrow: "Publishing view",
+      title: "Publishing Calendar",
+      description: "Place content on the schedule, then jump into drafting when a date needs a post.",
+    },
+    library: {
+      eyebrow: "Archive view",
+      title: "Content Library",
+      description: "Review what exists, filter by format, and reopen pieces that deserve another pass.",
+    },
+    workflow: {
+      eyebrow: "Active board",
+      title: "Post Workflow",
+      description: "Capture ideas, pull inspiration forward, and move each post through one clear stage at a time.",
+    },
+  };
+
+  const currentView = viewMeta[activeView];
+
   return (
     <div className="min-h-screen bg-[#fafafa]">
       {/* Top nav */}
@@ -85,99 +104,68 @@ export default function Dashboard() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-6 py-8">
-        {/* Stats row */}
-        <div className="grid grid-cols-4 gap-4 mb-8">
-          <StatCard
-            icon={<FileText size={20} className="text-[#78290f]" />}
-            value={stats?.blogCount ?? 0}
-            label="Blog Posts"
-            bg="bg-[#ffecd1]"
-          />
-          <StatCard
-            icon={<Linkedin size={20} className="text-[#15616d]" />}
-            value={stats?.linkedinCount ?? 0}
-            label="LinkedIn Posts"
-            bg="bg-[#15616d]/10"
-          />
-          <StatCard
-            icon={<CalendarDays size={20} className="text-[#ff7d00]" />}
-            value={stats?.scheduledCount ?? 0}
-            label="Scheduled"
-            bg="bg-[#ff7d00]/10"
-          />
-          <StatCard
-            icon={<Edit3 size={20} className="text-gray-500" />}
-            value={stats?.draftsCount ?? 0}
-            label="Drafts"
-            bg="bg-gray-100"
-          />
-        </div>
-
-        {/* View header */}
-        <div className="flex items-center justify-between mb-4">
-          {/* Left: view switcher + title */}
-          <div className="flex items-center gap-4">
-            {/* View switcher */}
-            <div className="flex items-center gap-0.5 bg-white border border-gray-200 rounded-xl p-1">
+      <main className="mx-auto max-w-[1400px] px-5 py-6 md:px-6 md:py-7">
+        <div className="mb-5 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:gap-5">
+            <div className="inline-flex items-center gap-0.5 rounded-[20px] border border-[#d7e2e8] bg-white/90 p-1.5 shadow-[0_18px_40px_rgba(0,21,36,0.08)] backdrop-blur">
               <button
                 onClick={() => setActiveView("calendar")}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                className={`flex items-center gap-2 rounded-2xl px-4 py-2 text-sm font-medium transition-all ${
                   activeView === "calendar"
-                    ? "bg-[#001524] text-white"
-                    : "text-gray-500 hover:text-[#001524]"
+                    ? "bg-[#001524] text-white shadow-[0_12px_24px_rgba(0,21,36,0.18)]"
+                    : "text-gray-500 hover:bg-[#f5f7f8] hover:text-[#001524]"
                 }`}
               >
-                <CalendarRange size={13} />
+                <CalendarRange size={14} />
                 Calendar
               </button>
               <button
                 onClick={() => setActiveView("library")}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                className={`flex items-center gap-2 rounded-2xl px-4 py-2 text-sm font-medium transition-all ${
                   activeView === "library"
-                    ? "bg-[#001524] text-white"
-                    : "text-gray-500 hover:text-[#001524]"
+                    ? "bg-[#001524] text-white shadow-[0_12px_24px_rgba(0,21,36,0.18)]"
+                    : "text-gray-500 hover:bg-[#f5f7f8] hover:text-[#001524]"
                 }`}
               >
-                <Library size={13} />
+                <Library size={14} />
                 Library
               </button>
               <button
                 onClick={() => setActiveView("workflow")}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                className={`flex items-center gap-2 rounded-2xl px-4 py-2 text-sm font-medium transition-all ${
                   activeView === "workflow"
-                    ? "bg-[#001524] text-white"
-                    : "text-gray-500 hover:text-[#001524]"
+                    ? "bg-[#001524] text-white shadow-[0_12px_24px_rgba(0,21,36,0.18)]"
+                    : "text-gray-500 hover:bg-[#f5f7f8] hover:text-[#001524]"
                 }`}
               >
-                <Layers3 size={13} />
+                <Layers3 size={14} />
                 Workflow
               </button>
             </div>
-            <div>
-              <h1 className="font-forum text-2xl text-[#001524]">
-                {activeView === "calendar"
-                  ? "Publishing Calendar"
-                  : activeView === "library"
-                  ? "Content Library"
-                  : "Post Workflow"}
+            <div className="max-w-2xl">
+              <p className="text-[11px] uppercase tracking-[0.28em] text-[#15616d]/70">
+                {currentView.eyebrow}
+              </p>
+              <h1 className="mt-2 font-forum text-[2rem] leading-none text-[#001524] md:text-[2.35rem]">
+                {currentView.title}
               </h1>
+              <p className="mt-1.5 text-sm leading-6 text-gray-600">
+                {currentView.description}
+              </p>
             </div>
           </div>
 
-          {/* Right: filters */}
           <div className="flex items-center gap-2">
-            {/* Time period filter — library only */}
             {activeView === "library" && (
-              <div className="flex items-center gap-0.5 bg-white border border-gray-200 rounded-xl p-1">
+              <div className="flex items-center gap-0.5 rounded-[18px] border border-gray-200 bg-white p-1 shadow-[0_12px_30px_rgba(0,21,36,0.05)]">
                 {(["all", "this-month", "last-3-months", "this-year"] as TimePeriod[]).map((tp) => (
                   <button
                     key={tp}
                     onClick={() => setTimePeriod(tp)}
-                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                    className={`rounded-2xl px-3 py-1.5 text-sm font-medium transition-colors ${
                       timePeriod === tp
                         ? "bg-[#001524] text-white"
-                        : "text-gray-500 hover:text-[#001524]"
+                        : "text-gray-500 hover:bg-[#f5f7f8] hover:text-[#001524]"
                     }`}
                   >
                     {tp === "all" ? "All time" : tp === "this-month" ? "This month" : tp === "last-3-months" ? "Last 3 months" : "This year"}
@@ -186,17 +174,16 @@ export default function Dashboard() {
               </div>
             )}
 
-            {/* Type filter */}
             {activeView !== "workflow" && (
-              <div className="flex items-center gap-0.5 bg-white border border-gray-200 rounded-xl p-1">
+              <div className="flex items-center gap-0.5 rounded-[18px] border border-gray-200 bg-white p-1 shadow-[0_12px_30px_rgba(0,21,36,0.05)]">
                 {(["all", "blog", "linkedin"] as Filter[]).map((f) => (
                   <button
                     key={f}
                     onClick={() => setFilter(f)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors capitalize ${
+                    className={`flex items-center gap-1.5 rounded-2xl px-3 py-1.5 text-sm font-medium capitalize transition-colors ${
                       filter === f
                         ? "bg-[#001524] text-white"
-                        : "text-gray-500 hover:text-[#001524]"
+                        : "text-gray-500 hover:bg-[#f5f7f8] hover:text-[#001524]"
                     }`}
                   >
                     {f === "blog" && <FileText size={13} />}
@@ -252,30 +239,6 @@ export default function Dashboard() {
         onClose={handleEditorClose}
         onSaved={() => {}}
       />
-    </div>
-  );
-}
-
-function StatCard({
-  icon,
-  value,
-  label,
-  bg,
-}: {
-  icon: React.ReactNode;
-  value: number;
-  label: string;
-  bg: string;
-}) {
-  return (
-    <div className="bg-white border border-gray-100 rounded-xl p-5 flex items-center gap-4">
-      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${bg}`}>
-        {icon}
-      </div>
-      <div>
-        <p className="text-2xl font-bold text-[#001524]">{value}</p>
-        <p className="text-sm text-gray-500">{label}</p>
-      </div>
     </div>
   );
 }

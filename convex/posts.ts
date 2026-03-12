@@ -24,18 +24,6 @@ export const getById = query({
   },
 });
 
-export const getStats = query({
-  handler: async (ctx) => {
-    const all = await ctx.db.query("posts").collect();
-    return {
-      blogCount: all.filter((p) => p.type === "blog").length,
-      linkedinCount: all.filter((p) => p.type === "linkedin").length,
-      scheduledCount: all.filter((p) => p.status === "scheduled").length,
-      draftsCount: all.filter((p) => p.status === "draft").length,
-    };
-  },
-});
-
 export const create = mutation({
   args: {
     type: v.union(v.literal("blog"), v.literal("linkedin")),
