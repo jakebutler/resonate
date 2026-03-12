@@ -29,7 +29,6 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import tunnel from "tunnel-rat";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 
 const t = tunnel();
@@ -76,7 +75,7 @@ export const KanbanBoard = ({ id, children, className }: KanbanBoardProps) => {
   return (
     <div
       className={cn(
-        "flex size-full min-h-40 flex-col divide-y overflow-hidden rounded-md border bg-secondary text-xs shadow-sm ring-2 transition-all",
+        "flex size-full min-h-40 min-w-0 flex-col overflow-hidden rounded-md border bg-secondary text-xs shadow-sm ring-2 transition-all",
         isOver ? "ring-primary" : "ring-transparent",
         className
       )}
@@ -118,7 +117,10 @@ export const KanbanCard = <T extends KanbanItemProps = KanbanItemProps>({
   return (
     <>
       <div
-        className={cn("touch-manipulation outline-none focus:outline-none focus-visible:outline-none", className)}
+        className={cn(
+          "w-full min-w-0 touch-manipulation outline-none focus:outline-none focus-visible:outline-none",
+          className
+        )}
         ref={setNodeRef}
         style={style}
         {...listeners}
@@ -166,17 +168,16 @@ export const KanbanCards = <T extends KanbanItemProps = KanbanItemProps>({
   const items = filteredData.map((item) => item.id);
 
   return (
-    <ScrollArea className="overflow-hidden">
+    <div className="min-h-0 min-w-0 flex-1 overflow-y-auto">
       <SortableContext items={items}>
         <div
-          className={cn("flex flex-grow flex-col gap-2 p-2", className)}
+          className={cn("flex min-w-0 flex-grow flex-col gap-2 p-2", className)}
           {...props}
         >
           {filteredData.map(children)}
         </div>
       </SortableContext>
-      <ScrollBar orientation="vertical" />
-    </ScrollArea>
+    </div>
   );
 };
 

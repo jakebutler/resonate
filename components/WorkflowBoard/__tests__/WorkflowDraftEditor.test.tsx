@@ -91,6 +91,27 @@ describe("WorkflowDraftEditor", () => {
     ).toBeInTheDocument();
   });
 
+  it("renders the split-pane workspace with internal pane scrolling", () => {
+    render(<WorkflowDraftEditor open draftId="draft_1" onClose={vi.fn()} />);
+
+    expect(screen.getByText("Draft content")).toBeInTheDocument();
+
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toBeInTheDocument();
+
+    const body = screen.getByText("Draft content").closest(".overflow-hidden.p-0");
+    expect(body).not.toBeNull();
+
+    const leftPane = screen.getByText("Draft content").closest(".border-r");
+    expect(leftPane).not.toBeNull();
+    expect(leftPane).toHaveClass("bg-white");
+
+    const rightPane = dialog.querySelector("aside");
+    expect(rightPane).not.toBeNull();
+    expect(rightPane).toHaveClass("bg-[#f7f4ee]");
+    expect(rightPane).toHaveTextContent("Source idea");
+  });
+
   it("runs the stage agent and records the resulting draft pass", async () => {
     render(<WorkflowDraftEditor open draftId="draft_1" onClose={vi.fn()} />);
     fireEvent.click(screen.getByText("Copyedit Agent"));

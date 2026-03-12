@@ -771,54 +771,60 @@ export function WorkflowBoard() {
                         ) : null}
                       </KanbanHeader>
 
-                      <KanbanCards<WorkflowCardRecord>
-                        className="gap-3 p-0"
-                        id={column.id}
-                      >
-                        {(item) => (
-                          <KanbanCard
-                            className="rounded-[20px] border-0 bg-transparent p-0 shadow-none"
-                            column={item.column}
-                            id={item.id}
-                            key={item.id}
-                            name={item.name}
-                          >
-                            <BoardCard
-                              card={item}
-                              onAdvanceDraft={handleAdvanceDraft}
-                              onAdvanceIdea={handleAdvanceIdea}
-                              onArchiveIdea={async (ideaId) => {
-                                await moveIdeaToStatus({ id: ideaId, status: "archived" });
-                              }}
-                              onMoveIdeaToBacklog={async (ideaId) => {
-                                await moveIdeaToStatus({ id: ideaId, status: "backlog" });
-                              }}
-                              onOpenDraft={(draftId) => setDraftEditorId(draftId)}
-                              onOpenIdea={(ideaId) => setIdeaEditorId(ideaId)}
-                              onOverflow={() => setOverflowColumnId(column.id)}
-                              onPublishDraft={handleAdvanceDraft}
-                              onRunDraftAgent={runDraftAgent}
-                              onSpawnDraft={handleSpawnDraft}
-                            />
-                          </KanbanCard>
-                        )}
-                      </KanbanCards>
-
-                      <div className="mt-3">
-                        {hiddenCount > 0 ? (
-                          <Button
-                            className="w-full rounded-full"
-                            onClick={() => setOverflowColumnId(column.id)}
-                            variant="outline"
-                          >
-                            +{hiddenCount} more
-                          </Button>
-                        ) : columnData.cards.length === 0 ? (
-                          <p className="text-xs text-muted-foreground">
+                      {columnData.cards.length === 0 ? (
+                        <div className="flex-1">
+                          <p className="text-sm text-muted-foreground">
                             Nothing here right now.
                           </p>
-                        ) : null}
-                      </div>
+                        </div>
+                      ) : (
+                        <>
+                          <KanbanCards<WorkflowCardRecord>
+                            className="gap-3 p-0"
+                            id={column.id}
+                          >
+                            {(item) => (
+                              <KanbanCard
+                                className="rounded-[20px] border-0 bg-transparent p-0 shadow-none"
+                                column={item.column}
+                                id={item.id}
+                                key={item.id}
+                                name={item.name}
+                              >
+                                <BoardCard
+                                  card={item}
+                                  onAdvanceDraft={handleAdvanceDraft}
+                                  onAdvanceIdea={handleAdvanceIdea}
+                                  onArchiveIdea={async (ideaId) => {
+                                    await moveIdeaToStatus({ id: ideaId, status: "archived" });
+                                  }}
+                                  onMoveIdeaToBacklog={async (ideaId) => {
+                                    await moveIdeaToStatus({ id: ideaId, status: "backlog" });
+                                  }}
+                                  onOpenDraft={(draftId) => setDraftEditorId(draftId)}
+                                  onOpenIdea={(ideaId) => setIdeaEditorId(ideaId)}
+                                  onOverflow={() => setOverflowColumnId(column.id)}
+                                  onPublishDraft={handleAdvanceDraft}
+                                  onRunDraftAgent={runDraftAgent}
+                                  onSpawnDraft={handleSpawnDraft}
+                                />
+                              </KanbanCard>
+                            )}
+                          </KanbanCards>
+
+                          {hiddenCount > 0 ? (
+                            <div className="mt-3">
+                              <Button
+                                className="w-full rounded-full"
+                                onClick={() => setOverflowColumnId(column.id)}
+                                variant="outline"
+                              >
+                                +{hiddenCount} more
+                              </Button>
+                            </div>
+                          ) : null}
+                        </>
+                      )}
                     </KanbanBoard>
                   );
                 }}
@@ -1135,7 +1141,7 @@ function BoardCard({
 
     return (
       <Card
-        className={`rounded-[20px] border py-0 shadow-[0_14px_30px_rgba(0,21,36,0.08)] ${
+        className={`min-w-0 rounded-[20px] border py-0 shadow-[0_14px_30px_rgba(0,21,36,0.08)] ${
           isResearch
             ? "border-[#b8dce1] bg-[linear-gradient(180deg,#ffffff_0%,#f4fbfd_100%)]"
             : "border-[#ffd59c] bg-[linear-gradient(180deg,#ffffff_0%,#fff8ec_100%)]"
@@ -1145,7 +1151,7 @@ function BoardCard({
         <CardHeader className="gap-3 border-b border-border/70 py-4">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 space-y-3">
-              <CardTitle className="pr-2 font-forum text-[1.7rem] leading-[1.02] break-words text-[var(--ink-black)]">
+              <CardTitle className="pr-2 font-forum text-[1.7rem] leading-[1.02] break-words [overflow-wrap:anywhere] text-[var(--ink-black)]">
                 {card.title}
               </CardTitle>
               {supportingBadges.length > 0 ? (
@@ -1215,7 +1221,7 @@ function BoardCard({
               ) : null}
             </>
           ) : card.idea.title ? (
-            <p className="line-clamp-3 break-words text-sm leading-6 text-muted-foreground">
+            <p className="line-clamp-3 break-words [overflow-wrap:anywhere] text-sm leading-6 text-muted-foreground">
               {card.idea.text}
             </p>
           ) : null}
@@ -1288,7 +1294,7 @@ function BoardCard({
 
   return (
     <Card
-      className="rounded-[20px] border border-[#d8dff2]/85 bg-[linear-gradient(180deg,#ffffff_0%,#f8f9ff_100%)] py-0 shadow-[0_14px_30px_rgba(0,21,36,0.08)]"
+      className="min-w-0 rounded-[20px] border border-[#d8dff2]/85 bg-[linear-gradient(180deg,#ffffff_0%,#f8f9ff_100%)] py-0 shadow-[0_14px_30px_rgba(0,21,36,0.08)]"
       size="sm"
     >
       <CardHeader className="gap-3 border-b border-border/70 py-4">
@@ -1315,7 +1321,7 @@ function BoardCard({
                 </Badge>
               ) : null}
             </div>
-            <CardTitle className="font-forum text-[1.7rem] leading-none break-words text-[var(--ink-black)]">
+            <CardTitle className="font-forum text-[1.7rem] leading-none break-words [overflow-wrap:anywhere] text-[var(--ink-black)]">
               {card.draft.title}
             </CardTitle>
           </div>

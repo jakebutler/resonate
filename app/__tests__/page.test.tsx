@@ -64,6 +64,10 @@ describe("Dashboard", () => {
     expect(screen.queryByText("Blog Posts")).not.toBeInTheDocument()
     expect(screen.queryByText("LinkedIn Posts")).not.toBeInTheDocument()
     expect(screen.getByText("Publishing Calendar")).toBeInTheDocument()
+    expect(screen.queryByText("Publishing view")).not.toBeInTheDocument()
+    expect(
+      screen.queryByText("Place content on the schedule, then jump into drafting when a date needs a post.")
+    ).not.toBeInTheDocument()
   })
 
   it("shows Calendar by default", () => {
@@ -79,10 +83,14 @@ describe("Dashboard", () => {
     expect(screen.queryByTestId("calendar")).not.toBeInTheDocument()
   })
 
-  it("switches to Workflow view when Workflow tab clicked", () => {
+  it("switches to Workflow view when Kanban tab clicked", () => {
     render(<Dashboard />)
-    fireEvent.click(screen.getByText("Workflow"))
+    fireEvent.click(screen.getByText("Kanban"))
     expect(screen.getByTestId("workflow-board")).toBeInTheDocument()
+    expect(screen.queryByText("Active board")).not.toBeInTheDocument()
+    expect(
+      screen.queryByText("Capture ideas, pull inspiration forward, and move each post through one clear stage at a time.")
+    ).not.toBeInTheDocument()
   })
 
   it("opens CreatePostModal when calendar add-post is clicked", () => {

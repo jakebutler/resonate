@@ -198,7 +198,7 @@ export function WorkflowDraftEditor({
   return (
     <>
       <Modal
-        bodyClassName="p-0"
+        bodyClassName="min-h-0 overflow-hidden p-0"
         footer={footer}
         onClose={onClose}
         open={open}
@@ -211,112 +211,114 @@ export function WorkflowDraftEditor({
         ) : !data ? (
           <div className="p-6 text-sm text-muted-foreground">Draft not found.</div>
         ) : (
-          <div className="grid h-full min-h-0 lg:grid-cols-[minmax(0,1fr)_360px]">
-            <ScrollArea className="min-h-0 border-r border-border/80 bg-white">
-              <div className="space-y-5 px-6 py-6">
-                <Card className="rounded-[28px] border border-border/80 bg-[linear-gradient(135deg,#061b29_0%,#124159_100%)] text-white shadow-none">
-                  <CardHeader className="gap-3">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="space-y-2">
-                        <Badge className="rounded-full bg-white/10 text-white" variant="secondary">
-                          Full-screen workflow editor
-                        </Badge>
-                        <CardTitle className="font-forum text-[2rem] leading-none text-white">
-                          {STAGE_LABELS[data.draft.stage]}
-                        </CardTitle>
+          <div className="grid h-full min-h-0 overflow-hidden lg:grid-cols-[minmax(0,1fr)_360px]">
+            <div className="min-h-0 min-w-0 border-r border-border/80 bg-white">
+              <ScrollArea className="h-full min-h-0">
+                <div className="space-y-5 px-6 py-6">
+                  <Card className="rounded-[28px] border border-border/80 bg-[linear-gradient(135deg,#061b29_0%,#124159_100%)] text-white shadow-none">
+                    <CardHeader className="gap-3">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="space-y-2">
+                          <Badge className="rounded-full bg-white/10 text-white" variant="secondary">
+                            Full-screen workflow editor
+                          </Badge>
+                          <CardTitle className="font-forum text-[2rem] leading-none text-white">
+                            {STAGE_LABELS[data.draft.stage]}
+                          </CardTitle>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <Badge className="rounded-full bg-white/12 text-white" variant="secondary">
+                            {data.draft.type === "blog" ? "Blog" : "LinkedIn"}
+                          </Badge>
+                          <Badge className="rounded-full bg-white/12 text-white" variant="secondary">
+                            Updated {formatWorkflowTimestamp(data.draft.updatedAt)}
+                          </Badge>
+                        </div>
                       </div>
-                      <div className="flex flex-wrap gap-2">
-                        <Badge className="rounded-full bg-white/12 text-white" variant="secondary">
-                          {data.draft.type === "blog" ? "Blog" : "LinkedIn"}
-                        </Badge>
-                        <Badge className="rounded-full bg-white/12 text-white" variant="secondary">
-                          Updated {formatWorkflowTimestamp(data.draft.updatedAt)}
-                        </Badge>
-                      </div>
-                    </div>
-                    <p className="text-sm leading-6 text-white/80">
-                      Use the board to triage, then finish substantive work here without the
-                      lane layout getting in the way.
-                    </p>
-                  </CardHeader>
-                </Card>
+                      <p className="text-sm leading-6 text-white/80">
+                        Use the board to triage, then finish substantive work here without the
+                        lane layout getting in the way.
+                      </p>
+                    </CardHeader>
+                  </Card>
 
-                <Card className="rounded-[28px] border border-border/80 bg-white shadow-none">
-                  <CardHeader>
-                    <CardTitle className="text-base text-[var(--ink-black)]">
-                      Draft content
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="grid gap-5 pb-6">
-                    {data.draft.type === "blog" ? (
+                  <Card className="rounded-[28px] border border-border/80 bg-white shadow-none">
+                    <CardHeader>
+                      <CardTitle className="text-base text-[var(--ink-black)]">
+                        Draft content
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="grid gap-5 pb-6">
+                      {data.draft.type === "blog" ? (
+                        <div className="space-y-2">
+                          <Label htmlFor="draft-title">Working Title</Label>
+                          <Input
+                            id="draft-title"
+                            onChange={(event) => setTitle(event.target.value)}
+                            placeholder="Untitled blog draft"
+                            value={title}
+                          />
+                        </div>
+                      ) : null}
+
+                      <div className="grid gap-5 md:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label htmlFor="draft-date">Publish Date</Label>
+                          <div className="relative">
+                            <CalendarDays className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                            <Input
+                              className="pl-10"
+                              id="draft-date"
+                              onChange={(event) => setScheduledDate(event.target.value)}
+                              type="date"
+                              value={scheduledDate}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="draft-time">Publish Time</Label>
+                          <div className="relative">
+                            <Clock3 className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                            <Input
+                              className="pl-10"
+                              id="draft-time"
+                              onChange={(event) => setScheduledTime(event.target.value)}
+                              type="time"
+                              value={scheduledTime}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
                       <div className="space-y-2">
-                        <Label htmlFor="draft-title">Working Title</Label>
-                        <Input
-                          id="draft-title"
-                          onChange={(event) => setTitle(event.target.value)}
-                          placeholder="Untitled blog draft"
-                          value={title}
+                        <Label htmlFor="draft-content">Draft Body</Label>
+                        <Textarea
+                          id="draft-content"
+                          onChange={(event) => setContent(event.target.value)}
+                          rows={22}
+                          value={content}
                         />
                       </div>
-                    ) : null}
-
-                    <div className="grid gap-5 md:grid-cols-2">
-                      <div className="space-y-2">
-                        <Label htmlFor="draft-date">Publish Date</Label>
-                        <div className="relative">
-                          <CalendarDays className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                          <Input
-                            className="pl-10"
-                            id="draft-date"
-                            onChange={(event) => setScheduledDate(event.target.value)}
-                            type="date"
-                            value={scheduledDate}
-                          />
-                        </div>
-                      </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="draft-time">Publish Time</Label>
-                        <div className="relative">
-                          <Clock3 className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                          <Input
-                            className="pl-10"
-                            id="draft-time"
-                            onChange={(event) => setScheduledTime(event.target.value)}
-                            type="time"
-                            value={scheduledTime}
-                          />
-                        </div>
+                        <Label htmlFor="draft-stage-notes">Stage Notes</Label>
+                        <Textarea
+                          id="draft-stage-notes"
+                          onChange={(event) => setStageNotes(event.target.value)}
+                          placeholder="Capture feedback, open questions, or direction for the next pass."
+                          rows={5}
+                          value={stageNotes}
+                        />
                       </div>
-                    </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </ScrollArea>
+            </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="draft-content">Draft Body</Label>
-                      <Textarea
-                        id="draft-content"
-                        onChange={(event) => setContent(event.target.value)}
-                        rows={22}
-                        value={content}
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="draft-stage-notes">Stage Notes</Label>
-                      <Textarea
-                        id="draft-stage-notes"
-                        onChange={(event) => setStageNotes(event.target.value)}
-                        placeholder="Capture feedback, open questions, or direction for the next pass."
-                        rows={5}
-                        value={stageNotes}
-                      />
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </ScrollArea>
-
-            <aside className="min-h-0 bg-[#f7f4ee]">
-              <ScrollArea className="h-full">
+            <aside className="min-h-0 min-w-0 bg-[#f7f4ee]">
+              <ScrollArea className="h-full min-h-0">
                 <div className="space-y-4 px-5 py-6">
                   <Card className="rounded-[24px] border border-border/80 bg-white shadow-none">
                     <CardHeader>

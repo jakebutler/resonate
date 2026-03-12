@@ -64,21 +64,15 @@ export default function Dashboard() {
     setEditorInitialDate(undefined);
   };
 
-  const viewMeta: Record<View, { eyebrow: string; title: string; description: string }> = {
+  const viewMeta: Record<View, { title: string }> = {
     calendar: {
-      eyebrow: "Publishing view",
       title: "Publishing Calendar",
-      description: "Place content on the schedule, then jump into drafting when a date needs a post.",
     },
     library: {
-      eyebrow: "Archive view",
       title: "Content Library",
-      description: "Review what exists, filter by format, and reopen pieces that deserve another pass.",
     },
     workflow: {
-      eyebrow: "Active board",
       title: "Post Workflow",
-      description: "Capture ideas, pull inspiration forward, and move each post through one clear stage at a time.",
     },
   };
 
@@ -139,19 +133,13 @@ export default function Dashboard() {
                 }`}
               >
                 <Layers3 size={14} />
-                Workflow
+                Kanban
               </button>
             </div>
             <div className="max-w-2xl">
-              <p className="text-[11px] uppercase tracking-[0.28em] text-[#15616d]/70">
-                {currentView.eyebrow}
-              </p>
-              <h1 className="mt-2 font-forum text-[2rem] leading-none text-[#001524] md:text-[2.35rem]">
+              <h1 className="font-forum text-[2rem] leading-none text-[#001524] md:text-[2.35rem]">
                 {currentView.title}
               </h1>
-              <p className="mt-1.5 text-sm leading-6 text-gray-600">
-                {currentView.description}
-              </p>
             </div>
           </div>
 

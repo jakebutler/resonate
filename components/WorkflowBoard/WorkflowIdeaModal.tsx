@@ -167,7 +167,7 @@ export function WorkflowIdeaModal({
 
   return (
     <Modal
-      bodyClassName="p-0"
+      bodyClassName="min-h-0 overflow-hidden p-0"
       footer={footer}
       onClose={onClose}
       open={open}
@@ -180,154 +180,156 @@ export function WorkflowIdeaModal({
       ) : !idea ? (
         <div className="p-6 text-sm text-muted-foreground">Idea not found.</div>
       ) : (
-        <div className="grid h-full min-h-0 md:grid-cols-[minmax(0,1.2fr)_320px] xl:grid-cols-[minmax(0,1.35fr)_360px]">
-          <ScrollArea className="min-h-0 border-r border-border/80">
-            <div className="space-y-5 px-6 py-6">
-              <Card className="rounded-[28px] border border-[#ffe0b8] bg-[linear-gradient(135deg,#fffaf0_0%,#fff4e4_100%)] shadow-none">
-                <CardHeader className="gap-3">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="grid h-full min-h-0 overflow-hidden md:grid-cols-[minmax(0,1.2fr)_320px] xl:grid-cols-[minmax(0,1.35fr)_360px]">
+          <div className="min-h-0 min-w-0 border-r border-border/80 bg-[#fcfaf6]">
+            <ScrollArea className="h-full min-h-0">
+              <div className="space-y-5 px-6 py-6">
+                <Card className="rounded-[28px] border border-[#ffe0b8] bg-[linear-gradient(135deg,#fffaf0_0%,#fff4e4_100%)] shadow-none">
+                  <CardHeader className="gap-3">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="space-y-2">
+                        <Badge
+                          className="rounded-full bg-white/90 text-[#8b4513]"
+                          variant="secondary"
+                        >
+                          Primitive idea
+                        </Badge>
+                        <CardTitle className="font-forum text-[2rem] leading-none text-[var(--ink-black)]">
+                          Keep the originating thought intact.
+                        </CardTitle>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <Badge className="rounded-full bg-white/80 text-[#8b4513]" variant="secondary">
+                          {idea.draftCount} downstream draft{idea.draftCount === 1 ? "" : "s"}
+                        </Badge>
+                        <Badge className="rounded-full bg-white/80 text-muted-foreground" variant="secondary">
+                          Updated {formatWorkflowTimestamp(idea.updatedAt)}
+                        </Badge>
+                      </div>
+                    </div>
+                    <p className="text-sm leading-6 text-muted-foreground">
+                      Research and downstream posts should sharpen this idea, not overwrite it.
+                    </p>
+                  </CardHeader>
+                </Card>
+
+                <Card className="rounded-[28px] border border-border/80 bg-white shadow-none">
+                  <CardHeader className="gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#fff1db] text-[#8b4513]">
+                        <BookOpenText className="size-5" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-base text-[var(--ink-black)]">
+                          Core brief
+                        </CardTitle>
+                        <p className="text-sm text-muted-foreground">
+                          Write the idea clearly first. Everything else is supporting structure.
+                        </p>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="grid gap-5 pb-6">
                     <div className="space-y-2">
-                      <Badge
-                        className="rounded-full bg-white/90 text-[#8b4513]"
-                        variant="secondary"
-                      >
-                        Primitive idea
-                      </Badge>
-                      <CardTitle className="font-forum text-[2rem] leading-none text-[var(--ink-black)]">
-                        Keep the originating thought intact.
-                      </CardTitle>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <Badge className="rounded-full bg-white/80 text-[#8b4513]" variant="secondary">
-                        {idea.draftCount} downstream draft{idea.draftCount === 1 ? "" : "s"}
-                      </Badge>
-                      <Badge className="rounded-full bg-white/80 text-muted-foreground" variant="secondary">
-                        Updated {formatWorkflowTimestamp(idea.updatedAt)}
-                      </Badge>
-                    </div>
-                  </div>
-                  <p className="text-sm leading-6 text-muted-foreground">
-                    Research and downstream posts should sharpen this idea, not overwrite it.
-                  </p>
-                </CardHeader>
-              </Card>
-
-              <Card className="rounded-[28px] border border-border/80 bg-white shadow-none">
-                <CardHeader className="gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#fff1db] text-[#8b4513]">
-                      <BookOpenText className="size-5" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-base text-[var(--ink-black)]">
-                        Core brief
-                      </CardTitle>
-                      <p className="text-sm text-muted-foreground">
-                        Write the idea clearly first. Everything else is supporting structure.
-                      </p>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="grid gap-5 pb-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="idea-title">Working Title</Label>
-                    <Input
-                      id="idea-title"
-                      onChange={(event) => setTitle(event.target.value)}
-                      placeholder="Optional title for the idea"
-                      value={title}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="idea-text">Core Idea</Label>
-                    <Textarea
-                      id="idea-text"
-                      onChange={(event) => setText(event.target.value)}
-                      placeholder="What is the original thought worth exploring?"
-                      rows={12}
-                      value={text}
-                    />
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="rounded-[28px] border border-border/80 bg-white shadow-none">
-                <CardHeader className="gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#e8f6f8] text-[#15616d]">
-                      <Compass className="size-5" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-base text-[var(--ink-black)]">
-                        Research angle
-                      </CardTitle>
-                      <p className="text-sm text-muted-foreground">
-                        Define what the research should prove, challenge, or clarify.
-                      </p>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="grid gap-5 pb-6">
-                  <div className="grid gap-5 lg:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="idea-objective">Research Objective</Label>
-                      <Textarea
-                        id="idea-objective"
-                        onChange={(event) => setResearchObjective(event.target.value)}
-                        placeholder="What should the research prove, challenge, or clarify?"
-                        rows={6}
-                        value={researchObjective}
+                      <Label htmlFor="idea-title">Working Title</Label>
+                      <Input
+                        id="idea-title"
+                        onChange={(event) => setTitle(event.target.value)}
+                        placeholder="Optional title for the idea"
+                        value={title}
                       />
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="idea-research-notes">Research Notes</Label>
+                      <Label htmlFor="idea-text">Core Idea</Label>
                       <Textarea
-                        id="idea-research-notes"
-                        onChange={(event) => setResearchNotes(event.target.value)}
-                        placeholder="Capture source notes, examples, stats, and objections here."
-                        rows={10}
-                        value={researchNotes}
+                        id="idea-text"
+                        onChange={(event) => setText(event.target.value)}
+                        placeholder="What is the original thought worth exploring?"
+                        rows={12}
+                        value={text}
                       />
                     </div>
-                  </div>
+                  </CardContent>
+                </Card>
 
-                  <Separator />
+                <Card className="rounded-[28px] border border-border/80 bg-white shadow-none">
+                  <CardHeader className="gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#e8f6f8] text-[#15616d]">
+                        <Compass className="size-5" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-base text-[var(--ink-black)]">
+                          Research angle
+                        </CardTitle>
+                        <p className="text-sm text-muted-foreground">
+                          Define what the research should prove, challenge, or clarify.
+                        </p>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="grid gap-5 pb-6">
+                    <div className="grid gap-5 lg:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="idea-objective">Research Objective</Label>
+                        <Textarea
+                          id="idea-objective"
+                          onChange={(event) => setResearchObjective(event.target.value)}
+                          placeholder="What should the research prove, challenge, or clarify?"
+                          rows={6}
+                          value={researchObjective}
+                        />
+                      </div>
 
-                  <div className="grid gap-5 lg:grid-cols-2">
-                    <SelectionSection
-                      items={RESEARCH_MODES}
-                      selected={researchModes}
-                      title="Research Modes"
-                      onToggle={(value) =>
-                        toggleSelection(
-                          value as ResearchMode,
-                          researchModes,
-                          setResearchModes
-                        )
-                      }
-                    />
-                    <SelectionSection
-                      items={RESEARCH_SOURCES}
-                      selected={researchSources}
-                      title="Source Buckets"
-                      onToggle={(value) =>
-                        toggleSelection(
-                          value as ResearchSource,
-                          researchSources,
-                          setResearchSources
-                        )
-                      }
-                    />
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </ScrollArea>
+                      <div className="space-y-2">
+                        <Label htmlFor="idea-research-notes">Research Notes</Label>
+                        <Textarea
+                          id="idea-research-notes"
+                          onChange={(event) => setResearchNotes(event.target.value)}
+                          placeholder="Capture source notes, examples, stats, and objections here."
+                          rows={10}
+                          value={researchNotes}
+                        />
+                      </div>
+                    </div>
 
-          <aside className="min-h-0 bg-[#f6f1e8]">
-            <ScrollArea className="h-full">
+                    <Separator />
+
+                    <div className="grid gap-5 lg:grid-cols-2">
+                      <SelectionSection
+                        items={RESEARCH_MODES}
+                        selected={researchModes}
+                        title="Research Modes"
+                        onToggle={(value) =>
+                          toggleSelection(
+                            value as ResearchMode,
+                            researchModes,
+                            setResearchModes
+                          )
+                        }
+                      />
+                      <SelectionSection
+                        items={RESEARCH_SOURCES}
+                        selected={researchSources}
+                        title="Source Buckets"
+                        onToggle={(value) =>
+                          toggleSelection(
+                            value as ResearchSource,
+                            researchSources,
+                            setResearchSources
+                          )
+                        }
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </ScrollArea>
+          </div>
+
+          <aside className="min-h-0 min-w-0 bg-[#f6f1e8]">
+            <ScrollArea className="h-full min-h-0">
               <div className="space-y-4 px-5 py-6">
                 <Card className="rounded-[24px] border border-border/80 bg-white shadow-none">
                   <CardHeader className="gap-3">
