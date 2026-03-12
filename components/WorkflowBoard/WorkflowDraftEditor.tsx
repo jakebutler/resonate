@@ -365,9 +365,12 @@ export function WorkflowDraftEditor({
                         </div>
                       ) : (
                         data.idea.references.map((reference) => (
-                          <div
-                            className="rounded-2xl border border-border/80 bg-[#faf7f2] px-4 py-3"
+                          <a
+                            className="block rounded-2xl border border-border/80 bg-[#faf7f2] px-4 py-3 transition-colors hover:border-[#15616d]/30 hover:bg-[#f4fbfc]"
+                            href={reference.url}
                             key={reference.url}
+                            rel="noreferrer"
+                            target="_blank"
                           >
                             <p className="text-sm font-medium text-[var(--ink-black)]">
                               {reference.title || reference.url}
@@ -377,7 +380,7 @@ export function WorkflowDraftEditor({
                                 {reference.url}
                               </p>
                             ) : null}
-                          </div>
+                          </a>
                         ))
                       )}
                     </CardContent>

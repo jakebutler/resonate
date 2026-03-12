@@ -153,7 +153,7 @@ export const ComboboxTrigger = ({
         {children ?? (
           <span className="flex w-full items-center justify-between gap-2">
             {value
-              ? data.find((item) => item.value === value)?.label
+              ? data.find((item) => item.value === value)?.label ?? value
               : `Select ${type}...`}
             <ChevronsUpDownIcon
               className="shrink-0 text-muted-foreground"

@@ -1,14 +1,5 @@
 export const CORTEX_BASE_URL = process.env.CORTEX_BASE_URL || "https://cortex.corvolabs.com";
 
-if (!process.env.CORTEX_API_KEY && !process.env.OPENAI_API_KEY) {
-  throw new Error("Missing required environment variable: CORTEX_API_KEY or OPENAI_API_KEY");
-}
-
-// Prefer Cortex when available; fall back to OpenAI directly only when no Cortex key is set
-const USE_OPENAI = !process.env.CORTEX_API_KEY && !!process.env.OPENAI_API_KEY;
-const API_KEY = USE_OPENAI ? process.env.OPENAI_API_KEY! : process.env.CORTEX_API_KEY!;
-const BASE_URL = USE_OPENAI ? "https://api.openai.com" : CORTEX_BASE_URL;
-
 export const LINKEDIN_SYSTEM_PROMPT = `You are an expert LinkedIn content writer for Corvo Labs, an AI consulting agency.
 Your role is to help craft compelling, professional LinkedIn posts that:
 - Sound authentic and conversational, not corporate or generic
@@ -54,6 +45,23 @@ const SYSTEM_PROMPTS: Record<AssistantType, string> = {
   blog: BLOG_SYSTEM_PROMPT,
 };
 
+function getCortexConfig() {
+  const cortexApiKey = process.env.CORTEX_API_KEY;
+  const openAiApiKey = process.env.OPENAI_API_KEY;
+
+  if (!cortexApiKey && !openAiApiKey) {
+    throw new Error("Missing required environment variable: CORTEX_API_KEY or OPENAI_API_KEY");
+  }
+
+  const useOpenAI = !cortexApiKey && !!openAiApiKey;
+
+  return {
+    useOpenAI,
+    apiKey: useOpenAI ? openAiApiKey! : cortexApiKey!,
+    baseUrl: useOpenAI ? "https://api.openai.com" : CORTEX_BASE_URL,
+  };
+}
+
 export async function streamCortexChat(
   messages: ChatMessage[],
   options?: {
@@ -61,13 +69,14 @@ export async function streamCortexChat(
     model?: string;
   }
 ): Promise<ReadableStream> {
-  const resolvedModel = options?.model ?? (USE_OPENAI ? "gpt-4o" : "claude-sonnet-4.6");
+  const { useOpenAI, apiKey, baseUrl } = getCortexConfig();
+  const resolvedModel = options?.model ?? (useOpenAI ? "gpt-4o" : "claude-sonnet-4.6");
   const assistantType = options?.assistantType ?? "linkedin";
 
-  const response = await fetch(`${BASE_URL}/v1/chat/completions`, {
+  const response = await fetch(`${baseUrl}/v1/chat/completions`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${API_KEY}`,
+      Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({

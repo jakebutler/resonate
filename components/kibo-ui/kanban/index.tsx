@@ -256,14 +256,28 @@ export const KanbanProvider = <
       columns[0]?.id;
 
     if (activeColumn !== overColumn) {
-      let newData = [...data];
+      const newData = [...data];
       const activeIndex = newData.findIndex((item) => item.id === active.id);
+
+      if (activeIndex === -1) {
+        return;
+      }
+
+      newData[activeIndex] = { ...newData[activeIndex], column: overColumn };
+
+      if (!overItem) {
+        onDataChange?.(newData);
+        onDragOver?.(event);
+        return;
+      }
+
       const overIndex = newData.findIndex((item) => item.id === over.id);
 
-      newData[activeIndex].column = overColumn;
-      newData = arrayMove(newData, activeIndex, overIndex);
+      if (overIndex === -1) {
+        return;
+      }
 
-      onDataChange?.(newData);
+      onDataChange?.(arrayMove(newData, activeIndex, overIndex));
     }
 
     onDragOver?.(event);
@@ -284,6 +298,10 @@ export const KanbanProvider = <
 
     const oldIndex = newData.findIndex((item) => item.id === active.id);
     const newIndex = newData.findIndex((item) => item.id === over.id);
+
+    if (oldIndex === -1 || newIndex === -1) {
+      return;
+    }
 
     newData = arrayMove(newData, oldIndex, newIndex);
 

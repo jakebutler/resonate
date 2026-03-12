@@ -211,6 +211,10 @@ function formatWorkflowCardDate(timestamp: number) {
   return workflowCardDateFormatter.format(new Date(timestamp));
 }
 
+function cloneWorkflowCards(cards: WorkflowCardRecord[]) {
+  return cards.map((card) => ({ ...card }));
+}
+
 export function WorkflowBoard() {
   const board = useQuery(api.workflow.getBoard);
   const createIdea = useMutation(api.workflow.createIdea);
@@ -606,8 +610,8 @@ export function WorkflowBoard() {
     }
 
     const activeCard =
-      kanbanItems.find((item) => item.id === activeId) ||
-      dragSnapshot.find((item) => item.id === activeId);
+      dragSnapshot.find((item) => item.id === activeId) ||
+      kanbanItems.find((item) => item.id === activeId);
     const overCard = kanbanItems.find((item) => item.id === overId);
     const targetColumn =
       overCard?.column ||
@@ -615,7 +619,7 @@ export function WorkflowBoard() {
       null;
 
     if (!activeCard || !targetColumn) {
-      setKanbanItems(dragSnapshot);
+      setKanbanItems(cloneWorkflowCards(dragSnapshot));
       setDragSnapshot(null);
       return;
     }
@@ -626,7 +630,7 @@ export function WorkflowBoard() {
     }
 
     if (!canDragToColumn(activeCard.stage, targetColumn)) {
-      setKanbanItems(dragSnapshot);
+      setKanbanItems(cloneWorkflowCards(dragSnapshot));
       if (activeCard.kind === "idea" && activeCard.stage === "research") {
         setBoardNotice(
           "Use Blog Draft or LinkedIn Draft to choose the post instance you want to create."
@@ -641,10 +645,10 @@ export function WorkflowBoard() {
     try {
       const transitioned = await handleCardTransition(activeCard, targetColumn);
       if (!transitioned) {
-        setKanbanItems(dragSnapshot);
+        setKanbanItems(cloneWorkflowCards(dragSnapshot));
       }
     } catch {
-      setKanbanItems(dragSnapshot);
+      setKanbanItems(cloneWorkflowCards(dragSnapshot));
     } finally {
       setDragSnapshot(null);
     }
@@ -703,7 +707,7 @@ export function WorkflowBoard() {
                 data={kanbanItems}
                 onDataChange={setKanbanItems}
                 onDragEnd={handleDragEnd}
-                onDragStart={() => setDragSnapshot(kanbanItems)}
+                onDragStart={() => setDragSnapshot(cloneWorkflowCards(kanbanItems))}
               >
                 {(column) => {
                   const definition = WORKFLOW_REVIEW_COLUMNS.find(

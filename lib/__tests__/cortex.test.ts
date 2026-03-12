@@ -1,7 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from 'vitest'
 
-// cortex.ts reads env vars as module-level constants; re-evaluate after setting them.
 let streamCortexChat: (typeof import('@/lib/cortex'))['streamCortexChat']
 let LINKEDIN_SYSTEM_PROMPT: (typeof import('@/lib/cortex'))['LINKEDIN_SYSTEM_PROMPT']
 let BLOG_SYSTEM_PROMPT: (typeof import('@/lib/cortex'))['BLOG_SYSTEM_PROMPT']
@@ -94,12 +93,17 @@ describe('streamCortexChat', () => {
 })
 
 describe('module initialization', () => {
-  it('throws when CORTEX_API_KEY is not set', async () => {
-    const saved = process.env.CORTEX_API_KEY
+  it('throws when neither CORTEX_API_KEY nor OPENAI_API_KEY is set at call time', async () => {
+    const savedCortexKey = process.env.CORTEX_API_KEY
+    const savedOpenAiKey = process.env.OPENAI_API_KEY
     delete process.env.CORTEX_API_KEY
+    delete process.env.OPENAI_API_KEY
     vi.resetModules()
-    await expect(import('@/lib/cortex')).rejects.toThrow('Missing required environment variable: CORTEX_API_KEY')
-    process.env.CORTEX_API_KEY = saved
+    const mod = await import('@/lib/cortex')
+    await expect(mod.streamCortexChat([{ role: 'user', content: 'test' }]))
+      .rejects.toThrow('Missing required environment variable: CORTEX_API_KEY or OPENAI_API_KEY')
+    process.env.CORTEX_API_KEY = savedCortexKey
+    process.env.OPENAI_API_KEY = savedOpenAiKey
     vi.resetModules()
   })
 })
