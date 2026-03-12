@@ -5,7 +5,7 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { SlideOver } from "@/components/ui/SlideOver";
-import { Button } from "@/components/ui/Button";
+import { Button } from "@/components/ui/button";
 import { AIAssistant } from "@/components/AIAssistant/AIAssistant";
 import { Linkedin, Trash2, Save, Edit3, Sparkles } from "lucide-react";
 

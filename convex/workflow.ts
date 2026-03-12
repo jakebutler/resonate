@@ -285,6 +285,7 @@ export const getBoard = query({
             stage: draft.stage,
             title: formatWorkflowTitle(post.title, post.content),
             preview: summarizeTextPreview(post.content),
+            content: post.content,
             postStatus: post.status,
             scheduledDate: post.scheduledDate,
             scheduledTime: post.scheduledTime,
@@ -299,6 +300,9 @@ export const getBoard = query({
             lastGateCheckedAt: draft.lastGateCheckedAt,
             ideaTitle: idea.title,
             ideaText: idea.text,
+            researchObjective: idea.researchObjective,
+            researchNotes: idea.researchNotes,
+            references: idea.references ?? [],
             updatedAt: draft.updatedAt,
           };
         })

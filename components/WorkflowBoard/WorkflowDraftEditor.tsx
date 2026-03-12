@@ -2,11 +2,23 @@
 
 import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
-import { ArrowRight, Bot, CalendarDays, CheckCircle2, Clock3, FileText, Sparkles, X } from "lucide-react";
+import {
+  ArrowRight,
+  Bot,
+  CalendarDays,
+  CheckCircle2,
+  Clock3,
+} from "lucide-react";
 import type { Id } from "@/convex/_generated/dataModel";
 import { api } from "@/convex/_generated/api";
-import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Modal } from "@/components/ui/Modal";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Textarea } from "@/components/ui/textarea";
 import { getAssistantResponse } from "@/lib/llmClient";
 import {
   STAGE_LABELS,
@@ -141,284 +153,297 @@ export function WorkflowDraftEditor({
     }
   };
 
-  if (!open) return null;
+  const footer = data ? (
+    <div className="flex w-full flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+      <div className="flex flex-wrap gap-2">
+        <Badge className="rounded-full bg-muted text-muted-foreground" variant="secondary">
+          {data.draft.type === "blog" ? "Blog draft" : "LinkedIn draft"}
+        </Badge>
+        <Badge className="rounded-full bg-[#eef2ff] text-[#4257a0]" variant="secondary">
+          {STAGE_LABELS[data.draft.stage]}
+        </Badge>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <Button onClick={onClose} variant="outline">
+          Close
+        </Button>
+        {nextStage ? (
+          <Button
+            disabled={runningAgent || advancing}
+            onClick={handleRunAgent}
+            variant="outline"
+          >
+            <Bot className="size-4" />
+            {runningAgent ? "Running..." : nextAgentLabel}
+          </Button>
+        ) : null}
+        <Button disabled={saving || advancing} onClick={handleSave} variant="outline">
+          <CheckCircle2 className="size-4" />
+          {saving ? "Saving..." : "Save"}
+        </Button>
+        {nextStage ? (
+          <Button
+            disabled={advancing || runningAgent}
+            onClick={() => handleAdvance(false)}
+          >
+            <ArrowRight className="size-4" />
+            {advancing ? "Checking..." : `Advance to ${STAGE_LABELS[nextStage]}`}
+          </Button>
+        ) : null}
+      </div>
+    </div>
+  ) : undefined;
 
   return (
     <>
-      <div className="fixed inset-0 z-50">
-        <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-        <div className="absolute inset-2 overflow-hidden rounded-[28px] border border-white/40 bg-[#f7f4ee] shadow-2xl md:inset-4">
-          <div className="flex h-full flex-col">
-            <header className="border-b border-black/5 bg-[linear-gradient(135deg,#001524_0%,#18485a_100%)] px-5 py-4 text-white md:px-7">
-              <div className="flex flex-wrap items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10">
-                    {data?.draft.type === "blog" ? <FileText size={18} /> : <Sparkles size={18} />}
-                  </div>
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.24em] text-white/60">
-                      Full-Screen Workflow Editor
+      <Modal
+        bodyClassName="p-0"
+        footer={footer}
+        onClose={onClose}
+        open={open}
+        panelClassName="h-[calc(100dvh-2rem)]"
+        size="full"
+        title={data ? STAGE_LABELS[data.draft.stage] : "Draft Workspace"}
+      >
+        {data === undefined ? (
+          <div className="p-6 text-sm text-muted-foreground">Loading draft...</div>
+        ) : !data ? (
+          <div className="p-6 text-sm text-muted-foreground">Draft not found.</div>
+        ) : (
+          <div className="grid h-full min-h-0 lg:grid-cols-[minmax(0,1fr)_360px]">
+            <ScrollArea className="min-h-0 border-r border-border/80 bg-white">
+              <div className="space-y-5 px-6 py-6">
+                <Card className="rounded-[28px] border border-border/80 bg-[linear-gradient(135deg,#061b29_0%,#124159_100%)] text-white shadow-none">
+                  <CardHeader className="gap-3">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="space-y-2">
+                        <Badge className="rounded-full bg-white/10 text-white" variant="secondary">
+                          Full-screen workflow editor
+                        </Badge>
+                        <CardTitle className="font-forum text-[2rem] leading-none text-white">
+                          {STAGE_LABELS[data.draft.stage]}
+                        </CardTitle>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <Badge className="rounded-full bg-white/12 text-white" variant="secondary">
+                          {data.draft.type === "blog" ? "Blog" : "LinkedIn"}
+                        </Badge>
+                        <Badge className="rounded-full bg-white/12 text-white" variant="secondary">
+                          Updated {formatWorkflowTimestamp(data.draft.updatedAt)}
+                        </Badge>
+                      </div>
+                    </div>
+                    <p className="text-sm leading-6 text-white/80">
+                      Use the board to triage, then finish substantive work here without the
+                      lane layout getting in the way.
                     </p>
-                    <h2 className="font-forum text-2xl">
-                      {data
-                        ? `${STAGE_LABELS[data.draft.stage]}`
-                        : "Loading draft…"}
-                    </h2>
-                  </div>
-                </div>
+                  </CardHeader>
+                </Card>
 
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button variant="secondary" onClick={onClose}>
-                    <X size={14} />
-                    Close
-                  </Button>
-                  {nextStage && (
-                    <Button
-                      variant="secondary"
-                      onClick={handleRunAgent}
-                      disabled={runningAgent || advancing}
-                    >
-                      <Bot size={14} />
-                      {runningAgent ? "Running…" : nextAgentLabel}
-                    </Button>
-                  )}
-                  <Button variant="secondary" onClick={handleSave} disabled={saving || advancing}>
-                    <CheckCircle2 size={14} />
-                    {saving ? "Saving…" : "Save"}
-                  </Button>
-                  {nextStage && (
-                    <Button
-                      variant="primary"
-                      onClick={() => handleAdvance(false)}
-                      disabled={advancing || runningAgent}
-                    >
-                      <ArrowRight size={14} />
-                      {advancing ? "Checking…" : `Advance to ${STAGE_LABELS[nextStage]}`}
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </header>
-
-            {data === undefined ? (
-              <div className="flex flex-1 items-center justify-center text-sm text-gray-500">
-                Loading draft…
-              </div>
-            ) : !data ? (
-              <div className="flex flex-1 items-center justify-center text-sm text-gray-500">
-                Draft not found.
-              </div>
-            ) : (
-              <div className="grid flex-1 gap-0 overflow-hidden lg:grid-cols-[minmax(0,1fr)_340px]">
-                <section className="overflow-y-auto bg-white px-5 py-5 md:px-7">
-                  <div className="mx-auto max-w-4xl space-y-5">
-                    {data.draft.type === "blog" && (
-                      <div>
-                        <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                          Working Title
-                        </label>
-                        <input
-                          value={title}
+                <Card className="rounded-[28px] border border-border/80 bg-white shadow-none">
+                  <CardHeader>
+                    <CardTitle className="text-base text-[var(--ink-black)]">
+                      Draft content
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="grid gap-5 pb-6">
+                    {data.draft.type === "blog" ? (
+                      <div className="space-y-2">
+                        <Label htmlFor="draft-title">Working Title</Label>
+                        <Input
+                          id="draft-title"
                           onChange={(event) => setTitle(event.target.value)}
-                          className="w-full rounded-2xl border border-gray-200 px-4 py-3 text-lg text-[#001524] shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#ff7d00]"
                           placeholder="Untitled blog draft"
+                          value={title}
                         />
                       </div>
-                    )}
+                    ) : null}
 
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <div>
-                        <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                          Publish Date
-                        </label>
+                    <div className="grid gap-5 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="draft-date">Publish Date</Label>
                         <div className="relative">
-                          <CalendarDays className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                          <input
+                          <CalendarDays className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                          <Input
+                            className="pl-10"
+                            id="draft-date"
+                            onChange={(event) => setScheduledDate(event.target.value)}
                             type="date"
                             value={scheduledDate}
-                            onChange={(event) => setScheduledDate(event.target.value)}
-                            className="w-full rounded-2xl border border-gray-200 py-3 pl-10 pr-4 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#ff7d00]"
                           />
                         </div>
                       </div>
-                      <div>
-                        <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                          Publish Time
-                        </label>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="draft-time">Publish Time</Label>
                         <div className="relative">
-                          <Clock3 className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                          <input
+                          <Clock3 className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                          <Input
+                            className="pl-10"
+                            id="draft-time"
+                            onChange={(event) => setScheduledTime(event.target.value)}
                             type="time"
                             value={scheduledTime}
-                            onChange={(event) => setScheduledTime(event.target.value)}
-                            className="w-full rounded-2xl border border-gray-200 py-3 pl-10 pr-4 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#ff7d00]"
                           />
                         </div>
                       </div>
                     </div>
 
-                    <div>
-                      <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                        Draft Body
-                      </label>
-                      <textarea
-                        value={content}
+                    <div className="space-y-2">
+                      <Label htmlFor="draft-content">Draft Body</Label>
+                      <Textarea
+                        id="draft-content"
                         onChange={(event) => setContent(event.target.value)}
-                        rows={24}
-                        className="min-h-[58dvh] w-full rounded-[24px] border border-gray-200 px-4 py-4 font-mono text-sm leading-7 text-[#001524] shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#ff7d00]"
-                        placeholder="Draft content goes here"
+                        rows={22}
+                        value={content}
                       />
                     </div>
-                  </div>
-                </section>
 
-                <aside className="overflow-y-auto border-t border-black/5 bg-[#f4efe4] px-5 py-5 lg:border-l lg:border-t-0">
-                  <div className="space-y-4">
-                    <div className="rounded-3xl bg-white p-4 shadow-sm">
-                      <p className="text-xs uppercase tracking-[0.2em] text-gray-400">
-                        Source Idea
-                      </p>
-                      <h3 className="mt-2 font-forum text-xl text-[#001524]">
-                        {data.idea.title || "Untitled idea"}
-                      </h3>
-                      <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-gray-700">
-                        {data.idea.text}
-                      </p>
-                    </div>
-
-                    <div className="rounded-3xl bg-white p-4 shadow-sm">
-                      <p className="text-xs uppercase tracking-[0.2em] text-gray-400">
-                        Research Context
-                      </p>
-                      <div className="mt-3 space-y-3 text-sm text-gray-700">
-                        <div>
-                          <p className="font-medium text-[#001524]">Objective</p>
-                          <p>{data.idea.researchObjective || "No objective captured yet."}</p>
-                        </div>
-                        <div>
-                          <p className="font-medium text-[#001524]">Notes</p>
-                          <p className="whitespace-pre-wrap">
-                            {data.idea.researchNotes || "No research notes captured yet."}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="rounded-3xl bg-white p-4 shadow-sm">
-                      <p className="text-xs uppercase tracking-[0.2em] text-gray-400">
-                        References
-                      </p>
-                      <div className="mt-3 space-y-2">
-                        {data.idea.references.length === 0 ? (
-                          <p className="text-sm text-gray-500">No references attached yet.</p>
-                        ) : (
-                          data.idea.references.map((reference) => (
-                            <a
-                              key={reference.url}
-                              href={reference.url}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="block rounded-2xl border border-gray-100 bg-gray-50 px-3 py-2 text-sm text-[#15616d] transition-colors hover:border-[#15616d]/30 hover:bg-[#15616d]/5"
-                            >
-                              {reference.title || reference.url}
-                            </a>
-                          ))
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="rounded-3xl bg-white p-4 shadow-sm">
-                      <p className="text-xs uppercase tracking-[0.2em] text-gray-400">
-                        Editor Notes
-                      </p>
-                      <textarea
-                        value={stageNotes}
+                    <div className="space-y-2">
+                      <Label htmlFor="draft-stage-notes">Stage Notes</Label>
+                      <Textarea
+                        id="draft-stage-notes"
                         onChange={(event) => setStageNotes(event.target.value)}
-                        rows={7}
-                        className="mt-3 w-full rounded-2xl border border-gray-200 px-3 py-3 text-sm leading-6 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#ff7d00]"
-                        placeholder="Capture reviewer notes, blockers, or reminders for this stage."
+                        placeholder="Capture feedback, open questions, or direction for the next pass."
+                        rows={5}
+                        value={stageNotes}
                       />
                     </div>
-
-                    <div className="rounded-3xl bg-white p-4 shadow-sm">
-                      <p className="text-xs uppercase tracking-[0.2em] text-gray-400">
-                        Workflow Signals
-                      </p>
-                      <div className="mt-3 space-y-3 text-sm text-gray-700">
-                        <div>
-                          <p className="font-medium text-[#001524]">Last agent run</p>
-                          <p>{data.draft.lastAgentSummary || "No stage agent has been run yet."}</p>
-                          {data.draft.lastAgentRunAt && (
-                            <p className="mt-1 text-xs text-gray-500">
-                              {formatWorkflowTimestamp(data.draft.lastAgentRunAt)}
-                            </p>
-                          )}
-                        </div>
-
-                        <div>
-                          <p className="font-medium text-[#001524]">Last gate check</p>
-                          <p>{data.draft.lastGateSummary || "No gate check recorded yet."}</p>
-                          {data.draft.lastGateIssues.length > 0 && (
-                            <ul className="mt-2 space-y-1 text-xs text-[#78290f]">
-                              {data.draft.lastGateIssues.map((issue) => (
-                                <li key={issue}>• {issue}</li>
-                              ))}
-                            </ul>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </aside>
+                  </CardContent>
+                </Card>
               </div>
-            )}
+            </ScrollArea>
+
+            <aside className="min-h-0 bg-[#f7f4ee]">
+              <ScrollArea className="h-full">
+                <div className="space-y-4 px-5 py-6">
+                  <Card className="rounded-[24px] border border-border/80 bg-white shadow-none">
+                    <CardHeader>
+                      <CardTitle className="text-base text-[var(--ink-black)]">
+                        Source idea
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4 pb-6">
+                      <div className="rounded-2xl bg-[#faf7f2] px-4 py-4">
+                        <p className="font-medium text-[var(--ink-black)]">
+                          {data.idea.title || "Untitled idea"}
+                        </p>
+                        <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                          {data.idea.text}
+                        </p>
+                      </div>
+                      <div className="space-y-2 text-sm text-muted-foreground">
+                        <p>
+                          <span className="font-medium text-[var(--ink-black)]">
+                            Research objective:
+                          </span>{" "}
+                          {data.idea.researchObjective || "None yet"}
+                        </p>
+                        <p className="leading-6">
+                          <span className="font-medium text-[var(--ink-black)]">
+                            Research notes:
+                          </span>{" "}
+                          {data.idea.researchNotes || "None yet"}
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="rounded-[24px] border border-border/80 bg-white shadow-none">
+                    <CardHeader>
+                      <CardTitle className="text-base text-[var(--ink-black)]">
+                        References
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2 pb-6">
+                      {data.idea.references.length === 0 ? (
+                        <div className="rounded-2xl border border-dashed border-border bg-muted/40 px-4 py-4 text-sm text-muted-foreground">
+                          No references attached yet.
+                        </div>
+                      ) : (
+                        data.idea.references.map((reference) => (
+                          <div
+                            className="rounded-2xl border border-border/80 bg-[#faf7f2] px-4 py-3"
+                            key={reference.url}
+                          >
+                            <p className="text-sm font-medium text-[var(--ink-black)]">
+                              {reference.title || reference.url}
+                            </p>
+                            {reference.title ? (
+                              <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                                {reference.url}
+                              </p>
+                            ) : null}
+                          </div>
+                        ))
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {(data.draft.lastAgentSummary || data.draft.lastGateSummary) ? (
+                    <Card className="rounded-[24px] border border-border/80 bg-white shadow-none">
+                      <CardHeader>
+                        <CardTitle className="text-base text-[var(--ink-black)]">
+                          Latest workflow signals
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-3 pb-6">
+                        {data.draft.lastAgentSummary ? (
+                          <p className="rounded-2xl bg-[#eef8fb] px-4 py-3 text-sm text-[#15616d]">
+                            {data.draft.lastAgentSummary}
+                          </p>
+                        ) : null}
+                        {data.draft.lastGateSummary ? (
+                          <p className="rounded-2xl bg-[#fff7ea] px-4 py-3 text-sm text-[#8b4513]">
+                            {data.draft.lastGateSummary}
+                          </p>
+                        ) : null}
+                      </CardContent>
+                    </Card>
+                  ) : null}
+                </div>
+              </ScrollArea>
+            </aside>
           </div>
-        </div>
-      </div>
+        )}
+      </Modal>
 
-      <Modal
-        open={Boolean(gateState)}
-        onClose={() => setGateState(null)}
-        title={gateState ? `${gateState.recommendedAction} Recommended` : "Gate Check"}
-      >
-        {gateState && (
+      <Modal onClose={() => setGateState(null)} open={Boolean(gateState)} title="Gate Check">
+        {gateState ? (
           <div className="space-y-4">
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
-              <p className="text-sm text-[#78290f]">{gateState.summary}</p>
+            <div className="rounded-[20px] border border-[#ffe1b7] bg-[#fff7ea] px-4 py-3 text-sm text-[#8b4513]">
+              {gateState.summary}
             </div>
-
-            <div>
-              <p className="text-sm font-medium text-[#001524]">What still looks weak</p>
-              <ul className="mt-2 space-y-2 text-sm text-gray-600">
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-[var(--ink-black)]">
+                What still looks weak
+              </p>
+              <ul className="space-y-2 text-sm text-muted-foreground">
                 {gateState.issues.map((issue) => (
                   <li key={issue}>• {issue}</li>
                 ))}
               </ul>
             </div>
-
             <div className="flex flex-wrap justify-end gap-2">
-              <Button variant="secondary" onClick={() => setGateState(null)}>
+              <Button onClick={() => setGateState(null)} variant="outline">
                 Cancel
               </Button>
               <Button
-                variant="secondary"
-                onClick={handleRunAgent}
                 disabled={runningAgent}
+                onClick={handleRunAgent}
+                variant="outline"
               >
-                <Bot size={14} />
-                {runningAgent ? "Running…" : gateState.recommendedAction}
+                <Bot className="size-4" />
+                {runningAgent ? "Running..." : gateState.recommendedAction}
               </Button>
-              <Button
-                variant="primary"
-                onClick={() => handleAdvance(true)}
-                disabled={advancing}
-              >
-                <ArrowRight size={14} />
+              <Button disabled={advancing} onClick={() => handleAdvance(true)}>
+                <ArrowRight className="size-4" />
                 Move Anyway
               </Button>
             </div>
           </div>
-        )}
+        ) : null}
       </Modal>
     </>
   );

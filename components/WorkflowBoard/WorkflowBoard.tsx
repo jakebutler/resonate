@@ -1,69 +1,96 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import {
-  ArrowDown,
   ArrowRight,
-  BadgeCheck,
   Bot,
-  ChevronDown,
-  ChevronUp,
-  Compass,
+  CheckCircle2,
+  Clock3,
   FileText,
   Layers3,
   Lightbulb,
   MoreHorizontal,
-  PenLine,
   Plus,
   Search,
   Sparkles,
-  Wand2,
+  Timer,
+  WandSparkles,
 } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
-import { Button } from "@/components/ui/Button";
-import { Modal } from "@/components/ui/Modal";
 import { WorkflowDraftEditor } from "@/components/WorkflowBoard/WorkflowDraftEditor";
 import { WorkflowIdeaModal } from "@/components/WorkflowBoard/WorkflowIdeaModal";
+import {
+  KanbanBoard,
+  KanbanCard,
+  KanbanCards,
+  KanbanHeader,
+  KanbanProvider,
+  type DragEndEvent,
+} from "@/components/kibo-ui/kanban";
+import {
+  Choicebox,
+  ChoiceboxIndicator,
+  ChoiceboxItem,
+  ChoiceboxItemDescription,
+  ChoiceboxItemHeader,
+  ChoiceboxItemTitle,
+} from "@/components/kibo-ui/choicebox";
+import {
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxGroup,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+  ComboboxTrigger,
+} from "@/components/kibo-ui/combobox";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Modal } from "@/components/ui/Modal";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Textarea } from "@/components/ui/textarea";
 import { getAssistantResponse } from "@/lib/llmClient";
 import {
-  DRAFT_STAGES,
-  STAGE_DESCRIPTIONS,
-  STAGE_LABELS,
+  buildDraftStageAgentPrompt,
   buildOutlineAgentPrompt,
   buildResearchAgentPrompt,
-  formatWorkflowTitle,
   formatWorkflowTimestamp,
+  formatWorkflowTitle,
+  getNextDraftStage,
   getStageAgentLabel,
+  STAGE_LABELS,
+  type DraftStage,
   type ResearchMode,
   type ResearchSource,
 } from "@/lib/workflow";
+import {
+  canDragToColumn,
+  getReviewColumnBadgeLabel,
+  WORKFLOW_COLUMN_OVERFLOW_LIMIT,
+  WORKFLOW_REVIEW_COLUMNS,
+  type WorkflowReviewColumnKey,
+} from "@/lib/workflowBoard";
 
-type ComposerMode = "new" | "existing";
 type NewIdeaDestination = "idea" | "backlog";
-type StageKey = "idea" | "research" | (typeof DRAFT_STAGES)[number];
-
-type GateState =
-  | {
-      kind: "idea";
-      ideaId: Id<"ideas">;
-      gate: {
-        summary: string;
-        issues: string[];
-        recommendedAction: string;
-      };
-    }
-  | {
-      kind: "spawn";
-      ideaId: Id<"ideas">;
-      postType: "blog" | "linkedin";
-      gate: {
-        summary: string;
-        issues: string[];
-        recommendedAction: string;
-      };
-    };
 
 type IdeaLookupCard = {
   _id: Id<"ideas">;
@@ -99,86 +126,89 @@ type DraftBoardCard = {
   _id: Id<"workflowDrafts">;
   title: string;
   preview: string;
+  content: string;
   type: "blog" | "linkedin";
   ideaTitle?: string;
+  ideaText: string;
+  researchObjective?: string;
+  researchNotes?: string;
+  references: Array<{ url: string; title?: string; kind?: string; addedBy: "user" | "extractor" | "agent" }>;
   scheduledDate?: string;
+  publishedAt?: number;
+  updatedAt: number;
   lastAgentSummary?: string;
   lastGateSummary?: string;
+  stage: DraftStage;
 };
 
-const STAGE_THEME: Record<
-  StageKey,
-  {
-    shell: string;
-    panel: string;
-    chip: string;
-    soft: string;
-    icon: React.ReactNode;
-    eyebrow: string;
-  }
-> = {
-  idea: {
-    shell: "border-[#ffe1b4] bg-[radial-gradient(circle_at_top_left,_rgba(255,236,209,0.95),_rgba(255,255,255,0.94)_58%)]",
-    panel: "border-[#ffd199] bg-white/90",
-    chip: "bg-[#ffecd1] text-[#8b4513]",
-    soft: "bg-[#fff6ea] text-[#8b4513]",
-    icon: <Lightbulb size={18} />,
-    eyebrow: "Select and shape the strongest raw ideas.",
-  },
-  research: {
-    shell: "border-[#bfe1e4] bg-[radial-gradient(circle_at_top_left,_rgba(217,240,242,0.95),_rgba(255,255,255,0.94)_58%)]",
-    panel: "border-[#afd7db] bg-white/90",
-    chip: "bg-[#dff2f4] text-[#135b64]",
-    soft: "bg-[#eef9fa] text-[#135b64]",
-    icon: <Compass size={18} />,
-    eyebrow: "Gather proof, objections, and structure before drafting.",
-  },
-  outline: {
-    shell: "border-[#ffe0b6] bg-[radial-gradient(circle_at_top_left,_rgba(255,240,219,0.95),_rgba(255,255,255,0.94)_58%)]",
-    panel: "border-[#ffd4a0] bg-white/90",
-    chip: "bg-[#fff1de] text-[#9b5b00]",
-    soft: "bg-[#fff8ef] text-[#9b5b00]",
-    icon: <PenLine size={18} />,
-    eyebrow: "Turn research into a real post instance.",
-  },
-  copyedit: {
-    shell: "border-[#edd1c8] bg-[radial-gradient(circle_at_top_left,_rgba(248,236,231,0.96),_rgba(255,255,255,0.94)_58%)]",
-    panel: "border-[#e3c2b7] bg-white/90",
-    chip: "bg-[#f8e8e1] text-[#7e3f2f]",
-    soft: "bg-[#fdf3ef] text-[#7e3f2f]",
-    icon: <Wand2 size={18} />,
-    eyebrow: "Improve flow, clarity, and factual hygiene.",
-  },
-  seo: {
-    shell: "border-[#cfe5d5] bg-[radial-gradient(circle_at_top_left,_rgba(230,243,234,0.96),_rgba(255,255,255,0.94)_58%)]",
-    panel: "border-[#bdd9c6] bg-white/90",
-    chip: "bg-[#e8f5ec] text-[#226141]",
-    soft: "bg-[#f2fbf5] text-[#226141]",
-    icon: <Search size={18} />,
-    eyebrow: "Sharpen hooks, structure, and discoverability.",
-  },
-  final: {
-    shell: "border-[#d7ddf0] bg-[radial-gradient(circle_at_top_left,_rgba(233,237,247,0.96),_rgba(255,255,255,0.94)_58%)]",
-    panel: "border-[#c5cfeb] bg-white/90",
-    chip: "bg-[#edf1fb] text-[#304d8c]",
-    soft: "bg-[#f5f7fd] text-[#304d8c]",
-    icon: <Sparkles size={18} />,
-    eyebrow: "Polish the last editorial details before release.",
-  },
-  published: {
-    shell: "border-[#dadada] bg-[radial-gradient(circle_at_top_left,_rgba(236,236,236,0.96),_rgba(255,255,255,0.94)_58%)]",
-    panel: "border-[#cccccc] bg-white/90",
-    chip: "bg-[#efefef] text-[#434343]",
-    soft: "bg-[#f7f7f7] text-[#434343]",
-    icon: <BadgeCheck size={18} />,
-    eyebrow: "Recent wins stay visible for one week, then clear away.",
-  },
+type WorkflowIdeaCardRecord = {
+  id: string;
+  name: string;
+  kind: "idea";
+  stage: "idea" | "research";
+  column: "idea" | "research";
+  idea: IdeaBoardCard;
+  title: string;
 };
 
-function getPreviewLimit(stage: StageKey) {
-  if (stage === "idea") return 4;
-  if (stage === "published") return 2;
-  return 3;
+type WorkflowDraftCardRecord = {
+  id: string;
+  name: string;
+  kind: "draft";
+  stage: DraftStage;
+  column: WorkflowReviewColumnKey;
+  draft: DraftBoardCard;
+};
+
+type WorkflowCardRecord = WorkflowIdeaCardRecord | WorkflowDraftCardRecord;
+
+type GatePayload = {
+  summary: string;
+  issues: string[];
+  recommendedAction: string;
+};
+
+type GateState =
+  | {
+      kind: "idea";
+      ideaId: Id<"ideas">;
+      gate: GatePayload;
+    }
+  | {
+      kind: "spawn";
+      ideaId: Id<"ideas">;
+      postType: "blog" | "linkedin";
+      gate: GatePayload;
+    }
+  | {
+      kind: "draft";
+      draft: DraftBoardCard & { _id: Id<"workflowDrafts"> };
+      gate: GatePayload;
+    };
+
+type BoardColumn = {
+  id: WorkflowReviewColumnKey;
+  label: string;
+  description: string;
+  accentClassName: string;
+  cards: WorkflowCardRecord[];
+};
+
+const REVIEW_STAGE_PRIORITY: DraftStage[] = [
+  "final",
+  "seo",
+  "copyedit",
+  "outline",
+  "published",
+];
+
+const workflowCardDateFormatter = new Intl.DateTimeFormat("en-US", {
+  month: "2-digit",
+  day: "2-digit",
+});
+
+function formatWorkflowCardDate(timestamp: number) {
+  return workflowCardDateFormatter.format(new Date(timestamp));
 }
 
 export function WorkflowBoard() {
@@ -188,28 +218,28 @@ export function WorkflowBoard() {
   const advanceIdeaStage = useMutation(api.workflow.advanceIdeaStage);
   const createDraftFromIdea = useMutation(api.workflow.createDraftFromIdea);
   const recordIdeaResearchRun = useMutation(api.workflow.recordIdeaResearchRun);
+  const advanceDraft = useMutation(api.workflow.advanceDraft);
+  const recordDraftAgentRun = useMutation(api.workflow.recordDraftAgentRun);
 
-  const [composerOpen, setComposerOpen] = useState(false);
-  const [composerMode, setComposerMode] = useState<ComposerMode>("new");
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [inspirationDialogOpen, setInspirationDialogOpen] = useState(false);
+  const [overflowColumnId, setOverflowColumnId] =
+    useState<WorkflowReviewColumnKey | null>(null);
+  const [ideaEditorId, setIdeaEditorId] = useState<Id<"ideas"> | null>(null);
+  const [draftEditorId, setDraftEditorId] = useState<Id<"workflowDrafts"> | null>(
+    null
+  );
+  const [gateState, setGateState] = useState<GateState | null>(null);
   const [newIdeaTitle, setNewIdeaTitle] = useState("");
   const [newIdeaText, setNewIdeaText] = useState("");
   const [newIdeaDestination, setNewIdeaDestination] =
     useState<NewIdeaDestination>("idea");
-  const [ideaEditorId, setIdeaEditorId] = useState<Id<"ideas"> | null>(null);
-  const [draftEditorId, setDraftEditorId] = useState<Id<"workflowDrafts"> | null>(null);
-  const [gateState, setGateState] = useState<GateState | null>(null);
   const [creating, setCreating] = useState(false);
   const [runningAgent, setRunningAgent] = useState(false);
-  const [expandedStages, setExpandedStages] = useState<Partial<Record<StageKey, boolean>>>({});
-
-  const allStages = useMemo(() => {
-    if (!board) return [];
-    return [
-      { stage: "idea" as const, cards: board.ideaCards },
-      { stage: "research" as const, cards: board.researchCards },
-      ...board.draftColumns,
-    ];
-  }, [board]);
+  const [selectedInspirationId, setSelectedInspirationId] = useState<string>("");
+  const [boardNotice, setBoardNotice] = useState<string | null>(null);
+  const [kanbanItems, setKanbanItems] = useState<WorkflowCardRecord[]>([]);
+  const [dragSnapshot, setDragSnapshot] = useState<WorkflowCardRecord[] | null>(null);
 
   const ideaLookup = useMemo(() => {
     const lookup = new Map<Id<"ideas">, IdeaLookupCard>();
@@ -217,6 +247,120 @@ export function WorkflowBoard() {
     for (const idea of board?.researchCards || []) lookup.set(idea._id, idea);
     return lookup;
   }, [board]);
+
+  const groupedColumns = useMemo<BoardColumn[]>(() => {
+    const emptyColumns = WORKFLOW_REVIEW_COLUMNS.map((column) => ({
+      ...column,
+      cards: [] as WorkflowCardRecord[],
+    }));
+
+    if (!board) return emptyColumns;
+
+    const columns = new Map<WorkflowReviewColumnKey, BoardColumn>(
+      emptyColumns.map((column) => [column.id, column])
+    );
+
+    for (const idea of board.ideaCards) {
+      columns.get("idea")?.cards.push({
+        id: `idea:${idea._id}`,
+        name: formatWorkflowTitle(idea.title, idea.text),
+        kind: "idea",
+        stage: "idea",
+        column: "idea",
+        idea,
+        title: formatWorkflowTitle(idea.title, idea.text),
+      });
+    }
+
+    for (const idea of board.researchCards) {
+      columns.get("research")?.cards.push({
+        id: `idea:${idea._id}`,
+        name: formatWorkflowTitle(idea.title, idea.text),
+        kind: "idea",
+        stage: "research",
+        column: "research",
+        idea,
+        title: formatWorkflowTitle(idea.title, idea.text),
+      });
+    }
+
+    const draftLookup = new Map<DraftStage, DraftBoardCard[]>(
+      board.draftColumns.map((column) => [
+        column.stage as DraftStage,
+        column.cards as DraftBoardCard[],
+      ])
+    );
+
+    const orderedDrafts = [
+      ...(draftLookup.get("outline") || []).map((draft) => ({
+        draft,
+        column: "outline" as const,
+      })),
+      ...REVIEW_STAGE_PRIORITY.flatMap((stage) =>
+        stage === "outline" || stage === "published"
+          ? []
+          : (draftLookup.get(stage) || []).map((draft) => ({
+              draft,
+              column: "review" as const,
+            }))
+      ),
+      ...(draftLookup.get("published") || []).map((draft) => ({
+        draft,
+        column: "published" as const,
+      })),
+    ];
+
+    for (const { draft, column } of orderedDrafts) {
+      columns.get(column)?.cards.push({
+        id: `draft:${draft._id}`,
+        name: draft.title,
+        kind: "draft",
+        stage: draft.stage,
+        column,
+        draft,
+      });
+    }
+
+    return WORKFLOW_REVIEW_COLUMNS.map((column) => columns.get(column.id)!);
+  }, [board]);
+
+  const visibleCards = useMemo(
+    () =>
+      groupedColumns.flatMap((column) =>
+        column.cards.slice(0, WORKFLOW_COLUMN_OVERFLOW_LIMIT)
+      ),
+    [groupedColumns]
+  );
+
+  useEffect(() => {
+    setKanbanItems(visibleCards);
+  }, [visibleCards]);
+
+  useEffect(() => {
+    if (!selectedInspirationId && board?.availableIdeas?.length) {
+      setSelectedInspirationId(String(board.availableIdeas[0]?._id || ""));
+    }
+  }, [board?.availableIdeas, selectedInspirationId]);
+
+  const overflowColumn = groupedColumns.find(
+    (column) => column.id === overflowColumnId
+  );
+
+  const selectedInspiration =
+    board?.availableIdeas.find((idea) => String(idea._id) === selectedInspirationId) ||
+    board?.availableIdeas[0] ||
+    null;
+
+  const inspirationOptions = (board?.availableIdeas || []).map((idea) => ({
+    label: formatWorkflowTitle(idea.title, idea.text),
+    value: String(idea._id),
+  }));
+
+  const clearComposer = () => {
+    setNewIdeaTitle("");
+    setNewIdeaText("");
+    setNewIdeaDestination("idea");
+  };
 
   const handleCreateIdea = async () => {
     if (!newIdeaText.trim()) return;
@@ -227,10 +371,8 @@ export function WorkflowBoard() {
         text: newIdeaText,
         status: newIdeaDestination,
       });
-      setNewIdeaTitle("");
-      setNewIdeaText("");
-      setNewIdeaDestination("idea");
-      setComposerOpen(false);
+      clearComposer();
+      setCreateDialogOpen(false);
     } finally {
       setCreating(false);
     }
@@ -238,33 +380,112 @@ export function WorkflowBoard() {
 
   const handlePromoteInspiration = async (ideaId: Id<"ideas">) => {
     await moveIdeaToStatus({ id: ideaId, status: "idea" });
-    setComposerOpen(false);
+    setInspirationDialogOpen(false);
   };
 
-  const handleAdvanceIdea = async (ideaId: Id<"ideas">) => {
-    const result = await advanceIdeaStage({ id: ideaId });
+  const handleAdvanceIdea = async (ideaId: Id<"ideas">, force = false) => {
+    const result = await advanceIdeaStage({ id: ideaId, force });
     if (result?.blocked && result.gate) {
       setGateState({ kind: "idea", ideaId, gate: result.gate });
+      return false;
     }
+    return true;
   };
 
   const handleSpawnDraft = async (
     ideaId: Id<"ideas">,
-    postType: "blog" | "linkedin"
+    postType: "blog" | "linkedin",
+    force = false,
+    seedContent?: string,
+    agentSummary?: string
   ) => {
-    const result = await createDraftFromIdea({ ideaId, type: postType });
+    const result = await createDraftFromIdea({
+      ideaId,
+      type: postType,
+      force,
+      seedContent,
+      agentSummary,
+    });
     if (result?.blocked && result.gate) {
       setGateState({ kind: "spawn", ideaId, postType, gate: result.gate });
-      return;
+      return false;
     }
-
     if (result?.draftId) {
       setDraftEditorId(result.draftId);
+    }
+    return true;
+  };
+
+  const handleAdvanceDraft = async (
+    draftId: Id<"workflowDrafts">,
+    force = false
+  ) => {
+    const result = await advanceDraft({ id: draftId, force });
+    if (result?.blocked && result.gate) {
+      const draft = groupedColumns
+        .flatMap((column) => column.cards)
+        .find(
+          (card): card is WorkflowDraftCardRecord =>
+            card.kind === "draft" && card.draft._id === draftId
+        )?.draft;
+      if (draft) {
+        setGateState({ kind: "draft", draft: draft as DraftBoardCard & { _id: Id<"workflowDrafts"> }, gate: result.gate });
+      }
+      return false;
+    }
+    return true;
+  };
+
+  const runDraftAgent = async (draft: DraftBoardCard) => {
+    const nextStage = getNextDraftStage(draft.stage);
+    if (!nextStage) return;
+
+    setRunningAgent(true);
+    try {
+      const generated = await getAssistantResponse({
+        assistantType: draft.type,
+        messages: [
+          {
+            role: "user",
+            content: buildDraftStageAgentPrompt({
+              type: draft.type,
+              targetStage: nextStage,
+              title: draft.type === "blog" ? draft.title : undefined,
+              content: draft.content,
+              scheduledDate: draft.scheduledDate,
+              ideaTitle: draft.ideaTitle,
+              ideaText: draft.ideaText,
+              researchObjective: draft.researchObjective,
+              researchNotes: draft.researchNotes,
+              references: draft.references,
+            }),
+          },
+        ],
+      });
+
+      await recordDraftAgentRun({
+        id: draft._id,
+        stage: nextStage,
+        title: draft.type === "blog" ? draft.title : undefined,
+        content: generated,
+        summary: `${getStageAgentLabel(nextStage, draft.type)} produced a fresh ${STAGE_LABELS[nextStage].toLowerCase()} pass.`,
+      });
+
+      setGateState(null);
+      setBoardNotice(`${getStageAgentLabel(nextStage, draft.type)} refreshed ${draft.title}.`);
+    } finally {
+      setRunningAgent(false);
     }
   };
 
   const handleRunGateAgent = async () => {
     if (!gateState) return;
+
+    if (gateState.kind === "draft") {
+      await runDraftAgent(gateState.draft);
+      return;
+    }
+
     const idea = ideaLookup.get(gateState.ideaId);
     if (!idea) return;
 
@@ -297,32 +518,30 @@ export function WorkflowBoard() {
       }
 
       if (gateState.kind === "spawn") {
-        const result = await createDraftFromIdea({
-          ideaId: gateState.ideaId,
-          type: gateState.postType,
-          force: true,
-          seedContent: await getAssistantResponse({
-            assistantType: gateState.postType,
-            messages: [
-              {
-                role: "user",
-                content: buildOutlineAgentPrompt({
-                  type: gateState.postType,
-                  title: idea.title,
-                  text: idea.text,
-                  researchObjective: idea.researchObjective,
-                  researchNotes: idea.researchNotes,
-                  references: idea.references,
-                }),
-              },
-            ],
-          }),
-          agentSummary: `${getStageAgentLabel("outline", gateState.postType)} created the initial draft.`,
+        const generated = await getAssistantResponse({
+          assistantType: gateState.postType,
+          messages: [
+            {
+              role: "user",
+              content: buildOutlineAgentPrompt({
+                type: gateState.postType,
+                title: idea.title,
+                text: idea.text,
+                researchObjective: idea.researchObjective,
+                researchNotes: idea.researchNotes,
+                references: idea.references,
+              }),
+            },
+          ],
         });
 
-        if (result?.draftId) {
-          setDraftEditorId(result.draftId);
-        }
+        await handleSpawnDraft(
+          gateState.ideaId,
+          gateState.postType,
+          true,
+          generated,
+          `${getStageAgentLabel("outline", gateState.postType)} created the initial draft.`
+        );
       }
 
       setGateState(null);
@@ -334,246 +553,500 @@ export function WorkflowBoard() {
   const handleForceAdvance = async () => {
     if (!gateState) return;
     if (gateState.kind === "idea") {
-      await advanceIdeaStage({ id: gateState.ideaId, force: true });
+      await handleAdvanceIdea(gateState.ideaId, true);
+    } else if (gateState.kind === "spawn") {
+      await handleSpawnDraft(gateState.ideaId, gateState.postType, true);
     } else {
-      const result = await createDraftFromIdea({
-        ideaId: gateState.ideaId,
-        type: gateState.postType,
-        force: true,
-      });
-      if (result?.draftId) {
-        setDraftEditorId(result.draftId);
-      }
+      await handleAdvanceDraft(gateState.draft._id, true);
     }
     setGateState(null);
   };
 
-  const toggleStageExpansion = (stage: StageKey) => {
-    setExpandedStages((current) => ({
-      ...current,
-      [stage]: !current[stage],
-    }));
+  const handleCardTransition = async (
+    card: WorkflowCardRecord,
+    targetColumn: WorkflowReviewColumnKey
+  ) => {
+    if (card.kind === "idea") {
+      if (card.stage === "idea" && targetColumn === "research") {
+        return await handleAdvanceIdea(card.idea._id);
+      }
+
+      setBoardNotice(
+        "Research cards spawn draft instances through Blog Draft or LinkedIn Draft."
+      );
+      return false;
+    }
+
+    if (card.stage === "outline" && targetColumn === "review") {
+      return await handleAdvanceDraft(card.draft._id);
+    }
+
+    if (card.stage === "final" && targetColumn === "published") {
+      return await handleAdvanceDraft(card.draft._id);
+    }
+
+    if (targetColumn === "published") {
+      setBoardNotice("Only final-edit drafts can move into Published.");
+      return false;
+    }
+
+    setBoardNotice(
+      "Advance cards inside Review from the card actions or the full editor."
+    );
+    return false;
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const activeId = String(event.active.id);
+    const overId = event.over ? String(event.over.id) : null;
+
+    if (!dragSnapshot || !overId) {
+      setDragSnapshot(null);
+      return;
+    }
+
+    const activeCard =
+      kanbanItems.find((item) => item.id === activeId) ||
+      dragSnapshot.find((item) => item.id === activeId);
+    const overCard = kanbanItems.find((item) => item.id === overId);
+    const targetColumn =
+      overCard?.column ||
+      WORKFLOW_REVIEW_COLUMNS.find((column) => column.id === overId)?.id ||
+      null;
+
+    if (!activeCard || !targetColumn) {
+      setKanbanItems(dragSnapshot);
+      setDragSnapshot(null);
+      return;
+    }
+
+    if (targetColumn === activeCard.column) {
+      setDragSnapshot(null);
+      return;
+    }
+
+    if (!canDragToColumn(activeCard.stage, targetColumn)) {
+      setKanbanItems(dragSnapshot);
+      if (activeCard.kind === "idea" && activeCard.stage === "research") {
+        setBoardNotice(
+          "Use Blog Draft or LinkedIn Draft to choose the post instance you want to create."
+        );
+      } else {
+        setBoardNotice("That move is not supported directly from the board.");
+      }
+      setDragSnapshot(null);
+      return;
+    }
+
+    try {
+      const transitioned = await handleCardTransition(activeCard, targetColumn);
+      if (!transitioned) {
+        setKanbanItems(dragSnapshot);
+      }
+    } catch {
+      setKanbanItems(dragSnapshot);
+    } finally {
+      setDragSnapshot(null);
+    }
   };
 
   return (
     <>
-      <section className="space-y-6">
-        <div className="overflow-hidden rounded-[32px] border border-[#15384a] bg-[linear-gradient(135deg,#061b29_0%,#0b3147_46%,#15616d_100%)] text-white shadow-[0_30px_90px_rgba(0,21,36,0.18)]">
-          <div className="relative px-4 py-4 md:px-5 md:py-5">
-            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,236,209,0.16),transparent_24%),radial-gradient(circle_at_bottom_left,rgba(255,255,255,0.08),transparent_36%)]" />
-
-            <div className="relative">
-              <p className="text-[11px] uppercase tracking-[0.34em] text-white/58">
-                Editorial Runway
-              </p>
-
-              <div className="mt-3 grid gap-3 lg:grid-cols-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setComposerMode("existing");
-                    setComposerOpen(true);
-                  }}
-                  className="group relative overflow-hidden rounded-[28px] border border-white/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(244,248,250,0.94))] p-5 text-left text-[#001524] shadow-[0_24px_60px_rgba(0,0,0,0.14)] transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_32px_70px_rgba(0,0,0,0.18)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ffecd1] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b3045]"
-                >
-                  <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(21,97,109,0.12),transparent_34%)]" />
-                  <div className="relative flex h-full items-start justify-between gap-4">
-                    <div className="min-w-0">
-                      <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-[#dff2f4] text-[#15616d] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)]">
-                        <Layers3 size={18} />
-                      </span>
-                      <p className="mt-5 text-[11px] uppercase tracking-[0.28em] text-[#15616d]">
-                        From backlog
-                      </p>
-                      <p className="mt-2 text-[1.75rem] font-semibold leading-none tracking-[-0.03em]">
-                        Use Inspiration
-                      </p>
-                      <p className="mt-3 max-w-md text-sm leading-6 text-[#436170]">
-                        Pull a saved spark into the active board and give it a real
-                        next step.
-                      </p>
-                    </div>
-                    <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#d6e7eb] bg-white/80 text-[#15616d] transition-transform duration-200 group-hover:translate-x-1">
-                      <ArrowRight size={17} />
-                    </span>
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setComposerMode("new");
-                    setComposerOpen(true);
-                  }}
-                  className="group relative overflow-hidden rounded-[28px] border border-[#ff9d33] bg-[linear-gradient(135deg,#ff7d00_0%,#ff9629_100%)] p-5 text-left text-white shadow-[0_26px_60px_rgba(255,125,0,0.26)] transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_34px_72px_rgba(255,125,0,0.32)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b3045]"
-                >
-                  <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.22),transparent_28%)]" />
-                  <div className="relative flex h-full items-start justify-between gap-4">
-                    <div className="min-w-0">
-                      <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-white/18 shadow-[inset_0_1px_0_rgba(255,255,255,0.35)] backdrop-blur">
-                        <Plus size={18} />
-                      </span>
-                      <p className="mt-5 text-[11px] uppercase tracking-[0.28em] text-white/70">
-                        Fresh card
-                      </p>
-                      <p className="mt-2 text-[1.75rem] font-semibold leading-none tracking-[-0.03em]">
-                        Add Idea Card
-                      </p>
-                      <p className="mt-3 max-w-md text-sm leading-6 text-white/82">
-                        Capture a new angle now and drop it straight into the
-                        workflow without breaking your pace.
-                      </p>
-                    </div>
-                    <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/22 bg-white/14 text-white transition-transform duration-200 group-hover:translate-x-1">
-                      <ArrowRight size={17} />
-                    </span>
-                  </div>
-                </button>
+      <section className="space-y-5">
+        <div className="overflow-hidden rounded-[28px] border border-border/80 bg-white shadow-[0_24px_60px_rgba(0,21,36,0.06)]">
+          <div className="border-b border-border/80 px-5 py-4">
+            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+              <div>
+                <p className="text-sm font-medium text-[var(--ink-black)]">
+                  Kanban
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Drag cards when the move is unambiguous. Use the card actions when the
+                  board needs more context than a simple lane change can express.
+                </p>
               </div>
             </div>
-          </div>
-        </div>
-
-        <div className="rounded-[28px] border border-gray-200 bg-[linear-gradient(180deg,#ffffff_0%,#f5f2ea_100%)] px-4 py-5 shadow-[0_18px_60px_rgba(0,21,36,0.06)] md:px-6">
-          <div className="mb-5 flex items-center justify-between gap-4">
-            <div>
-              <p className="text-xs uppercase tracking-[0.22em] text-gray-400">
-                Stage Flow
-              </p>
-              <p className="mt-1 text-sm text-gray-600">
-                Each row previews the current stage. Overflow stays collapsed until
-                you ask for it.
-              </p>
-            </div>
-            <div className="hidden items-center gap-2 rounded-full bg-[#001524] px-3 py-1.5 text-xs text-white md:flex">
-              <ArrowDown size={12} />
-              Top to bottom progression
-            </div>
+            {boardNotice ? (
+              <div className="mt-4 flex items-center justify-between rounded-2xl border border-[#ffe1b7] bg-[#fff7ea] px-4 py-3 text-sm text-[#8b4513]">
+                <span>{boardNotice}</span>
+                <Button
+                  className="h-auto px-0 text-[#8b4513] hover:bg-transparent"
+                  onClick={() => setBoardNotice(null)}
+                  variant="ghost"
+                >
+                  Dismiss
+                </Button>
+              </div>
+            ) : null}
           </div>
 
-          <div className="relative">
-            <div className="absolute bottom-0 left-[27px] top-0 hidden w-px bg-[linear-gradient(180deg,rgba(0,21,36,0.04),rgba(0,21,36,0.18),rgba(0,21,36,0.04))] md:block" />
-
-            <div className="space-y-5">
-              {board === undefined
-                ? (["idea", "research", ...DRAFT_STAGES] as StageKey[]).map((stage) => (
-                    <div
-                      key={stage}
-                      className="h-48 animate-pulse rounded-[30px] border border-gray-200 bg-white/80"
-                    />
-                  ))
-                : allStages.map((section, index) => {
-                    const stage = section.stage;
-                    const previewLimit = getPreviewLimit(stage);
-                    const isExpanded = expandedStages[stage] ?? false;
-                    const visibleCards = isExpanded
-                      ? section.cards
-                      : section.cards.slice(0, previewLimit);
-                    const hiddenCount = Math.max(section.cards.length - previewLimit, 0);
-                    const visibleIdeaCards = visibleCards as IdeaBoardCard[];
-                    const visibleDraftCards = visibleCards as DraftBoardCard[];
+          <div className="overflow-x-auto px-4 py-4">
+            {board === undefined ? (
+              <div className="grid min-w-[1320px] auto-cols-[minmax(260px,1fr)] grid-flow-col gap-0">
+                {WORKFLOW_REVIEW_COLUMNS.map((column) => (
+                  <div
+                    key={column.id}
+                    className="h-[480px] animate-pulse border-l border-border/80 bg-muted/20 px-4 first:border-l-0 first:pl-0"
+                  />
+                ))}
+              </div>
+            ) : (
+              <KanbanProvider<
+                WorkflowCardRecord,
+                { id: WorkflowReviewColumnKey; name: string }
+              >
+                className="min-w-[1320px] auto-cols-[minmax(260px,1fr)] gap-0"
+                columns={WORKFLOW_REVIEW_COLUMNS.map(({ id, label }) => ({
+                  id,
+                  name: label,
+                }))}
+                data={kanbanItems}
+                onDataChange={setKanbanItems}
+                onDragEnd={handleDragEnd}
+                onDragStart={() => setDragSnapshot(kanbanItems)}
+              >
+                {(column) => {
+                  const definition = WORKFLOW_REVIEW_COLUMNS.find(
+                    (entry) => entry.id === column.id
+                  )!;
+                  const isIdeaColumn = column.id === "idea";
+                  const isFirstColumn = column.id === WORKFLOW_REVIEW_COLUMNS[0]?.id;
+                  const columnData = groupedColumns.find(
+                    (entry) => entry.id === column.id
+                  )!;
+                  const hiddenCount = Math.max(
+                    columnData.cards.length - WORKFLOW_COLUMN_OVERFLOW_LIMIT,
+                    0
+                  );
 
                     return (
-                      <StageSection
-                        key={stage}
-                        stage={stage}
-                        count={section.cards.length}
-                        hiddenCount={hiddenCount}
-                        expanded={isExpanded}
-                        index={index}
-                        onToggleOverflow={
-                          hiddenCount > 0 ? () => toggleStageExpansion(stage) : undefined
-                        }
+                      <KanbanBoard
+                        className={`min-h-[520px] overflow-visible rounded-none border-0 bg-transparent pr-4 shadow-none ring-0 ${!isFirstColumn ? "border-l border-border/80 pl-4" : ""}`}
+                        id={column.id}
+                        key={column.id}
                       >
-                        {section.cards.length === 0 ? (
-                          <EmptyStage stage={stage} />
-                        ) : (
-                          <div className="grid gap-4 xl:grid-cols-2">
-                            {stage === "idea" || stage === "research"
-                              ? visibleIdeaCards.map((idea) => (
-                                  <IdeaCard
-                                    key={idea._id}
-                                    stage={stage}
-                                    idea={idea}
-                                    onOpen={() => setIdeaEditorId(idea._id)}
-                                    onAdvance={
-                                      stage === "idea"
-                                        ? () => handleAdvanceIdea(idea._id)
-                                        : undefined
-                                    }
-                                    onSpawnBlog={
-                                      stage === "research"
-                                        ? () => handleSpawnDraft(idea._id, "blog")
-                                        : undefined
-                                    }
-                                    onSpawnLinkedIn={
-                                      stage === "research"
-                                        ? () => handleSpawnDraft(idea._id, "linkedin")
-                                        : undefined
-                                    }
-                                  />
-                                ))
-                              : visibleDraftCards.map((draft) => (
-                                  <DraftCard
-                                    key={draft._id}
-                                    stage={stage}
-                                    draft={draft}
-                                    onOpen={() => setDraftEditorId(draft._id)}
-                                  />
-                                ))}
+                      <KanbanHeader className="space-y-3 px-0 py-0">
+                        <div className="flex items-start justify-between gap-3 pb-4">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className="text-base font-semibold text-[var(--ink-black)]">
+                                {definition.label}
+                              </p>
+                              <Badge
+                                className="rounded-full bg-muted text-muted-foreground shadow-none"
+                                variant="secondary"
+                              >
+                                {columnData.cards.length}
+                              </Badge>
+                            </div>
+                            <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                              {definition.description}
+                            </p>
                           </div>
+                        </div>
+
+                        {isIdeaColumn ? (
+                          <div className="grid gap-2 pb-4">
+                            <Button
+                              className="justify-start rounded-2xl"
+                              onClick={() => setCreateDialogOpen(true)}
+                            >
+                              <Plus className="size-4" />
+                              Add Idea Card
+                            </Button>
+                            <Button
+                              className="justify-start rounded-2xl"
+                              onClick={() => {
+                                setSelectedInspirationId(
+                                  String(board?.availableIdeas[0]?._id || "")
+                                );
+                                setInspirationDialogOpen(true);
+                              }}
+                              variant="outline"
+                            >
+                              <Layers3 className="size-4" />
+                              Use Inspiration
+                            </Button>
+                          </div>
+                        ) : null}
+                      </KanbanHeader>
+
+                      <KanbanCards<WorkflowCardRecord>
+                        className="gap-3 p-0"
+                        id={column.id}
+                      >
+                        {(item) => (
+                          <KanbanCard
+                            className="rounded-[20px] border-0 bg-transparent p-0 shadow-none"
+                            column={item.column}
+                            id={item.id}
+                            key={item.id}
+                            name={item.name}
+                          >
+                            <BoardCard
+                              card={item}
+                              onAdvanceDraft={handleAdvanceDraft}
+                              onAdvanceIdea={handleAdvanceIdea}
+                              onArchiveIdea={async (ideaId) => {
+                                await moveIdeaToStatus({ id: ideaId, status: "archived" });
+                              }}
+                              onMoveIdeaToBacklog={async (ideaId) => {
+                                await moveIdeaToStatus({ id: ideaId, status: "backlog" });
+                              }}
+                              onOpenDraft={(draftId) => setDraftEditorId(draftId)}
+                              onOpenIdea={(ideaId) => setIdeaEditorId(ideaId)}
+                              onOverflow={() => setOverflowColumnId(column.id)}
+                              onPublishDraft={handleAdvanceDraft}
+                              onRunDraftAgent={runDraftAgent}
+                              onSpawnDraft={handleSpawnDraft}
+                            />
+                          </KanbanCard>
                         )}
-                      </StageSection>
-                    );
-                  })}
-            </div>
+                      </KanbanCards>
+
+                      <div className="mt-3">
+                        {hiddenCount > 0 ? (
+                          <Button
+                            className="w-full rounded-full"
+                            onClick={() => setOverflowColumnId(column.id)}
+                            variant="outline"
+                          >
+                            +{hiddenCount} more
+                          </Button>
+                        ) : columnData.cards.length === 0 ? (
+                          <p className="text-xs text-muted-foreground">
+                            Nothing here right now.
+                          </p>
+                        ) : null}
+                      </div>
+                    </KanbanBoard>
+                  );
+                }}
+              </KanbanProvider>
+            )}
           </div>
         </div>
       </section>
 
-      <WorkflowIdeaComposerModal
-        open={composerOpen}
-        mode={composerMode}
-        newIdeaDestination={newIdeaDestination}
-        newIdeaText={newIdeaText}
-        newIdeaTitle={newIdeaTitle}
-        availableIdeas={board?.availableIdeas || []}
-        creating={creating}
-        onClose={() => setComposerOpen(false)}
-        onCreate={handleCreateIdea}
-        onDestinationChange={setNewIdeaDestination}
-        onModeChange={setComposerMode}
-        onNewIdeaTextChange={setNewIdeaText}
-        onNewIdeaTitleChange={setNewIdeaTitle}
-        onPromoteIdea={handlePromoteInspiration}
-      />
+      <Modal
+        bodyClassName="space-y-4"
+        onClose={() => {
+          clearComposer();
+          setCreateDialogOpen(false);
+        }}
+        open={createDialogOpen}
+        title="Add Idea Card"
+      >
+        <div className="space-y-2">
+          <Label htmlFor="workflow-new-title">Working Title</Label>
+          <Input
+            id="workflow-new-title"
+            onChange={(event) => setNewIdeaTitle(event.target.value)}
+            placeholder="Optional title"
+            value={newIdeaTitle}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="workflow-new-idea">Idea</Label>
+          <Textarea
+            id="workflow-new-idea"
+            onChange={(event) => setNewIdeaText(event.target.value)}
+            placeholder="Capture the thought that should become a workflow card."
+            rows={7}
+            value={newIdeaText}
+          />
+        </div>
+
+        <div className="space-y-3">
+          <Label>Where should this go first?</Label>
+          <Choicebox
+            onValueChange={(value) =>
+              setNewIdeaDestination(value as NewIdeaDestination)
+            }
+            value={newIdeaDestination}
+          >
+            <div className="grid gap-3 md:grid-cols-2">
+              <ChoiceboxItem
+                className="rounded-[20px] border border-border/80 bg-white p-4"
+                id="destination-idea"
+                value="idea"
+              >
+                <ChoiceboxIndicator id="destination-idea" />
+                <ChoiceboxItemHeader>
+                  <ChoiceboxItemTitle>Add to Idea column</ChoiceboxItemTitle>
+                  <ChoiceboxItemDescription>
+                    This enters the active board immediately.
+                  </ChoiceboxItemDescription>
+                </ChoiceboxItemHeader>
+              </ChoiceboxItem>
+
+              <ChoiceboxItem
+                className="rounded-[20px] border border-border/80 bg-white p-4"
+                id="destination-backlog"
+                value="backlog"
+              >
+                <ChoiceboxIndicator id="destination-backlog" />
+                <ChoiceboxItemHeader>
+                  <ChoiceboxItemTitle>Save as inspiration</ChoiceboxItemTitle>
+                  <ChoiceboxItemDescription>
+                    Keep it out of column one until you intentionally select it.
+                  </ChoiceboxItemDescription>
+                </ChoiceboxItemHeader>
+              </ChoiceboxItem>
+            </div>
+          </Choicebox>
+        </div>
+
+        <div className="flex justify-end gap-2">
+          <Button onClick={() => setCreateDialogOpen(false)} variant="outline">
+            Cancel
+          </Button>
+          <Button
+            disabled={creating || !newIdeaText.trim()}
+            onClick={handleCreateIdea}
+          >
+            <Plus className="size-4" />
+            {creating ? "Saving..." : "Create Idea"}
+          </Button>
+        </div>
+      </Modal>
+
+      <Modal
+        bodyClassName="space-y-4"
+        onClose={() => setInspirationDialogOpen(false)}
+        open={inspirationDialogOpen}
+        title="Use Inspiration"
+      >
+        <div className="space-y-2">
+          <Label>Saved inspiration</Label>
+          <Combobox
+            data={inspirationOptions}
+            onValueChange={setSelectedInspirationId}
+            type="idea"
+            value={selectedInspirationId}
+          >
+            <ComboboxTrigger className="w-full justify-between rounded-xl" />
+            <ComboboxContent>
+              <ComboboxInput />
+              <ComboboxList>
+                <ComboboxEmpty>No saved ideas found.</ComboboxEmpty>
+                <ComboboxGroup>
+                  {inspirationOptions.map((option) => (
+                    <ComboboxItem key={option.value} value={option.value}>
+                      {option.label}
+                    </ComboboxItem>
+                  ))}
+                </ComboboxGroup>
+              </ComboboxList>
+            </ComboboxContent>
+          </Combobox>
+        </div>
+
+        {selectedInspiration ? (
+          <Card className="rounded-[24px] border border-border/80 bg-[#fcfaf6] shadow-none">
+            <CardHeader className="space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <CardTitle className="font-forum text-[1.7rem] leading-none text-[var(--ink-black)]">
+                  {formatWorkflowTitle(
+                    selectedInspiration.title,
+                    selectedInspiration.text
+                  )}
+                </CardTitle>
+                <Badge className="rounded-full" variant="secondary">
+                  {selectedInspiration.referencesCount} refs
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="line-clamp-4 text-sm leading-6 text-muted-foreground">
+                {selectedInspiration.text}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Updated {formatWorkflowTimestamp(selectedInspiration.updatedAt)}
+              </p>
+            </CardContent>
+            <CardFooter className="justify-end gap-2 border-t border-border/80 bg-white/80">
+              <Button onClick={() => setInspirationDialogOpen(false)} variant="outline">
+                Cancel
+              </Button>
+              <Button
+                onClick={() => handlePromoteInspiration(selectedInspiration._id)}
+              >
+                Select
+              </Button>
+            </CardFooter>
+          </Card>
+        ) : (
+          <div className="rounded-[24px] border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
+            No inspiration items are waiting. Save a new idea to inspiration first.
+          </div>
+        )}
+      </Modal>
 
       <WorkflowIdeaModal
-        open={Boolean(ideaEditorId)}
         ideaId={ideaEditorId}
         onClose={() => setIdeaEditorId(null)}
+        open={Boolean(ideaEditorId)}
       />
 
       <WorkflowDraftEditor
-        open={Boolean(draftEditorId)}
         draftId={draftEditorId}
         onClose={() => setDraftEditorId(null)}
+        open={Boolean(draftEditorId)}
       />
 
       <Modal
-        open={Boolean(gateState)}
+        bodyClassName="space-y-4"
+        onClose={() => setOverflowColumnId(null)}
+        open={Boolean(overflowColumn)}
+        size="xl"
+        title={overflowColumn ? `${overflowColumn.label} overflow` : "Overflow"}
+      >
+        {overflowColumn ? (
+          <ScrollArea className="max-h-[70dvh] pr-4">
+            <div className="space-y-3">
+              {overflowColumn.cards.map((card) => (
+                <BoardCard
+                  card={card}
+                  key={`${overflowColumn.id}-${card.id}`}
+                  onAdvanceDraft={handleAdvanceDraft}
+                  onAdvanceIdea={handleAdvanceIdea}
+                  onArchiveIdea={async (ideaId) => {
+                    await moveIdeaToStatus({ id: ideaId, status: "archived" });
+                  }}
+                  onMoveIdeaToBacklog={async (ideaId) => {
+                    await moveIdeaToStatus({ id: ideaId, status: "backlog" });
+                  }}
+                  onOpenDraft={(draftId) => setDraftEditorId(draftId)}
+                  onOpenIdea={(ideaId) => setIdeaEditorId(ideaId)}
+                  onPublishDraft={handleAdvanceDraft}
+                  onRunDraftAgent={runDraftAgent}
+                  onSpawnDraft={handleSpawnDraft}
+                />
+              ))}
+            </div>
+          </ScrollArea>
+        ) : null}
+      </Modal>
+
+      <Modal
+        bodyClassName="space-y-4"
         onClose={() => setGateState(null)}
+        open={Boolean(gateState)}
         title={gateState ? `${gateState.gate.recommendedAction} Recommended` : "Gate Check"}
       >
-        {gateState && (
-          <div className="space-y-4">
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
-              <p className="text-sm text-[#78290f]">{gateState.gate.summary}</p>
+        {gateState ? (
+          <>
+            <div className="rounded-[20px] border border-[#ffe1b7] bg-[#fff7ea] px-4 py-3 text-sm text-[#8b4513]">
+              {gateState.gate.summary}
             </div>
 
-            <div>
-              <p className="text-sm font-medium text-[#001524]">What still looks weak</p>
-              <ul className="mt-2 space-y-2 text-sm text-gray-600">
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-[var(--ink-black)]">
+                What still looks weak
+              </p>
+              <ul className="space-y-2 text-sm text-muted-foreground">
                 {gateState.gate.issues.map((issue) => (
                   <li key={issue}>• {issue}</li>
                 ))}
@@ -581,471 +1054,412 @@ export function WorkflowBoard() {
             </div>
 
             <div className="flex flex-wrap justify-end gap-2">
-              <Button variant="secondary" onClick={() => setGateState(null)}>
+              <Button onClick={() => setGateState(null)} variant="outline">
                 Cancel
               </Button>
               <Button
-                variant="secondary"
-                onClick={handleRunGateAgent}
                 disabled={runningAgent}
+                onClick={handleRunGateAgent}
+                variant="outline"
               >
-                <Bot size={14} />
-                {runningAgent ? "Running…" : gateState.gate.recommendedAction}
+                <Bot className="size-4" />
+                {runningAgent ? "Running..." : gateState.gate.recommendedAction}
               </Button>
-              <Button variant="primary" onClick={handleForceAdvance}>
-                <ArrowRight size={14} />
+              <Button onClick={handleForceAdvance}>
+                <ArrowRight className="size-4" />
                 Move Anyway
               </Button>
             </div>
-          </div>
-        )}
+          </>
+        ) : null}
       </Modal>
     </>
   );
 }
 
-function StageSection({
-  stage,
-  count,
-  hiddenCount,
-  expanded,
-  index,
-  onToggleOverflow,
-  children,
+function BoardCard({
+  card,
+  onOpenIdea,
+  onOpenDraft,
+  onAdvanceIdea,
+  onAdvanceDraft,
+  onPublishDraft,
+  onSpawnDraft,
+  onRunDraftAgent,
+  onMoveIdeaToBacklog,
+  onArchiveIdea,
+  onOverflow,
 }: {
-  stage: StageKey;
-  count: number;
-  hiddenCount: number;
-  expanded: boolean;
-  index: number;
-  onToggleOverflow?: () => void;
-  children: React.ReactNode;
+  card: WorkflowCardRecord;
+  onOpenIdea: (ideaId: Id<"ideas">) => void;
+  onOpenDraft: (draftId: Id<"workflowDrafts">) => void;
+  onAdvanceIdea: (ideaId: Id<"ideas">) => Promise<boolean>;
+  onAdvanceDraft: (draftId: Id<"workflowDrafts">) => Promise<boolean>;
+  onPublishDraft: (draftId: Id<"workflowDrafts">) => Promise<boolean>;
+  onSpawnDraft: (
+    ideaId: Id<"ideas">,
+    postType: "blog" | "linkedin"
+  ) => Promise<boolean>;
+  onRunDraftAgent: (draft: DraftBoardCard) => Promise<void>;
+  onMoveIdeaToBacklog?: (ideaId: Id<"ideas">) => Promise<void>;
+  onArchiveIdea?: (ideaId: Id<"ideas">) => Promise<void>;
+  onOverflow?: () => void;
 }) {
-  const theme = STAGE_THEME[stage];
-
-  return (
-    <section
-      className={`relative overflow-hidden rounded-[30px] border px-4 py-4 shadow-[0_14px_40px_rgba(0,21,36,0.05)] md:grid md:grid-cols-[180px_minmax(0,1fr)] md:gap-6 md:px-5 ${theme.shell}`}
-    >
-      <div className="mb-5 md:mb-0">
-        <div className="relative z-10 flex items-start gap-3 md:sticky md:top-24">
-          <div className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/70 bg-white/95 text-[#001524] shadow-sm md:flex">
-            <span className="text-xs font-semibold">{index + 1}</span>
-          </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <div className={`flex h-10 w-10 items-center justify-center rounded-2xl border ${theme.panel} text-[#001524] shadow-sm`}>
-                {theme.icon}
-              </div>
-              <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${theme.chip}`}>
-                {count}
-              </span>
-            </div>
-            <p className="mt-3 text-[11px] uppercase tracking-[0.24em] text-gray-500">
-              {STAGE_LABELS[stage]}
-            </p>
-            <p className="mt-2 text-sm leading-6 text-[#001524]">{theme.eyebrow}</p>
-          </div>
-        </div>
-      </div>
-
-      <div className={`relative rounded-[26px] border px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)] md:px-5 ${theme.panel}`}>
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="max-w-2xl">
-            <p className="text-sm leading-6 text-gray-600">{STAGE_DESCRIPTIONS[stage]}</p>
-          </div>
-
-          {hiddenCount > 0 ? (
-            <button
-              type="button"
-              onClick={onToggleOverflow}
-              className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${theme.soft}`}
-            >
-              <MoreHorizontal size={12} />
-              {expanded ? "Show less" : `Show ${hiddenCount} more`}
-              {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-            </button>
-          ) : (
-            <div className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs ${theme.soft}`}>
-              <ArrowDown size={12} />
-              {count === 0 ? "Ready for the next card" : "Focused preview"}
-            </div>
-          )}
-        </div>
-
-        <div className="mt-4">{children}</div>
-      </div>
-    </section>
-  );
-}
-
-function EmptyStage({ stage }: { stage: StageKey }) {
-  const theme = STAGE_THEME[stage];
-
-  return (
-    <div className="rounded-[24px] border border-dashed border-gray-300/90 bg-white/70 px-4 py-7 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
-      <div className={`mx-auto flex h-11 w-11 items-center justify-center rounded-2xl ${theme.soft}`}>
-        {theme.icon}
-      </div>
-      <p className="mt-3 text-sm font-medium text-[#001524]">Nothing parked here right now.</p>
-      <p className="mt-1 text-sm leading-6 text-gray-500">
-        Keep this lane quiet until a card genuinely earns its way down.
-      </p>
-    </div>
-  );
-}
-
-function IdeaCard({
-  stage,
-  idea,
-  onOpen,
-  onAdvance,
-  onSpawnBlog,
-  onSpawnLinkedIn,
-}: {
-  stage: "idea" | "research";
-  idea: {
-    _id: Id<"ideas">;
-    title?: string;
-    text: string;
-    references: Array<{ url: string; title?: string }>;
-    draftCount: number;
-    lastResearchRunAt?: number;
-    lastGateSummary?: string;
-    researchObjective?: string;
-    updatedAt: number;
+  const stopCardAction = (event: { stopPropagation: () => void }) => {
+    event.stopPropagation();
   };
-  onOpen: () => void;
-  onAdvance?: () => void;
-  onSpawnBlog?: () => void;
-  onSpawnLinkedIn?: () => void;
-}) {
-  const theme = STAGE_THEME[stage];
-  const title = formatWorkflowTitle(idea.title, idea.text);
-  const isCompact = stage === "idea";
 
-  return (
-    <article className="overflow-hidden rounded-[24px] border border-white/80 bg-white shadow-[0_18px_40px_rgba(0,21,36,0.08)]">
-      <div className={`h-1.5 w-full ${stage === "idea" ? "bg-[#ffb351]" : "bg-[#52b4bc]"}`} />
-      <div className="space-y-4 p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className={`font-forum leading-[1.02] text-[#001524] ${isCompact ? "text-[22px]" : "text-[28px]"}`}>
-              {title}
+  if (card.kind === "idea") {
+    const isResearch = card.stage === "research";
+    const supportingBadges = [
+      isResearch ? (
+        <Badge
+          className="rounded-full bg-[#e7f7fa] text-[#15616d]"
+          key="research"
+          variant="secondary"
+        >
+          Research
+        </Badge>
+      ) : null,
+      card.idea.draftCount > 0 ? (
+        <Badge className="rounded-full" key="drafts" variant="outline">
+          {card.idea.draftCount} drafts
+        </Badge>
+      ) : null,
+      card.idea.references.length > 0 ? (
+        <Badge className="rounded-full" key="refs" variant="outline">
+          {card.idea.references.length} refs
+        </Badge>
+      ) : null,
+    ].filter(Boolean);
+
+    return (
+      <Card
+        className={`rounded-[20px] border py-0 shadow-[0_14px_30px_rgba(0,21,36,0.08)] ${
+          isResearch
+            ? "border-[#b8dce1] bg-[linear-gradient(180deg,#ffffff_0%,#f4fbfd_100%)]"
+            : "border-[#ffd59c] bg-[linear-gradient(180deg,#ffffff_0%,#fff8ec_100%)]"
+        }`}
+        size="sm"
+      >
+        <CardHeader className="gap-3 border-b border-border/70 py-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 space-y-3">
+              <CardTitle className="pr-2 font-forum text-[1.7rem] leading-[1.02] break-words text-[var(--ink-black)]">
+                {card.title}
+              </CardTitle>
+              {supportingBadges.length > 0 ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  {supportingBadges}
+                </div>
+              ) : null}
+            </div>
+
+            <div className="flex shrink-0 items-start gap-2">
+              <span className="inline-flex items-center gap-1 rounded-full bg-white/86 px-2 py-1 text-[11px] font-medium text-muted-foreground ring-1 ring-border/70">
+                <Timer className="size-3" />
+                {formatWorkflowCardDate(card.idea.updatedAt)}
+              </span>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    data-no-dnd="true"
+                    onClick={stopCardAction}
+                    onPointerDown={stopCardAction}
+                    size="icon-sm"
+                    variant="ghost"
+                  >
+                    <MoreHorizontal className="size-4" />
+                    <span className="sr-only">Open idea actions</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => onOpenIdea(card.idea._id)}>
+                    Open workspace
+                  </DropdownMenuItem>
+                  {card.stage === "idea" ? (
+                    <DropdownMenuItem onClick={() => onAdvanceIdea(card.idea._id)}>
+                      Move to Research
+                    </DropdownMenuItem>
+                  ) : null}
+                  {onMoveIdeaToBacklog ? (
+                    <DropdownMenuItem onClick={() => onMoveIdeaToBacklog(card.idea._id)}>
+                      Send to Inspiration
+                    </DropdownMenuItem>
+                  ) : null}
+                  {onArchiveIdea ? (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => onArchiveIdea(card.idea._id)}>
+                        Archive
+                      </DropdownMenuItem>
+                    </>
+                  ) : null}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </div>
+        </CardHeader>
+
+        <CardContent className="space-y-3 py-4">
+          {isResearch ? (
+            <>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Search className="size-3.5" />
+                {card.idea.references.length} sources attached
+              </div>
+              {card.idea.lastGateSummary ? (
+                <p className="rounded-2xl bg-[#f9f5ee] px-3 py-2 text-xs text-muted-foreground">
+                  {card.idea.lastGateSummary}
+                </p>
+              ) : null}
+            </>
+          ) : card.idea.title ? (
+            <p className="line-clamp-3 break-words text-sm leading-6 text-muted-foreground">
+              {card.idea.text}
             </p>
-            {!isCompact && (
-              <p className="mt-2 text-sm leading-7 text-gray-600">{idea.text}</p>
-            )}
-          </div>
-          <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${theme.chip}`}>
-            {idea.references.length} refs
-          </span>
-        </div>
+          ) : null}
+        </CardContent>
 
-        <div className="flex flex-wrap gap-2 text-xs">
-          {idea.researchObjective && (
-            <span className="rounded-full bg-[#edf3ff] px-2.5 py-1 text-[#395495]">
-              angle set
-            </span>
-          )}
-          {idea.draftCount > 0 && (
-            <span className="rounded-full bg-[#ecf9f0] px-2.5 py-1 text-[#226141]">
-              {idea.draftCount} draft{idea.draftCount === 1 ? "" : "s"}
-            </span>
-          )}
-          <span className="rounded-full bg-gray-100 px-2.5 py-1 text-gray-600">
-            Updated {formatWorkflowTimestamp(idea.updatedAt)}
-          </span>
-        </div>
-
-        {!isCompact && idea.lastGateSummary && (
-          <div className="rounded-[18px] bg-[#fff6e8] px-3 py-2 text-xs leading-5 text-[#8b4513]">
-            {idea.lastGateSummary}
-          </div>
-        )}
-
-        <div className="flex flex-wrap gap-2 border-t border-gray-100 pt-4">
-          <Button variant="ghost" size="sm" onClick={onOpen}>
+        <CardFooter className="flex-col items-stretch gap-2 border-t border-border/70 bg-white/90">
+          <Button
+            data-no-dnd="true"
+            className="w-full justify-start"
+            onClick={(event) => {
+              stopCardAction(event);
+              onOpenIdea(card.idea._id);
+            }}
+            onPointerDown={stopCardAction}
+            variant="ghost"
+          >
             Open
           </Button>
-          {onAdvance && (
-            <Button variant="primary" size="sm" onClick={onAdvance}>
-              <ArrowRight size={14} />
+          {card.stage === "idea" ? (
+            <Button
+              data-no-dnd="true"
+              className="w-full justify-center"
+              onClick={(event) => {
+                stopCardAction(event);
+                onAdvanceIdea(card.idea._id);
+              }}
+              onPointerDown={stopCardAction}
+            >
+              <ArrowRight className="size-4" />
               Move to Research
             </Button>
-          )}
-          {onSpawnBlog && (
-            <Button variant="secondary" size="sm" onClick={onSpawnBlog}>
-              <FileText size={14} />
-              Blog Draft
-            </Button>
-          )}
-          {onSpawnLinkedIn && (
-            <Button variant="secondary" size="sm" onClick={onSpawnLinkedIn}>
-              <Sparkles size={14} />
-              LinkedIn Draft
-            </Button>
-          )}
-        </div>
-      </div>
-    </article>
-  );
-}
-
-function DraftCard({
-  stage,
-  draft,
-  onOpen,
-}: {
-  stage: Exclude<StageKey, "idea" | "research">;
-  draft: DraftBoardCard;
-  onOpen: () => void;
-}) {
-  const theme = STAGE_THEME[stage];
-
-  return (
-    <article className="overflow-hidden rounded-[24px] border border-white/80 bg-white shadow-[0_18px_40px_rgba(0,21,36,0.08)]">
-      <div className={`h-1.5 w-full ${
-        stage === "outline"
-          ? "bg-[#ffbe64]"
-          : stage === "copyedit"
-          ? "bg-[#d69c84]"
-          : stage === "seo"
-          ? "bg-[#7bc18e]"
-          : stage === "final"
-          ? "bg-[#8ea5e6]"
-          : "bg-[#b5b5b5]"
-      }`} />
-      <div className="space-y-4 p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="font-forum text-[28px] leading-[1.02] text-[#001524]">
-              {draft.title}
-            </p>
-            <div className="mt-2 flex flex-wrap gap-2 text-xs uppercase tracking-[0.14em] text-gray-400">
-              <span>{draft.type === "blog" ? "Blog" : "LinkedIn"}</span>
-              {draft.ideaTitle && <span>From {draft.ideaTitle}</span>}
-            </div>
-          </div>
-          {draft.scheduledDate && (
-            <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${theme.chip}`}>
-              {draft.scheduledDate}
-            </span>
-          )}
-        </div>
-
-        <p className="text-sm leading-7 text-gray-600">
-          {draft.preview || "No content preview yet."}
-        </p>
-
-        {(draft.lastAgentSummary || draft.lastGateSummary) && (
-          <div className="space-y-2">
-            {draft.lastAgentSummary && (
-              <div className="rounded-[18px] bg-[#eef8fb] px-3 py-2 text-xs leading-5 text-[#15616d]">
-                {draft.lastAgentSummary}
-              </div>
-            )}
-            {draft.lastGateSummary && (
-              <div className="rounded-[18px] bg-[#fff6e8] px-3 py-2 text-xs leading-5 text-[#8b4513]">
-                {draft.lastGateSummary}
-              </div>
-            )}
-          </div>
-        )}
-
-        <div className="border-t border-gray-100 pt-4">
-          <Button variant="ghost" size="sm" onClick={onOpen}>
-            Open
-          </Button>
-        </div>
-      </div>
-    </article>
-  );
-}
-
-function WorkflowIdeaComposerModal({
-  open,
-  mode,
-  newIdeaDestination,
-  newIdeaText,
-  newIdeaTitle,
-  availableIdeas,
-  creating,
-  onClose,
-  onCreate,
-  onDestinationChange,
-  onModeChange,
-  onNewIdeaTextChange,
-  onNewIdeaTitleChange,
-  onPromoteIdea,
-}: {
-  open: boolean;
-  mode: ComposerMode;
-  newIdeaDestination: NewIdeaDestination;
-  newIdeaText: string;
-  newIdeaTitle: string;
-  availableIdeas: Array<{
-    _id: Id<"ideas">;
-    title?: string;
-    text: string;
-    updatedAt: number;
-    referencesCount: number;
-  }>;
-  creating: boolean;
-  onClose: () => void;
-  onCreate: () => void;
-  onDestinationChange: (value: NewIdeaDestination) => void;
-  onModeChange: (value: ComposerMode) => void;
-  onNewIdeaTextChange: (value: string) => void;
-  onNewIdeaTitleChange: (value: string) => void;
-  onPromoteIdea: (ideaId: Id<"ideas">) => void;
-}) {
-  return (
-    <Modal open={open} onClose={onClose} title="Add to Workflow">
-      <div className="space-y-5">
-        <div className="inline-flex rounded-2xl border border-gray-200 p-1">
-          {(["new", "existing"] as const).map((value) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => onModeChange(value)}
-              className={`rounded-xl px-3 py-2 text-sm font-medium transition-colors ${
-                mode === value
-                  ? "bg-[#001524] text-white"
-                  : "text-gray-600 hover:text-[#001524]"
-              }`}
-            >
-              {value === "new" ? "New idea" : "Existing inspiration"}
-            </button>
-          ))}
-        </div>
-
-        {mode === "new" ? (
-          <div className="space-y-4">
-            <div>
-              <label
-                htmlFor="workflow-new-title"
-                className="mb-1.5 block text-sm font-medium text-gray-700"
+          ) : (
+            <div className="grid w-full gap-2">
+              <Button
+                data-no-dnd="true"
+                className="w-full justify-center"
+                onClick={(event) => {
+                  stopCardAction(event);
+                  onSpawnDraft(card.idea._id, "blog");
+                }}
+                onPointerDown={stopCardAction}
+                variant="outline"
               >
-                Working Title
-              </label>
-              <input
-                id="workflow-new-title"
-                value={newIdeaTitle}
-                onChange={(event) => onNewIdeaTitleChange(event.target.value)}
-                className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#ff7d00]"
-                placeholder="Optional"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="workflow-new-idea"
-                className="mb-1.5 block text-sm font-medium text-gray-700"
-              >
-                Idea
-              </label>
-              <textarea
-                id="workflow-new-idea"
-                value={newIdeaText}
-                onChange={(event) => onNewIdeaTextChange(event.target.value)}
-                rows={7}
-                className="w-full rounded-2xl border border-gray-200 px-3 py-3 text-sm leading-6 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#ff7d00]"
-                placeholder="Capture the thought that should become a workflow card."
-              />
-            </div>
-
-            <div>
-              <p className="mb-2 text-sm font-medium text-gray-700">
-                Where should this go first?
-              </p>
-              <div className="grid gap-3 md:grid-cols-2">
-                <button
-                  type="button"
-                  onClick={() => onDestinationChange("idea")}
-                  className={`rounded-2xl border p-4 text-left transition-colors ${
-                    newIdeaDestination === "idea"
-                      ? "border-[#001524] bg-[#001524] text-white"
-                      : "border-gray-200 bg-white text-[#001524]"
-                  }`}
-                >
-                  <p className="font-medium">Add to Idea column</p>
-                  <p className="mt-1 text-sm opacity-80">
-                    This enters the active pipeline immediately.
-                  </p>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onDestinationChange("backlog")}
-                  className={`rounded-2xl border p-4 text-left transition-colors ${
-                    newIdeaDestination === "backlog"
-                      ? "border-[#15616d] bg-[#15616d] text-white"
-                      : "border-gray-200 bg-white text-[#001524]"
-                  }`}
-                >
-                  <p className="font-medium">Save as inspiration</p>
-                  <p className="mt-1 text-sm opacity-80">
-                    Keep it out of column one until it is selected later.
-                  </p>
-                </button>
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2">
-              <Button variant="secondary" onClick={onClose}>
-                Cancel
+                <FileText className="size-4" />
+                Blog Draft
               </Button>
               <Button
-                variant="primary"
-                onClick={onCreate}
-                disabled={creating || !newIdeaText.trim()}
+                data-no-dnd="true"
+                className="w-full justify-center"
+                onClick={(event) => {
+                  stopCardAction(event);
+                  onSpawnDraft(card.idea._id, "linkedin");
+                }}
+                onPointerDown={stopCardAction}
+                variant="outline"
               >
-                <Plus size={14} />
-                {creating ? "Saving…" : "Create Idea"}
+                <Sparkles className="size-4" />
+                LinkedIn Draft
               </Button>
             </div>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {availableIdeas.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-8 text-center text-sm text-gray-500">
-                No inspiration items are waiting. Save a new idea to inspiration first.
-              </div>
-            ) : (
-              availableIdeas.map((idea) => (
-                <div
-                  key={idea._id}
-                  className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-4"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="font-medium text-[#001524]">
-                        {idea.title || "Untitled inspiration"}
-                      </p>
-                      <p className="mt-2 line-clamp-3 text-sm leading-6 text-gray-600">
-                        {idea.text}
-                      </p>
-                    </div>
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      onClick={() => onPromoteIdea(idea._id)}
-                    >
-                      <ArrowRight size={14} />
-                      Select
-                    </Button>
-                  </div>
+          )}
+        </CardFooter>
+      </Card>
+    );
+  }
 
-                  <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
-                    <span>{idea.referencesCount} refs</span>
-                    <span>Updated {formatWorkflowTimestamp(idea.updatedAt)}</span>
-                  </div>
-                </div>
-              ))
-            )}
+  const nextStage = getNextDraftStage(card.stage);
+  const reviewBadge = getReviewColumnBadgeLabel(card.stage);
+  const canPublish = card.stage === "final";
+
+  return (
+    <Card
+      className="rounded-[20px] border border-[#d8dff2]/85 bg-[linear-gradient(180deg,#ffffff_0%,#f8f9ff_100%)] py-0 shadow-[0_14px_30px_rgba(0,21,36,0.08)]"
+      size="sm"
+    >
+      <CardHeader className="gap-3 border-b border-border/70 py-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge className="rounded-full" variant="secondary">
+                {card.draft.type === "blog" ? "Blog" : "LinkedIn"}
+              </Badge>
+              {reviewBadge ? (
+                <Badge
+                  className="rounded-full bg-[#eef2ff] text-[#4257a0]"
+                  variant="secondary"
+                >
+                  {reviewBadge}
+                </Badge>
+              ) : null}
+              {card.draft.lastGateSummary ? (
+                <Badge
+                  className="rounded-full bg-[#fff7ea] text-[#8b4513]"
+                  variant="secondary"
+                >
+                  Gate note
+                </Badge>
+              ) : null}
+            </div>
+            <CardTitle className="font-forum text-[1.7rem] leading-none break-words text-[var(--ink-black)]">
+              {card.draft.title}
+            </CardTitle>
           </div>
-        )}
-      </div>
-    </Modal>
+
+          <div className="flex shrink-0 items-start gap-2">
+            <span className="inline-flex items-center gap-1 rounded-full bg-white/86 px-2 py-1 text-[11px] font-medium text-muted-foreground ring-1 ring-border/70">
+              <Timer className="size-3" />
+              {formatWorkflowCardDate(card.draft.updatedAt)}
+            </span>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  data-no-dnd="true"
+                  onClick={stopCardAction}
+                  onPointerDown={stopCardAction}
+                  size="icon-sm"
+                  variant="ghost"
+                >
+                  <MoreHorizontal className="size-4" />
+                  <span className="sr-only">Open draft actions</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => onOpenDraft(card.draft._id)}>
+                  Open workspace
+                </DropdownMenuItem>
+                {nextStage ? (
+                  <DropdownMenuItem onClick={() => onRunDraftAgent(card.draft)}>
+                    {getStageAgentLabel(nextStage, card.draft.type)}
+                  </DropdownMenuItem>
+                ) : null}
+                {card.stage === "final" ? (
+                  <DropdownMenuItem onClick={() => onPublishDraft(card.draft._id)}>
+                    Publish
+                  </DropdownMenuItem>
+                ) : nextStage ? (
+                  <DropdownMenuItem onClick={() => onAdvanceDraft(card.draft._id)}>
+                    Advance to {STAGE_LABELS[nextStage]}
+                  </DropdownMenuItem>
+                ) : null}
+                {onOverflow ? (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={onOverflow}>
+                      View full column
+                    </DropdownMenuItem>
+                  </>
+                ) : null}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+      </CardHeader>
+
+      <CardContent className="space-y-3 py-4">
+        <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+          {card.draft.ideaTitle ? (
+            <span className="inline-flex items-center gap-1">
+              <Lightbulb className="size-3.5" />
+              {card.draft.ideaTitle}
+            </span>
+          ) : null}
+          {card.draft.scheduledDate ? (
+            <span className="inline-flex items-center gap-1">
+              <Clock3 className="size-3.5" />
+              {card.draft.scheduledDate}
+            </span>
+          ) : null}
+        </div>
+
+        {card.draft.lastAgentSummary ? (
+          <p className="rounded-2xl bg-[#eef8fb] px-3 py-2 text-xs text-[#15616d]">
+            {card.draft.lastAgentSummary}
+          </p>
+        ) : null}
+        {card.draft.lastGateSummary ? (
+          <p className="rounded-2xl bg-[#fff7ea] px-3 py-2 text-xs text-[#8b4513]">
+            {card.draft.lastGateSummary}
+          </p>
+        ) : null}
+      </CardContent>
+
+      <CardFooter className="flex-col items-stretch gap-2 border-t border-border/70 bg-white/90">
+        <Button
+          data-no-dnd="true"
+          className="w-full justify-start"
+          onClick={(event) => {
+            stopCardAction(event);
+            onOpenDraft(card.draft._id);
+          }}
+          onPointerDown={stopCardAction}
+          variant="ghost"
+        >
+          Open
+        </Button>
+        <div className="grid w-full gap-2">
+          {nextStage ? (
+            <Button
+              data-no-dnd="true"
+              className="w-full justify-center"
+              onClick={(event) => {
+                stopCardAction(event);
+                onRunDraftAgent(card.draft);
+              }}
+              onPointerDown={stopCardAction}
+              variant="outline"
+            >
+              <Bot className="size-4" />
+              Agent
+            </Button>
+          ) : null}
+          {canPublish ? (
+            <Button
+              data-no-dnd="true"
+              className="w-full justify-center"
+              onClick={(event) => {
+                stopCardAction(event);
+                onPublishDraft(card.draft._id);
+              }}
+              onPointerDown={stopCardAction}
+            >
+              <CheckCircle2 className="size-4" />
+              Publish
+            </Button>
+          ) : nextStage ? (
+            <Button
+              data-no-dnd="true"
+              className="w-full justify-center"
+              onClick={(event) => {
+                stopCardAction(event);
+                onAdvanceDraft(card.draft._id);
+              }}
+              onPointerDown={stopCardAction}
+            >
+              {card.stage === "outline" ? (
+                <WandSparkles className="size-4" />
+              ) : (
+                <ArrowRight className="size-4" />
+              )}
+              {card.stage === "outline" ? "Send to Review" : "Advance"}
+            </Button>
+          ) : null}
+        </div>
+      </CardFooter>
+    </Card>
   );
 }

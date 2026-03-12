@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { useMutation, useQuery } from "convex/react";
 import { WorkflowBoard } from "@/components/WorkflowBoard/WorkflowBoard";
 
@@ -17,6 +17,8 @@ vi.mock("@/convex/_generated/api", () => ({
       advanceIdeaStage: "workflow:advanceIdeaStage",
       createDraftFromIdea: "workflow:createDraftFromIdea",
       recordIdeaResearchRun: "workflow:recordIdeaResearchRun",
+      advanceDraft: "workflow:advanceDraft",
+      recordDraftAgentRun: "workflow:recordDraftAgentRun",
     },
   },
 }));
@@ -41,6 +43,8 @@ const moveIdeaToStatusMock = vi.fn();
 const advanceIdeaStageMock = vi.fn();
 const createDraftFromIdeaMock = vi.fn();
 const recordIdeaResearchRunMock = vi.fn();
+const advanceDraftMock = vi.fn();
+const recordDraftAgentRunMock = vi.fn();
 
 const boardData = {
   ideaCards: [
@@ -103,6 +107,10 @@ describe("WorkflowBoard", () => {
           return createDraftFromIdeaMock;
         case "workflow:recordIdeaResearchRun":
           return recordIdeaResearchRunMock;
+        case "workflow:advanceDraft":
+          return advanceDraftMock;
+        case "workflow:recordDraftAgentRun":
+          return recordDraftAgentRunMock;
         default:
           throw new Error(`Unexpected mutation reference: ${String(reference)}`);
       }
@@ -130,6 +138,16 @@ describe("WorkflowBoard", () => {
     });
   });
 
+  it("opens the idea detail view from the card action", async () => {
+    render(<WorkflowBoard />);
+
+    const card = screen.getByText("Editorial system notes").closest("[data-slot='card']");
+    expect(card).not.toBeNull();
+    fireEvent.click(within(card as HTMLElement).getByText("Open"));
+
+    expect(await screen.findByTestId("idea-modal")).toBeInTheDocument();
+  });
+
   it("promotes an inspiration item into the idea column", async () => {
     render(<WorkflowBoard />);
 
@@ -142,6 +160,14 @@ describe("WorkflowBoard", () => {
         status: "idea",
       });
     });
+  });
+
+  it("removes the workflow summary chrome from the board", () => {
+    render(<WorkflowBoard />);
+
+    expect(screen.queryByText("Workflow board")).not.toBeInTheDocument();
+    expect(screen.queryByText("Idea to published progression")).not.toBeInTheDocument();
+    expect(screen.getByText("Kanban")).toBeInTheDocument();
   });
 
   it("shows the gate modal and allows force-advancing when an idea is blocked", async () => {
@@ -188,10 +214,12 @@ describe("WorkflowBoard", () => {
     fireEvent.click(screen.getByText("Blog Draft"));
 
     await waitFor(() => {
-      expect(createDraftFromIdeaMock).toHaveBeenCalledWith({
-        ideaId: "idea_2",
-        type: "blog",
-      });
+      expect(createDraftFromIdeaMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          ideaId: "idea_2",
+          type: "blog",
+        })
+      );
     });
     expect(await screen.findByTestId("draft-editor")).toHaveTextContent("draft_1");
   });
