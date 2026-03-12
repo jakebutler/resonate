@@ -1141,7 +1141,7 @@ function BoardCard({
 
     return (
       <Card
-        className={`min-w-0 rounded-[20px] border py-0 shadow-[0_14px_30px_rgba(0,21,36,0.08)] ${
+        className={`min-w-0 rounded-[20px] border py-0 shadow-[0_8px_18px_rgba(0,21,36,0.06)] ${
           isResearch
             ? "border-[#b8dce1] bg-[linear-gradient(180deg,#ffffff_0%,#f4fbfd_100%)]"
             : "border-[#ffd59c] bg-[linear-gradient(180deg,#ffffff_0%,#fff8ec_100%)]"
@@ -1227,34 +1227,48 @@ function BoardCard({
           ) : null}
         </CardContent>
 
-        <CardFooter className="flex-col items-stretch gap-2 border-t border-border/70 bg-white/90">
-          <Button
-            data-no-dnd="true"
-            className="w-full justify-start"
-            onClick={(event) => {
-              stopCardAction(event);
-              onOpenIdea(card.idea._id);
-            }}
-            onPointerDown={stopCardAction}
-            variant="ghost"
-          >
-            Open
-          </Button>
+        <CardFooter className="flex-col items-stretch gap-2 border-t border-border/70 bg-white/95">
           {card.stage === "idea" ? (
-            <Button
-              data-no-dnd="true"
-              className="w-full justify-center"
-              onClick={(event) => {
-                stopCardAction(event);
-                onAdvanceIdea(card.idea._id);
-              }}
-              onPointerDown={stopCardAction}
-            >
-              <ArrowRight className="size-4" />
-              Move to Research
-            </Button>
+            <div className="grid w-full grid-cols-[0.92fr_1.08fr] gap-2">
+              <Button
+                data-no-dnd="true"
+                className="w-full justify-center"
+                onClick={(event) => {
+                  stopCardAction(event);
+                  onOpenIdea(card.idea._id);
+                }}
+                onPointerDown={stopCardAction}
+                variant="secondary"
+              >
+                Open
+              </Button>
+              <Button
+                data-no-dnd="true"
+                className="w-full justify-center"
+                onClick={(event) => {
+                  stopCardAction(event);
+                  onAdvanceIdea(card.idea._id);
+                }}
+                onPointerDown={stopCardAction}
+              >
+                <ArrowRight className="size-4" />
+                Move
+              </Button>
+            </div>
           ) : (
             <div className="grid w-full gap-2">
+              <Button
+                data-no-dnd="true"
+                className="w-full justify-center"
+                onClick={(event) => {
+                  stopCardAction(event);
+                  onOpenIdea(card.idea._id);
+                }}
+                onPointerDown={stopCardAction}
+                variant="secondary"
+              >
+                Open
+              </Button>
               <Button
                 data-no-dnd="true"
                 className="w-full justify-center"
@@ -1294,7 +1308,7 @@ function BoardCard({
 
   return (
     <Card
-      className="min-w-0 rounded-[20px] border border-[#d8dff2]/85 bg-[linear-gradient(180deg,#ffffff_0%,#f8f9ff_100%)] py-0 shadow-[0_14px_30px_rgba(0,21,36,0.08)]"
+      className="min-w-0 rounded-[20px] border border-[#d8dff2]/85 bg-[linear-gradient(180deg,#ffffff_0%,#f8f9ff_100%)] py-0 shadow-[0_8px_18px_rgba(0,21,36,0.06)]"
       size="sm"
     >
       <CardHeader className="gap-3 border-b border-border/70 py-4">
@@ -1404,16 +1418,16 @@ function BoardCard({
         ) : null}
       </CardContent>
 
-      <CardFooter className="flex-col items-stretch gap-2 border-t border-border/70 bg-white/90">
+      <CardFooter className="flex-col items-stretch gap-2 border-t border-border/70 bg-white/95">
         <Button
           data-no-dnd="true"
-          className="w-full justify-start"
+          className="w-full justify-center"
           onClick={(event) => {
             stopCardAction(event);
             onOpenDraft(card.draft._id);
           }}
           onPointerDown={stopCardAction}
-          variant="ghost"
+          variant="secondary"
         >
           Open
         </Button>

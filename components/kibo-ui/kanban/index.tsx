@@ -168,7 +168,7 @@ export const KanbanCards = <T extends KanbanItemProps = KanbanItemProps>({
   const items = filteredData.map((item) => item.id);
 
   return (
-    <div className="min-h-0 min-w-0 flex-1 overflow-y-auto">
+    <div className="min-h-0 min-w-0 flex-1 overflow-y-auto px-1 py-1.5">
       <SortableContext items={items}>
         <div
           className={cn("flex min-w-0 flex-grow flex-col gap-2 p-2", className)}

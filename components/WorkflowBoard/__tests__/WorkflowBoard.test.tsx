@@ -187,7 +187,7 @@ describe("WorkflowBoard", () => {
 
     render(<WorkflowBoard />);
     await act(async () => {
-      fireEvent.click(screen.getByText("Move to Research"));
+      fireEvent.click(screen.getByText("Move"));
     });
 
     expect(
