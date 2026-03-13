@@ -23,6 +23,12 @@ vi.mock('@/components/AIAssistant/AIAssistant', () => ({
   ),
 }))
 
+function futureDateYMD() {
+  const date = new Date()
+  date.setDate(date.getDate() + 7)
+  return date.toISOString().slice(0, 10)
+}
+
 describe('LinkedInPostEditor', () => {
   const mockCreate = vi.fn().mockResolvedValue('new_id')
 
@@ -82,6 +88,7 @@ describe('LinkedInPostEditor', () => {
   })
 
   it('hydrates existing post data into the editor', async () => {
+    const scheduledDate = futureDateYMD()
     vi.mocked(useQuery).mockImplementation((fn) => {
       if (String(fn).includes('getById')) {
         return {
@@ -89,7 +96,7 @@ describe('LinkedInPostEditor', () => {
           type: 'linkedin',
           content: 'Existing LinkedIn content',
           status: 'scheduled',
-          scheduledDate: '2026-03-12',
+          scheduledDate,
           scheduledTime: '14:00',
           isRepost: true,
           externalUrl: 'https://www.linkedin.com/posts/example',
@@ -103,7 +110,7 @@ describe('LinkedInPostEditor', () => {
 
     await waitFor(() => {
       expect(screen.getByDisplayValue('Existing LinkedIn content')).toBeInTheDocument()
-      expect(screen.getByDisplayValue('2026-03-12')).toBeInTheDocument()
+      expect(screen.getByDisplayValue(scheduledDate)).toBeInTheDocument()
       expect(screen.getByDisplayValue('https://www.linkedin.com/posts/example')).toBeInTheDocument()
     })
   })

@@ -23,6 +23,12 @@ vi.mock('@/convex/_generated/api', () => ({
   }
 }))
 
+function futureDateYMD() {
+  const date = new Date()
+  date.setDate(date.getDate() + 7)
+  return date.toISOString().slice(0, 10)
+}
+
 describe('BlogPostEditor', () => {
   const mockCreate = vi.fn().mockResolvedValue('new_id')
   const mockUpdate = vi.fn().mockResolvedValue(undefined)
@@ -94,13 +100,14 @@ describe('BlogPostEditor', () => {
   })
 
   it('hydrates existing post data into the editor', async () => {
+    const scheduledDate = futureDateYMD()
     const existingPost = {
       _id: 'post-1',
       type: 'blog',
       title: 'Existing title',
       content: 'Existing content',
       status: 'scheduled',
-      scheduledDate: '2026-03-12',
+      scheduledDate,
       scheduledTime: '14:00',
       fileIds: [],
       githubPrUrl: '',
@@ -112,7 +119,7 @@ describe('BlogPostEditor', () => {
     await waitFor(() => {
       expect(screen.getByDisplayValue('Existing title')).toBeInTheDocument()
       expect(screen.getByDisplayValue('Existing content')).toBeInTheDocument()
-      expect(screen.getByDisplayValue('2026-03-12')).toBeInTheDocument()
+      expect(screen.getByDisplayValue(scheduledDate)).toBeInTheDocument()
     })
   })
 

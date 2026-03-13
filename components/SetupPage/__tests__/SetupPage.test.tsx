@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { useQuery, useMutation } from 'convex/react'
 import { SetupPage } from '@/components/SetupPage/SetupPage'
 
@@ -30,7 +31,7 @@ describe('SetupPage', () => {
   it('Continue button calls upsert then navigates', async () => {
     render(<SetupPage />)
     const continueBtn = screen.getByRole('button', { name: /continue/i })
-    fireEvent.click(continueBtn)
+    await userEvent.click(continueBtn)
     await vi.waitFor(() => expect(mockUpsert).toHaveBeenCalledOnce())
     await vi.waitFor(() => expect(mockPush).toHaveBeenCalledWith('/'))
   })
