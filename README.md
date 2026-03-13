@@ -7,6 +7,7 @@ A publishing schedule manager for [Corvo Labs](https://corvolabs.com). Manage Li
 - **Publishing Calendar**: Monthly view with color-coded post chips, filtering by channel
 - **Blog Post Editor**: Markdown editor with preview, image uploads, GitHub PR publishing
 - **LinkedIn Post Editor**: Character counter, repost support, cross-promotion linking
+- **Inspiration & Ideas**: Note-first idea capture with optional source URLs, duplicate detection, manual statuses, and threaded idea detail
 - **AI Writing Assistant**: Multi-turn chat with Corvo Cortex for LinkedIn post drafting
 - **Onboarding Setup**: Channel toggles and publishing frequency configuration
 
@@ -64,6 +65,7 @@ resonate/
 ├── app/
 │   ├── layout.tsx         # Root layout with Clerk + Convex providers
 │   ├── page.tsx           # Dashboard (calendar)
+│   ├── ideas/page.tsx     # Inspiration & Ideas route
 │   ├── setup/page.tsx     # Onboarding
 │   └── api/
 │       ├── llm/route.ts   # Corvo Cortex proxy (streaming)
@@ -73,15 +75,20 @@ resonate/
 │   ├── BlogPostEditor/    # Markdown editor slide-over
 │   ├── Calendar/          # Monthly publishing grid
 │   ├── CreatePostModal/   # Type picker modal
+│   ├── IdeaDetail/        # Idea thread + metadata + promote-to-draft actions
+│   ├── IdeasPage/         # Idea capture composer and inbox list
 │   ├── LinkedInPostEditor/# Text editor slide-over
 │   ├── SetupPage/         # Channel configuration
 │   └── ui/                # Shared primitives
 ├── convex/
+│   ├── ideas.ts           # Ideas queries, mutations, and linking logic
 │   ├── schema.ts          # Data models
 │   ├── posts.ts           # CRUD operations
-│   └── settings.ts        # User preferences
+│   ├── settings.ts        # User preferences
+│   └── auth.config.ts     # Clerk auth provider configuration for Convex
 └── lib/
     ├── cortex.ts          # Corvo Cortex client
+    ├── ideas.ts           # Shared idea normalization helpers
     └── github.ts          # GitHub API helpers
 ```
 

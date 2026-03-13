@@ -98,3 +98,58 @@ export const getFileUrl = query({
     return await ctx.storage.getUrl(args.fileId);
   },
 });
+
+export const createFromIdea = mutation({
+  args: {
+    ideaId: v.id("capturedIdeas"),
+    type: v.union(v.literal("blog"), v.literal("linkedin")),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Unauthorized");
+    }
+
+    const idea = await ctx.db.get(args.ideaId);
+    if (!idea || idea.userId !== identity.subject) {
+      throw new Error("Idea not found");
+    }
+
+    const entries = await ctx.db
+      .query("capturedIdeaEntries")
+      .withIndex("by_idea", (q) => q.eq("ideaId", args.ideaId))
+      .collect();
+    const sortedEntries = entries.sort((a, b) => a.createdAt - b.createdAt);
+    if (sortedEntries.length === 0) {
+      throw new Error("Idea has no entries");
+    }
+
+    const noteLines = sortedEntries.map((entry) => `- ${entry.content}`);
+    const referenceLine = idea.sourceUrl
+      ? `\nReference: ${idea.sourceUrl}`
+      : "";
+    const now = Date.now();
+
+    const postId = await ctx.db.insert("posts", {
+      type: args.type,
+      title: args.type === "blog" ? idea.sourceTitle || "Idea draft" : undefined,
+      content:
+        args.type === "blog"
+          ? `# ${idea.sourceTitle || "Idea Draft"}\n\n## Notes\n${noteLines.join("\n")}${referenceLine}`
+          : `${sortedEntries.map((entry) => entry.content).join("\n\n")}${referenceLine}`,
+      status: "draft",
+      externalUrl: args.type === "linkedin" ? idea.sourceUrl : undefined,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    await ctx.db.insert("capturedIdeaPostLinks", {
+      ideaId: args.ideaId,
+      postId,
+      userId: identity.subject,
+      createdAt: now,
+    });
+
+    return postId;
+  },
+});

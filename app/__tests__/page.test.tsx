@@ -117,4 +117,9 @@ describe("Dashboard", () => {
     render(<Dashboard />)
     expect(screen.getByTestId("user-button")).toBeInTheDocument()
   })
+
+  it('renders an Ideas navigation link', () => {
+    render(<Dashboard />)
+    expect(screen.getByRole('link', { name: 'Ideas' })).toBeInTheDocument()
+  })
 })

@@ -11,7 +11,16 @@ import { CreatePostModal } from "@/components/CreatePostModal/CreatePostModal";
 import { ContentLibrary } from "@/components/ContentLibrary/ContentLibrary";
 import { WorkflowBoard } from "@/components/WorkflowBoard/WorkflowBoard";
 import { UserButton } from "@clerk/nextjs";
-import { FileText, Linkedin, Settings, CalendarRange, Library, AudioWaveform, Layers3 } from "lucide-react";
+import {
+  FileText,
+  Linkedin,
+  Settings,
+  CalendarRange,
+  Library,
+  AudioWaveform,
+  Layers3,
+  Lightbulb,
+} from "lucide-react";
 import Link from "next/link";
 
 type Filter = "all" | "blog" | "linkedin";
@@ -80,7 +89,6 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-[#fafafa]">
-      {/* Top nav */}
       <header className="bg-white border-b border-gray-100 px-6 py-3 flex items-center justify-between sticky top-0 z-10">
         <div className="flex items-center gap-2">
           <AudioWaveform size={20} className="text-[#001524]" />
@@ -135,6 +143,13 @@ export default function Dashboard() {
                 <Layers3 size={14} />
                 Kanban
               </button>
+              <Link
+                href="/ideas"
+                className="flex items-center gap-2 rounded-2xl px-4 py-2 text-sm font-medium text-gray-500 transition-all hover:bg-[#f5f7f8] hover:text-[#001524]"
+              >
+                <Lightbulb size={14} />
+                Ideas
+              </Link>
             </div>
             <div className="max-w-2xl">
               <h1 className="font-forum text-[2rem] leading-none text-[#001524] md:text-[2.35rem]">
