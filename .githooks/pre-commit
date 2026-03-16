@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+if [[ "${RESONATE_DOCS_HOOK_SKIP:-0}" == "1" ]]; then
+  exit 0
+fi
+
+repo_root="$(git rev-parse --show-toplevel)"
+
+cd "$repo_root"
+
+node scripts/update-docs.mjs
+git add docs/spec.md docs/changelog.md docs/project-status.md
