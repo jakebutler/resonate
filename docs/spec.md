@@ -4,90 +4,92 @@ Last updated: 2026-03-16
 
 ## Purpose
 
-Resonate is an internal content operations app for Corvo Labs. It combines content planning, draft editing, editorial workflow, idea capture, AI-assisted writing, and blog publishing into one Next.js + Convex product.
+Resonate is an internal content operations app for Corvo Labs. It combines planning, drafting, editorial workflow, idea capture, AI-assisted writing, and blog publishing in one Next.js + Convex app.
 
-This document stays high-level on purpose. It should describe the product shape and the important cross-file behaviors without turning into an implementation dump.
+This spec stays intentionally high-level. It describes product shape and cross-file behavior that is easy to miss if you only read one area of the codebase.
 
 ## Product Surfaces
 
 ### Dashboard
 
 - `/` is the main workspace.
-- It has three primary views:
+- It exposes three primary views inside one screen:
   - Publishing calendar
   - Content library
   - Workflow kanban
-- Draft creation from the calendar still opens the standalone blog or LinkedIn editors.
+- Calendar and library actions open the standalone blog or LinkedIn editors against shared `posts` records.
 
 ### Setup
 
-- `/setup` manages channel enablement and target posting frequency for blog and LinkedIn.
-- Settings currently behave like app-wide configuration, not per-user preferences.
+- `/setup` manages whether blog and LinkedIn are enabled and how frequently each should publish.
+- These settings currently act like one shared app record, not per-user preferences.
 
 ### Captured Ideas
 
-- `/ideas` is the lightweight note-first inbox.
-- Each captured idea can store tags, source metadata, and a thread of appended entries over time.
-- Captured ideas can create a blog or LinkedIn draft directly in the main `posts` table.
+- `/ideas` is the lightweight capture inbox.
+- A captured idea can hold tags, source metadata, and multiple appended note entries.
+- Captured ideas can spawn a blog or LinkedIn draft directly into the shared `posts` table.
 
 ### Workflow Board
 
-- The workflow board is a separate editorial workflow from `/ideas`.
-- It manages selected ideas, research, draft progression, review passes, and recently published items.
-- The UI shows five columns:
+- The workflow board is separate from `/ideas`.
+- It tracks selected ideas, research, drafting, review passes, and recent publication state.
+- The visible columns are:
   - Ideas
   - Research
   - Outline
   - Review
   - Published
-- The backend keeps more granular draft stages:
+- The backend draft stages are stricter:
   - `outline`
   - `copyedit`
   - `seo`
   - `final`
   - `published`
-- `copyedit`, `seo`, and `final` intentionally collapse into the single Review column.
+- `copyedit`, `seo`, and `final` intentionally collapse into the single Review column in the UI.
 
 ### AI and Publishing
 
-- `/api/llm` is the authenticated server route for AI assistant calls from editors and workflow passes.
-- `/api/publish` creates a GitHub PR for blog publication; LinkedIn content stays in-app and is not published through this route.
-- Workflow “agents” are single-pass prompt runs over the current idea or draft, not autonomous background agents.
+- `/api/llm` is the authenticated server route for AI assistant calls from editors and workflow actions.
+- `/api/publish` creates a GitHub PR for blog publication.
+- LinkedIn content is managed in-app and does not publish through `/api/publish`.
+- Workflow agents are single-pass prompt runs on the current record, not background autonomous workers.
 
 ## System Boundaries
 
 ### Frontend
 
-- Next.js App Router application.
-- Clerk middleware protects app routes and API routes; only sign-in and sign-up are public.
-- Convex React queries and mutations back most product state.
-- The workflow board uses the Kibo kanban/choicebox/combobox components.
+- Next.js App Router app.
+- Clerk route protection is implemented in `proxy.ts`; sign-in and sign-up are the only public routes.
+- Convex React handles most app state.
+- The workflow board uses Kibo-based UI primitives plus explicit stage mapping logic.
 
 ### Backend
 
-- Convex stores product data and most business logic.
-- Next.js route handlers own LLM calls and GitHub publishing.
-- Clerk auth is bridged into Convex with the `convex` JWT template configuration.
+- Convex stores most product data and business logic.
+- Next.js route handlers own external side effects such as LLM requests and GitHub publishing.
+- Clerk auth is bridged into Convex with the `convex` JWT template.
 
 ### AI
 
-- `lib/cortex.ts` is the canonical LLM client.
+- `lib/cortex.ts` is the canonical LLM client entry point.
 - The app prefers Corvo Cortex via `CORTEX_API_KEY`.
-- If Cortex is absent but `OPENAI_API_KEY` is present, the app falls back to OpenAI-compatible chat completions.
-- Missing both keys breaks AI requests at runtime.
+- If Cortex is unavailable but `OPENAI_API_KEY` exists, the app falls back to OpenAI-compatible chat completions.
+- If neither key is set, AI requests fail at runtime.
 
 ## Core Data Model
 
 ### `posts`
 
-- Shared content record for blog and LinkedIn drafts/posts.
-- Used by the calendar, content library, standalone editors, captured-idea draft creation, and workflow drafts.
-- Blog publishing metadata and LinkedIn-specific fields live on the same table.
+- Shared content record for both blog and LinkedIn.
+- Used by the calendar, content library, editors, captured-idea draft creation, and workflow drafts.
+- Blog publishing metadata and LinkedIn-specific metadata live on the same record.
+- Historical published content can be backfilled idempotently by `externalUrl`.
 
 ### `settings`
 
-- Stores blog/LinkedIn enablement and publishing frequency.
-- Current implementation is a single shared record.
+- Stores blog and LinkedIn enablement plus target frequency.
+- Current implementation is a single shared settings record.
 
 ### Captured idea tables
 
@@ -106,21 +108,22 @@ These power the kanban workflow.
 
 ## Non-Obvious Behavior
 
-- There are two idea systems and they are still separate:
-  - `/ideas` uses `capturedIdeas` for quick capture and threaded notes.
+- There are still two idea systems:
+  - `/ideas` uses `capturedIdeas` for note capture and source tracking.
   - The workflow board uses `ideas` for editorial progression.
-- Workflow drafts are not isolated documents. A workflow draft always points to a `posts` row, so edits made in the workflow editor also affect the calendar and content library views.
-- Sending a workflow idea “back to inspiration” moves it to workflow `backlog`; it does not copy it into the `/ideas` captured-ideas inbox.
-- Workflow gate checks are heuristic checks in `lib/workflow.ts`, not model-based validation.
-- AI workflow passes can update research notes or draft content, but advancing stages still goes through explicit mutations and gate checks.
-- Published workflow cards age off the board after seven days even though the underlying Convex records remain.
-- `ideas`, `workflowDrafts`, and captured idea tables are user-scoped. `posts` and `settings` are not currently user-scoped the same way.
-- Auth and env wiring is now strict:
-  - `CLERK_JWT_ISSUER_DOMAIN` is required for Convex auth config.
-  - `NEXT_PUBLIC_CONVEX_URL` is required for the client provider.
-  - The layout no longer injects build-time placeholder Clerk or Convex values.
-- The `/ideas` page can show a signed-in-but-not-Convex-authenticated warning when Clerk app auth works but the Convex JWT bridge is misconfigured.
-- Captured-idea draft creation links the source idea to the new post, but workflow draft creation uses the separate workflow idea model.
+- Workflow drafts are not separate documents. Each `workflowDrafts` row points at a `posts` row, so workflow edits also change what the calendar and library show.
+- Sending a workflow item back to inspiration only returns it to workflow `backlog`; it does not create or sync a `/ideas` captured idea.
+- Captured-idea draft creation links the source idea to the new post, but workflow draft creation starts from the separate workflow idea model.
+- Workflow gate checks in `lib/workflow.ts` are heuristic readiness checks, not model-based validation.
+- AI passes can rewrite notes or content, but stage advancement still goes through explicit mutations and gate checks.
+- Published workflow cards disappear from the board after seven days even though the underlying records stay in Convex.
+- `capturedIdeas`, `capturedIdeaEntries`, `capturedIdeaPostLinks`, `ideas`, and `workflowDrafts` are user-scoped. `posts` and `settings` are not scoped the same way.
+- That scoping difference matters because the dashboard reads `posts` directly, while the idea and workflow systems enforce ownership inside Convex functions.
+- Auth and env wiring is intentionally strict now:
+  - `CLERK_JWT_ISSUER_DOMAIN` is required by `convex/auth.config.ts`.
+  - `NEXT_PUBLIC_CONVEX_URL` is required by `components/ConvexClientProvider.tsx`.
+  - `app/layout.tsx` passes through the real env values instead of placeholder defaults.
+- A user can be signed into Clerk but still fail Convex-backed screens if the Clerk-to-Convex JWT bridge is misconfigured.
 
 ## Current Route Inventory
 
@@ -134,6 +137,6 @@ These power the kanban workflow.
 
 ## Current Direction
 
-- Keep captured ideas and workflow ideas distinct until there is a deliberate migration plan.
+- Keep captured ideas and workflow ideas separate until there is a deliberate migration plan.
 - Preserve the simplified kanban UI while keeping the stricter backend stage model.
-- Continue hardening environment and auth setup instead of relying on placeholder local defaults.
+- Continue removing placeholder env assumptions and validating auth wiring explicitly.

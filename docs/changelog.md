@@ -66,3 +66,52 @@ Append-only session log for repository-level updates. Each documentation refresh
 ### Branch
 
 - main
+
+## 03/16/2026 01:29:04 PDT
+
+### Summary
+
+- Repaired the production Clerk-to-Convex auth path by aligning the app and Convex auth config with explicit environment-driven values.
+- Verified the production app now points at the Convex prod deployment instead of the old shared dev target.
+- Ran the historical content backfill against Convex production and confirmed the published Corvo Labs archive is present there.
+
+### Staged Changes
+
+- No staged changes were present when the docs refresh ran.
+
+### Working Tree Snapshot
+
+-  M app/layout.tsx
+-  M convex/auth.config.ts
+
+### Branch
+
+- main
+
+## 03/16/2026 01:30:02 PDT
+
+### Summary
+
+- Finalized the production auth recovery by aligning Clerk, Convex, and Vercel around explicit environment-driven config.
+- Confirmed the production app now points at the Convex prod deployment and no longer depends on placeholder layout defaults.
+- Verified the historical content backfill is present in Convex prod and documented the remaining repo cleanup as a source-control task.
+
+### Staged Changes
+
+- M	app/layout.tsx
+- M	convex/auth.config.ts
+- M	docs/changelog.md
+- M	docs/project-status.md
+- M	docs/spec.md
+
+### Working Tree Snapshot
+
+- M  app/layout.tsx
+- M  convex/auth.config.ts
+- M  docs/changelog.md
+- M  docs/project-status.md
+- M  docs/spec.md
+
+### Branch
+
+- main

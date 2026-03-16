@@ -1,9 +1,15 @@
 import type { AuthConfig } from "convex/server";
 
+const clerkJwtIssuerDomain = process.env.CLERK_JWT_ISSUER_DOMAIN?.trim();
+
+if (!clerkJwtIssuerDomain) {
+  throw new Error("Missing required environment variable: CLERK_JWT_ISSUER_DOMAIN");
+}
+
 export default {
   providers: [
     {
-      domain: "https://credible-gannet-1.clerk.accounts.dev",
+      domain: clerkJwtIssuerDomain,
       applicationID: "convex",
     },
   ],
