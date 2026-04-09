@@ -27,6 +27,8 @@ interface ToolbarButton {
   shortcut?: string;
 }
 
+const SAFE_URL_PROTOCOLS = new Set(["http:", "https:", "mailto:", "tel:"]);
+
 function normalizeUrl(rawValue: string) {
   const trimmed = rawValue.trim();
   if (!trimmed) return null;
@@ -36,7 +38,10 @@ function normalizeUrl(rawValue: string) {
     : `https://${trimmed}`;
 
   try {
-    return new URL(normalized).toString();
+    const parsedUrl = new URL(normalized);
+    return SAFE_URL_PROTOCOLS.has(parsedUrl.protocol)
+      ? parsedUrl.toString()
+      : null;
   } catch {
     return null;
   }

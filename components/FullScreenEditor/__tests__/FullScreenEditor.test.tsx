@@ -466,6 +466,58 @@ describe('FullScreenEditor', () => {
     )
   })
 
+  it('flushes pending autosave changes before publishing an existing post', async () => {
+    vi.mocked(useQuery).mockReturnValue({
+      _id: 'post-123',
+      type: 'blog',
+      title: 'Existing Post Title',
+      content: '<p>Existing content</p>',
+      status: 'draft',
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    })
+    vi.mocked(fetch).mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          prUrl: 'https://github.com/jakebutler/resonate-blog/pull/42',
+        }),
+        { status: 200 }
+      )
+    )
+
+    render(<FullScreenEditor postId="post-123" />)
+
+    fireEvent.change(screen.getByDisplayValue('Existing Post Title'), {
+      target: { value: 'Updated Before Publish' },
+    })
+    fireEvent.input(screen.getByTestId('tiptap-editor'), {
+      target: { innerHTML: '<p>Fresh content</p>' },
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /^publish$/i }))
+
+    await flushPromises()
+    await flushPromises()
+
+    expect(mockUpdate).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        id: 'post-123',
+        title: 'Updated Before Publish',
+        content: '<p>Fresh content</p>',
+      })
+    )
+
+    expect(mockUpdate).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        id: 'post-123',
+        githubPrUrl: 'https://github.com/jakebutler/resonate-blog/pull/42',
+        status: 'draft',
+      })
+    )
+  })
+
   it('does not create a duplicate draft when publish starts during an in-flight first save', async () => {
     let resolveCreate!: (id: string) => void
     mockCreate.mockReturnValueOnce(

@@ -174,6 +174,7 @@ export function FullScreenEditor({ postId, initialDate }: FullScreenEditorProps)
   const editorRef = useRef<TiptapEditorHandle>(null);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isSavingRef = useRef(false);
+  const inFlightSavePromiseRef = useRef<Promise<void> | null>(null);
   const pendingSaveRef = useRef<{ title: string; content: string } | null>(null);
   const createPostPromiseRef = useRef<Promise<Id<"posts">> | null>(null);
   const previewUrlByFileIdRef = useRef<Record<string, string>>({});
@@ -311,44 +312,71 @@ export function FullScreenEditor({ postId, initialDate }: FullScreenEditorProps)
     async (titleToSave: string, contentToSave: string) => {
       if (isSavingRef.current) {
         pendingSaveRef.current = { title: titleToSave, content: contentToSave };
-        return;
+        return inFlightSavePromiseRef.current ?? Promise.resolve();
       }
+
       isSavingRef.current = true;
       setSaveStatus("saving");
 
-      try {
+      const runSave = async (nextTitle: string, nextContent: string): Promise<void> => {
         const draft = draftSnapshotRef.current;
-        if (currentPostIdRef.current) {
-          // Update existing post
-          await updatePost({
-            id: currentPostIdRef.current as Id<"posts">,
-            title: titleToSave,
-            content: contentToSave,
-            status: draft.status,
-            scheduledDate: draft.scheduledDate,
-            scheduledTime: draft.scheduledTime,
-            tags: draft.tags,
-            seoDescription: draft.seoDescription,
-            fileIds: draft.fileIds,
-            heroImageId: draft.heroImageId ?? undefined,
-          });
-        } else {
-          await createPostDraft(titleToSave, contentToSave, draft);
+        try {
+          if (currentPostIdRef.current) {
+            await updatePost({
+              id: currentPostIdRef.current as Id<"posts">,
+              title: nextTitle,
+              content: nextContent,
+              status: draft.status,
+              scheduledDate: draft.scheduledDate,
+              scheduledTime: draft.scheduledTime,
+              tags: draft.tags,
+              seoDescription: draft.seoDescription,
+              fileIds: draft.fileIds,
+              heroImageId: draft.heroImageId ?? undefined,
+            });
+          } else {
+            await createPostDraft(nextTitle, nextContent, draft);
+          }
+          setSaveStatus("saved");
+        } catch {
+          setSaveStatus("error");
         }
-        setSaveStatus("saved");
-      } catch {
-        setSaveStatus("error");
-      } finally {
-        isSavingRef.current = false;
+
         const pendingSave = pendingSaveRef.current;
         if (pendingSave) {
           pendingSaveRef.current = null;
-          void performSave(pendingSave.title, pendingSave.content);
+          await runSave(pendingSave.title, pendingSave.content);
         }
-      }
+      };
+
+      const savePromise = runSave(titleToSave, contentToSave).finally(() => {
+        isSavingRef.current = false;
+        if (inFlightSavePromiseRef.current === savePromise) {
+          inFlightSavePromiseRef.current = null;
+        }
+      });
+
+      inFlightSavePromiseRef.current = savePromise;
+      return savePromise;
     },
     [createPostDraft, updatePost]
   );
+
+  const flushPendingAutosave = useCallback(async () => {
+    const debounceTimer = debounceTimerRef.current;
+    const hasDebouncedSave = debounceTimer !== null;
+
+    if (hasDebouncedSave) {
+      clearTimeout(debounceTimer);
+      debounceTimerRef.current = null;
+    }
+
+    if (!hasDebouncedSave && !isSavingRef.current && !pendingSaveRef.current) {
+      return;
+    }
+
+    await performSave(title, htmlContent);
+  }, [htmlContent, performSave, title]);
 
   const scheduleAutoSave = useCallback(
     (newTitle: string, newContent: string) => {
@@ -357,7 +385,8 @@ export function FullScreenEditor({ postId, initialDate }: FullScreenEditorProps)
       }
       setSaveStatus("idle");
       debounceTimerRef.current = setTimeout(() => {
-        performSave(newTitle, newContent);
+        debounceTimerRef.current = null;
+        void performSave(newTitle, newContent);
       }, AUTOSAVE_DEBOUNCE_MS);
     },
     [performSave]
@@ -382,9 +411,15 @@ export function FullScreenEditor({ postId, initialDate }: FullScreenEditorProps)
   };
 
   const ensurePersistedPost = useCallback(async () => {
+    await flushPendingAutosave();
+
+    if (currentPostIdRef.current) {
+      return currentPostIdRef.current as Id<"posts">;
+    }
+
     const draft = draftSnapshotRef.current;
     return createPostDraft(title, htmlContent, draft);
-  }, [createPostDraft, htmlContent, title]);
+  }, [createPostDraft, flushPendingAutosave, htmlContent, title]);
 
   const handlePublish = async () => {
     if (!title || !htmlContent) return;
