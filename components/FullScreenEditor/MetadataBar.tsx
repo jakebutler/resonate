@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Settings, ExternalLink } from "lucide-react";
 
 type Status = "draft" | "scheduled" | "published";
@@ -66,6 +66,7 @@ export function MetadataBar({
   const [expanded, setExpanded] = useState(false);
   const [tagsInput, setTagsInput] = useState(tags.join(", "));
   const [isEditingTags, setIsEditingTags] = useState(false);
+  const skipNextBlurCommitRef = useRef(false);
 
   const canPublish = Boolean(title && hasContent && !publishing);
 
@@ -187,11 +188,16 @@ export function MetadataBar({
               }}
               onBlur={(e) => {
                 setIsEditingTags(false);
+                if (skipNextBlurCommitRef.current) {
+                  skipNextBlurCommitRef.current = false;
+                  return;
+                }
                 commitTags(e.target.value);
               }}
               onKeyDown={(e) => {
                 if (e.key !== "Enter") return;
                 e.preventDefault();
+                skipNextBlurCommitRef.current = true;
                 setIsEditingTags(false);
                 commitTags(tagsInput);
                 e.currentTarget.blur();

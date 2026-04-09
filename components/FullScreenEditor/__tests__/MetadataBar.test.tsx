@@ -104,6 +104,21 @@ describe('MetadataBar', () => {
     expect(defaultProps.onTagsChange).toHaveBeenCalledWith(['ai'])
   })
 
+  it('commits tags only once when Enter is pressed', () => {
+    render(<MetadataBar {...defaultProps} />)
+    fireEvent.click(screen.getByRole('button', { name: /settings/i }))
+
+    const tagsInput = screen.getByLabelText(/tags/i)
+    fireEvent.focus(tagsInput)
+    fireEvent.change(tagsInput, { target: { value: 'ai, strategy' } })
+    vi.mocked(defaultProps.onTagsChange).mockClear()
+
+    fireEvent.keyDown(tagsInput, { key: 'Enter' })
+
+    expect(defaultProps.onTagsChange).toHaveBeenCalledTimes(1)
+    expect(defaultProps.onTagsChange).toHaveBeenCalledWith(['ai', 'strategy'])
+  })
+
   // ── BEHAVIOR 6: GitHub PR link ──────────────────────────────────────────
   it('shows a PR link when githubPrUrl is set', () => {
     render(<MetadataBar {...defaultProps} githubPrUrl="https://github.com/pr/1" />)
