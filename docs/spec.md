@@ -14,7 +14,8 @@ This spec stays high-level on purpose. It describes the current product shape an
 
 - `/` is the main workspace.
 - It combines the content calendar, content library, and workflow board in one shell.
-- Dashboard-driven edit actions still use the older modal editors.
+- Blog create/edit actions from the calendar and library now route into `/editor/[id]`.
+- LinkedIn create/edit actions still use the older modal editors.
 
 ### Fullscreen Editor
 
@@ -26,7 +27,7 @@ This spec stays high-level on purpose. It describes the current product shape an
   - a collapsible, resizable AI sidebar backed by `/api/llm`
   - an inline metadata bar for status, schedule, tags, SEO description, and PR state
   - an image workflow with upload, inline insertion, hero-image designation, and image removal
-  - an AI rewrite flow that can replace the selected editor range in place
+  - an AI rewrite flow that can replace the selected editor range in place after user confirmation when the underlying text drifted
   - a publish action that opens a GitHub PR rather than directly pushing live content
 - This route still coexists with the legacy modal editors and is not yet the only editing path.
 
@@ -122,6 +123,10 @@ These power the kanban workflow.
   - New drafts created there are always `type: "blog"`.
   - Existing non-blog records are not blocked at the route layer.
 - Existing post content is pushed back into Tiptap with update emission disabled to avoid autosave loops when async data arrives.
+- Autosave is now explicitly queued:
+  - only one save runs at a time
+  - if edits land during an in-flight save, the latest title/content pair is buffered and saved immediately after
+  - metadata is read from the latest local snapshot at save time rather than from the originally scheduled debounce payload
 - Image handling is split across several layers:
   - uploads go to Convex storage through a generated upload URL
   - the editor inserts an immediate blob preview for responsiveness
@@ -131,12 +136,14 @@ These power the kanban workflow.
   - only common image MIME types are accepted
   - files over 10MB are rejected client-side
   - wide images are resized to 2000px max width before upload
+  - JPEG stays JPEG, WebP stays WebP, and GIF uploads are re-encoded as PNG instead of being forced through JPEG
 - The image tray is currently the hero-image picker. There is no separate metadata control for hero selection.
 - Metadata changes autosave back to Convex, but publish is a separate PR-creation step.
 - The publish flow is intentionally indirect: creating a PR stores `githubPrUrl` on the post and expects the actual merge to happen outside Resonate.
 - The publish path is still only partially aligned:
   - the editor now sends Markdown from the Tiptap markdown extension to `/api/publish`
-  - the editor sends `status: "published"` to the PR helper, but the local post is patched to `scheduled` after PR creation
+  - `/api/publish` now validates optional metadata shape and prefers a resolved `heroImageUrl` when both hero-image fields are present
+  - the editor still treats PR creation and local post status as separate steps, so publish semantics depend on the current metadata state when the request is sent
   - hero image frontmatter depends on resolving the selected storage ID back to a URL at publish time
 - The AI flow now has real editor-selection plumbing:
   - Tiptap emits selection range + text.

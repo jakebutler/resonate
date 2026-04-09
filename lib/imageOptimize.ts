@@ -56,8 +56,13 @@ export async function optimizeImage(file: File): Promise<Blob> {
   ctx.drawImage(bitmap, 0, 0, width, height);
   bitmap.close();
 
-  // Export as JPEG at ~80% quality (PNG for non-photo types to preserve transparency)
-  const outputType = file.type === "image/png" ? "image/png" : "image/jpeg";
+  // Keep formats that can preserve transparency instead of forcing everything to JPEG.
+  const outputType =
+    file.type === "image/jpeg"
+      ? "image/jpeg"
+      : file.type === "image/webp"
+      ? "image/webp"
+      : "image/png";
   const quality = outputType === "image/jpeg" ? JPEG_QUALITY : undefined;
 
   return new Promise<Blob>((resolve, reject) => {

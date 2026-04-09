@@ -22,11 +22,22 @@ function makeStream(chunks: string[]): ReadableStream {
 }
 
 describe('EditorChat', () => {
+  let originalScrollIntoView: typeof HTMLElement.prototype.scrollIntoView | undefined
+
   beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn())
+    originalScrollIntoView = window.HTMLElement.prototype.scrollIntoView
     window.HTMLElement.prototype.scrollIntoView = vi.fn()
   })
-  afterEach(() => vi.unstubAllGlobals())
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    if (originalScrollIntoView === undefined) {
+      delete (window.HTMLElement.prototype as Partial<HTMLElement>).scrollIntoView
+    } else {
+      window.HTMLElement.prototype.scrollIntoView = originalScrollIntoView
+    }
+  })
 
   // ── BEHAVIOR 1: renders ─────────────────────────────────────────────────
   it('renders a greeting message on mount', () => {
@@ -72,6 +83,33 @@ describe('EditorChat', () => {
     fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter' })
 
     await waitFor(() => expect(screen.getByText('Hello editor')).toBeInTheDocument())
+  })
+
+  it('shows a generic error message when the backend returns an error', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response('provider exploded', { status: 500 }))
+
+    render(<EditorChat />)
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Help me write' } })
+    fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter' })
+
+    await waitFor(() =>
+      expect(
+        screen.getByText('Something went wrong. Please try again.')
+      ).toBeInTheDocument()
+    )
+    expect(screen.queryByText('provider exploded')).not.toBeInTheDocument()
+  })
+
+  it('does not submit while the user is composing text with an IME', () => {
+    render(<EditorChat />)
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Help me write' } })
+    fireEvent.keyDown(screen.getByRole('textbox'), {
+      key: 'Enter',
+      isComposing: true,
+      nativeEvent: { isComposing: true },
+    })
+
+    expect(fetch).not.toHaveBeenCalled()
   })
 
   // ── BEHAVIOR 4: selection chip ──────────────────────────────────────────
@@ -129,6 +167,13 @@ describe('EditorChat', () => {
     rerender(<EditorChat focusRequestId={1} />)
 
     expect(textbox).toHaveFocus()
+  })
+
+  it('renders a safe empty state when no models are available', () => {
+    render(<EditorChat models={[]} />)
+
+    expect(screen.getByText('No models available')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /send message/i })).toBeDisabled()
   })
 
   it('renders rewrite responses as suggestion cards and accepts them', async () => {

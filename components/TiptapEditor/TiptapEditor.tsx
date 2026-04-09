@@ -165,9 +165,14 @@ export const TiptapEditor = forwardRef<TiptapEditorHandle, TiptapEditorProps>(
         editor
           ?.chain()
           .focus()
-          .insertContent(
-            `<img src="${src}" alt="${alt ?? ""}"${fileId ? ` data-file-id="${fileId}"` : ""} />`
-          )
+          .insertContent({
+            type: "image",
+            attrs: {
+              src,
+              alt: alt ?? "",
+              fileId: fileId ?? null,
+            },
+          })
           .run(),
       replaceRange: (range, content) =>
         editor?.chain().focus().insertContentAt(range, content).run(),

@@ -169,10 +169,19 @@ describe('FullScreenEditor', () => {
   const mockGenerateUploadUrl = vi.fn().mockResolvedValue('https://upload.example.com')
 
   let originalScrollIntoView: typeof HTMLElement.prototype.scrollIntoView | undefined
+  let createObjectURLSpy: ReturnType<typeof vi.spyOn>
+  let revokeObjectURLSpy: ReturnType<typeof vi.spyOn>
 
   beforeEach(() => {
     vi.clearAllMocks()
     vi.useFakeTimers()
+    mockGetHTML.mockReturnValue('<p>Editor content area</p>')
+    mockGetMarkdown.mockReturnValue('Editor content area')
+    mockInsertImage.mockImplementation(({ src, alt, fileId }) => {
+      const html = `<p>Editor content area</p><img src="${src}" alt="${alt ?? ''}"${fileId ? ` data-file-id="${fileId}"` : ''} />`
+      mockGetHTML.mockReturnValue(html)
+      mockGetMarkdown.mockReturnValue(html)
+    })
     // jsdom doesn't implement scrollIntoView — define it and restore in afterEach
     originalScrollIntoView = HTMLElement.prototype.scrollIntoView
     HTMLElement.prototype.scrollIntoView = vi.fn()
@@ -187,11 +196,8 @@ describe('FullScreenEditor', () => {
     vi.mocked(useQueries).mockReturnValue({})
     vi.stubGlobal('fetch', vi.fn())
     vi.stubGlobal('confirm', vi.fn(() => true))
-    vi.stubGlobal('URL', {
-      ...URL,
-      createObjectURL: vi.fn(() => 'blob:preview-image'),
-      revokeObjectURL: vi.fn(),
-    })
+    createObjectURLSpy = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:preview-image')
+    revokeObjectURLSpy = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
 
     // Default: no existing post (new post mode)
     vi.mocked(useQuery).mockReturnValue(undefined)
@@ -200,6 +206,8 @@ describe('FullScreenEditor', () => {
   afterEach(() => {
     vi.useRealTimers()
     vi.unstubAllGlobals()
+    createObjectURLSpy.mockRestore()
+    revokeObjectURLSpy.mockRestore()
     // Restore scrollIntoView to its original value (undefined in jsdom)
     if (originalScrollIntoView === undefined) {
       delete (HTMLElement.prototype as Partial<HTMLElement>).scrollIntoView
@@ -404,9 +412,90 @@ describe('FullScreenEditor', () => {
       expect.objectContaining({
         id: 'new-post-id',
         githubPrUrl: 'https://github.com/jakebutler/resonate-blog/pull/42',
-        status: 'scheduled',
+        status: 'draft',
       })
     )
+  })
+
+  it('publishes using the selected post status', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          prUrl: 'https://github.com/jakebutler/resonate-blog/pull/42',
+        }),
+        { status: 200 }
+      )
+    )
+
+    render(<FullScreenEditor postId="new" />)
+
+    fireEvent.change(screen.getByPlaceholderText(/untitled post/i), {
+      target: { value: 'Launch Post' },
+    })
+    fireEvent.input(screen.getByTestId('tiptap-editor'), {
+      target: { innerHTML: '<p>Publish me</p>' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /change status/i }))
+    fireEvent.click(screen.getByRole('button', { name: /change status/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^publish$/i }))
+
+    await flushPromises()
+    await flushPromises()
+
+    const [, options] = vi.mocked(fetch).mock.calls[0]
+    const body = JSON.parse((options as RequestInit).body as string)
+    expect(body.status).toBe('published')
+
+    expect(mockUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'new-post-id',
+        status: 'published',
+      })
+    )
+  })
+
+  it('does not create a duplicate draft when publish starts during an in-flight first save', async () => {
+    let resolveCreate!: (id: string) => void
+    mockCreate.mockReturnValueOnce(
+      new Promise<string>((resolve) => {
+        resolveCreate = resolve
+      })
+    )
+    vi.mocked(fetch).mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          prUrl: 'https://github.com/jakebutler/resonate-blog/pull/42',
+        }),
+        { status: 200 }
+      )
+    )
+
+    render(<FullScreenEditor postId="new" />)
+
+    fireEvent.change(screen.getByPlaceholderText(/untitled post/i), {
+      target: { value: 'Launch Post' },
+    })
+    fireEvent.input(screen.getByTestId('tiptap-editor'), {
+      target: { innerHTML: '<p>Publish me</p>' },
+    })
+
+    await act(async () => {
+      vi.advanceTimersByTime(3100)
+      await Promise.resolve()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /^publish$/i }))
+    expect(mockCreate).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      resolveCreate('new-post-id')
+      await Promise.resolve()
+    })
+
+    await flushPromises()
+    await flushPromises()
+
+    expect(mockCreate).toHaveBeenCalledTimes(1)
   })
 
   it('uploads an image and inserts it into the editor', async () => {
@@ -432,6 +521,28 @@ describe('FullScreenEditor', () => {
         alt: 'hero',
       })
     )
+  })
+
+  it('revokes blob preview URLs when an uploaded image is removed', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ storageId: 'storage-1' }), { status: 200 })
+    )
+
+    render(<FullScreenEditor postId="new" />)
+
+    const file = new File(['image'], 'hero.png', { type: 'image/png' })
+    fireEvent.click(screen.getByRole('button', { name: /insert image/i }))
+    fireEvent.change(screen.getByLabelText(/upload image/i), {
+      target: { files: [file] },
+    })
+
+    await flushPromises()
+    await flushPromises()
+
+    fireEvent.click(screen.getByRole('button', { name: /images \(1\)/i }))
+    fireEvent.click(screen.getByTestId('remove-btn-storage-1'))
+
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:preview-image')
   })
 
   it('shows the selection chip when the editor emits a selection', () => {

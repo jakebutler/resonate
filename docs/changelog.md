@@ -225,6 +225,52 @@ Append-only session log for repository-level updates. Each documentation refresh
 
 - feature/fullscreen-editor
 
+## 04/09/2026 08:55:59 PDT
+
+### Summary
+
+- Refreshed the living docs for the current `feature/fullscreen-editor` working tree after the editor picked up queued autosave, selection-aware rewrite acceptance, dashboard routing into the fullscreen blog editor, and tighter publish/image handling.
+- Kept `docs/spec.md` high-level while documenting the new cross-file behavior that is easy to miss: blog actions now route from the dashboard into `/editor/[id]`, publish sends Markdown plus validated metadata, and autosave now serializes overlapping writes instead of racing them.
+- Replaced the handoff doc with the latest pickup guidance for the staged fullscreen-editor work without touching non-doc files.
+
+### Staged Changes
+
+- M	app/__tests__/page.test.tsx
+- M	app/api/publish/__tests__/route.test.ts
+- M	app/api/publish/route.ts
+- M	app/page.tsx
+- M	components/EditorChat/EditorChat.tsx
+- M	components/EditorChat/__tests__/EditorChat.test.tsx
+- M	components/FullScreenEditor/FullScreenEditor.tsx
+- M	components/FullScreenEditor/MetadataBar.tsx
+- M	components/FullScreenEditor/ResizeHandle.tsx
+- M	components/FullScreenEditor/__tests__/FullScreenEditor.test.tsx
+- M	components/TiptapEditor/TiptapEditor.tsx
+- M	components/TiptapEditor/Toolbar.tsx
+- M	lib/__tests__/imageOptimize.test.ts
+- M	lib/imageOptimize.ts
+
+### Working Tree Snapshot
+
+- M  app/__tests__/page.test.tsx
+- M  app/api/publish/__tests__/route.test.ts
+- M  app/api/publish/route.ts
+- M  app/page.tsx
+- M  components/EditorChat/EditorChat.tsx
+- M  components/EditorChat/__tests__/EditorChat.test.tsx
+- M  components/FullScreenEditor/FullScreenEditor.tsx
+- M  components/FullScreenEditor/MetadataBar.tsx
+- M  components/FullScreenEditor/ResizeHandle.tsx
+- M  components/FullScreenEditor/__tests__/FullScreenEditor.test.tsx
+- M  components/TiptapEditor/TiptapEditor.tsx
+- M  components/TiptapEditor/Toolbar.tsx
+- M  lib/__tests__/imageOptimize.test.ts
+- M  lib/imageOptimize.ts
+
+### Branch
+
+- feature/fullscreen-editor
+
 ## 04/09/2026 01:47:24 PDT
 
 ### Summary

@@ -27,6 +27,21 @@ interface ToolbarButton {
   shortcut?: string;
 }
 
+function normalizeUrl(rawValue: string) {
+  const trimmed = rawValue.trim();
+  if (!trimmed) return null;
+
+  const normalized = /^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(trimmed)
+    ? trimmed
+    : `https://${trimmed}`;
+
+  try {
+    return new URL(normalized).toString();
+  } catch {
+    return null;
+  }
+}
+
 export function Toolbar({ editor, onImageInsert }: ToolbarProps) {
   if (!editor) return null;
 
@@ -62,9 +77,15 @@ export function Toolbar({ editor, onImageInsert }: ToolbarProps) {
       icon: <Link2 size={16} />,
       action: () => {
         const url = window.prompt("Enter URL:");
-        if (url) {
-          editor.chain().focus().setLink({ href: url }).run();
+        if (!url) return;
+
+        const normalizedUrl = normalizeUrl(url);
+        if (!normalizedUrl) {
+          window.alert("Please enter a valid URL.");
+          return;
         }
+
+        editor.chain().focus().setLink({ href: normalizedUrl }).run();
       },
       isActive: () => editor.isActive("link"),
       shortcut: "⌘K",

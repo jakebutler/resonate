@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { Calendar } from "@/components/Calendar/Calendar";
-import { BlogPostEditor } from "@/components/BlogPostEditor/BlogPostEditor";
 import { LinkedInPostEditor } from "@/components/LinkedInPostEditor/LinkedInPostEditor";
 import { CreatePostModal } from "@/components/CreatePostModal/CreatePostModal";
 import { ContentLibrary } from "@/components/ContentLibrary/ContentLibrary";
@@ -28,6 +28,7 @@ type View = "calendar" | "library" | "workflow";
 type TimePeriod = "all" | "this-month" | "last-3-months" | "this-year";
 
 export default function Dashboard() {
+  const router = useRouter();
   const allPosts = useQuery(api.posts.list, {});
 
   const [filter, setFilter] = useState<Filter>("all");
@@ -35,7 +36,6 @@ export default function Dashboard() {
   const [timePeriod, setTimePeriod] = useState<TimePeriod>("all");
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [createDate, setCreateDate] = useState<string | null>(null);
-  const [blogEditorOpen, setBlogEditorOpen] = useState(false);
   const [linkedinEditorOpen, setLinkedinEditorOpen] = useState(false);
   const [editingPostId, setEditingPostId] = useState<Id<"posts"> | null>(null);
   const [editorInitialDate, setEditorInitialDate] = useState<string | undefined>();
@@ -50,7 +50,8 @@ export default function Dashboard() {
     setEditingPostId(null);
     setEditorInitialDate(createDate || undefined);
     if (type === "blog") {
-      setBlogEditorOpen(true);
+      const nextUrl = createDate ? `/editor/new?date=${createDate}` : "/editor/new";
+      router.push(nextUrl);
     } else {
       setLinkedinEditorOpen(true);
     }
@@ -60,14 +61,13 @@ export default function Dashboard() {
     setEditingPostId(post._id);
     setEditorInitialDate(undefined);
     if (post.type === "blog") {
-      setBlogEditorOpen(true);
+      router.push(`/editor/${post._id}`);
     } else {
       setLinkedinEditorOpen(true);
     }
   };
 
   const handleEditorClose = () => {
-    setBlogEditorOpen(false);
     setLinkedinEditorOpen(false);
     setEditingPostId(null);
     setEditorInitialDate(undefined);
@@ -225,14 +225,6 @@ export default function Dashboard() {
         date={createDate}
         onClose={() => setCreateModalOpen(false)}
         onSelect={handlePostTypeSelect}
-      />
-
-      <BlogPostEditor
-        open={blogEditorOpen}
-        postId={editingPostId}
-        initialDate={editorInitialDate}
-        onClose={handleEditorClose}
-        onSaved={() => {}}
       />
 
       <LinkedInPostEditor

@@ -37,13 +37,25 @@ export function ResizeHandle({ onResize }: ResizeHandleProps) {
     [onResize]
   );
 
-  const handlePointerUp = useCallback(() => {
+  const releasePointerCapture = (event: React.PointerEvent) => {
+    const target = event.currentTarget as HTMLElement | null;
+    if (!target?.releasePointerCapture) return;
+    try {
+      target.releasePointerCapture(event.pointerId);
+    } catch {
+      // Ignore browsers that already released capture.
+    }
+  };
+
+  const handlePointerUp = useCallback((event: React.PointerEvent) => {
+    releasePointerCapture(event);
     isDraggingRef.current = false;
   }, []);
 
   // Also reset on pointercancel (e.g. touch interrupted, window blur)
   // so the drag doesn't get stuck in an active state
-  const handlePointerCancel = useCallback(() => {
+  const handlePointerCancel = useCallback((event: React.PointerEvent) => {
+    releasePointerCapture(event);
     isDraggingRef.current = false;
   }, []);
 

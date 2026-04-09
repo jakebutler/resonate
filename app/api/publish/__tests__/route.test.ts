@@ -83,6 +83,21 @@ describe("POST /api/publish", () => {
     })
   })
 
+  it("returns 400 when optional metadata has the wrong shape", async () => {
+    const res = await POST(
+      makeRequest({
+        title: "My Post",
+        content: "Content here",
+        heroImageUrl: ["https://cdn.example.com/hero.jpg"],
+        tags: "ai",
+        description: { text: "SEO" },
+      })
+    )
+
+    expect(res.status).toBe(400)
+    expect(createBlogPostPR).not.toHaveBeenCalled()
+  })
+
   it("returns 500 when createBlogPostPR throws", async () => {
     vi.mocked(createBlogPostPR).mockRejectedValueOnce(new Error("GitHub API down"))
     const res = await POST(makeRequest({ title: "T", content: "C" }))

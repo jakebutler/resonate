@@ -91,4 +91,32 @@ describe('optimizeImage', () => {
     const file = new File(['img'], 'photo.jpg', { type: 'image/jpeg' })
     await expect(optimizeImage(file)).rejects.toThrow(/compress/i)
   })
+
+  it('preserves webp output for webp uploads', async () => {
+    mockCanvas.toBlob.mockImplementation(
+      (callback: (blob: Blob | null) => void, type?: string) => {
+        callback(new Blob(['compressed'], { type }))
+      }
+    )
+
+    const file = new File(['img'], 'photo.webp', { type: 'image/webp' })
+    const result = await optimizeImage(file)
+
+    expect(mockCanvas.toBlob).toHaveBeenCalledWith(expect.any(Function), 'image/webp', undefined)
+    expect(result.type).toBe('image/webp')
+  })
+
+  it('exports gif uploads as png to preserve transparency', async () => {
+    mockCanvas.toBlob.mockImplementation(
+      (callback: (blob: Blob | null) => void, type?: string) => {
+        callback(new Blob(['compressed'], { type }))
+      }
+    )
+
+    const file = new File(['img'], 'photo.gif', { type: 'image/gif' })
+    const result = await optimizeImage(file)
+
+    expect(mockCanvas.toBlob).toHaveBeenCalledWith(expect.any(Function), 'image/png', undefined)
+    expect(result.type).toBe('image/png')
+  })
 })

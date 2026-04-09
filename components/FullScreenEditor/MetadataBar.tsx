@@ -17,10 +17,9 @@ const STATUS_STYLES: Record<Status, string> = {
   published: "bg-green-100 text-green-700",
 };
 
-const TIMES = [
-  "08:00","09:00","10:00","11:00","12:00",
-  "13:00","14:00","15:00","16:00","17:00",
-];
+const TIMES = Array.from({ length: 24 }, (_, hour) =>
+  `${String(hour).padStart(2, "0")}:00`
+);
 
 interface MetadataBarProps {
   status: Status;
@@ -58,6 +57,10 @@ export function MetadataBar({
   hasContent,
 }: MetadataBarProps) {
   const [expanded, setExpanded] = useState(false);
+  const locale =
+    typeof navigator !== "undefined" && navigator.language
+      ? navigator.language
+      : undefined;
 
   const canPublish = Boolean(title && hasContent && !publishing);
 
@@ -113,7 +116,7 @@ export function MetadataBar({
         >
           {TIMES.map((t) => (
             <option key={t} value={t}>
-              {new Date(`2000-01-01T${t}`).toLocaleTimeString("en-US", {
+              {new Date(`2000-01-01T${t}`).toLocaleTimeString(locale, {
                 hour: "numeric",
                 minute: "2-digit",
                 hour12: true,

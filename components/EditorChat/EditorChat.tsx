@@ -26,6 +26,7 @@ const GREETING =
   "Hi! I'm your Blog Copilot. I can help you refine your writing, suggest improvements, or answer questions about your draft. Highlight text in the editor and click Ask AI to get focused feedback on a specific passage.";
 
 const SELECTION_TRUNCATE_LENGTH = 80;
+const FALLBACK_ERROR_MESSAGE = "Something went wrong. Please try again.";
 
 function truncate(text: string, maxLen: number): string {
   if (text.length <= maxLen) return text;
@@ -69,14 +70,14 @@ export function EditorChat({
   models = MODELS,
   focusRequestId = 0,
 }: EditorChatProps) {
-  const initialModel = models.find((m) => m.id === DEFAULT_MODEL.id) ?? models[0];
+  const initialModel = models.find((m) => m.id === DEFAULT_MODEL.id) ?? models[0] ?? null;
   const [messages, setMessages] = useState<Message[]>([
     { role: "assistant", content: GREETING },
   ]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [copied, setCopied] = useState<number | null>(null);
-  const [selectedModel, setSelectedModel] = useState<ModelOption>(initialModel);
+  const [selectedModel, setSelectedModel] = useState<ModelOption | null>(initialModel);
   const [modelMenuOpen, setModelMenuOpen] = useState(false);
   const [dismissedSuggestions, setDismissedSuggestions] = useState<number[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -85,7 +86,7 @@ export function EditorChat({
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    bottomRef.current?.scrollIntoView?.({ behavior: "smooth" });
   }, [messages, streaming]);
 
   useEffect(() => {
@@ -105,6 +106,21 @@ export function EditorChat({
     return () => document.removeEventListener("mousedown", handleOutside);
   }, [modelMenuOpen]);
 
+  useEffect(() => {
+    if (models.length === 0) {
+      setSelectedModel(null);
+      setModelMenuOpen(false);
+      return;
+    }
+
+    setSelectedModel((current) => {
+      if (current && models.some((model) => model.id === current.id)) {
+        return current;
+      }
+      return models.find((model) => model.id === DEFAULT_MODEL.id) ?? models[0];
+    });
+  }, [models]);
+
   const buildUserContent = (text: string): string => {
     if (!selectedText) return text;
     return [
@@ -118,7 +134,7 @@ export function EditorChat({
 
   const sendMessage = async () => {
     const text = input.trim();
-    if (!text || streaming) return;
+    if (!text || streaming || !selectedModel) return;
 
     const userContent = buildUserContent(text);
     const userMsg: Message = { role: "user", content: userContent };
@@ -141,7 +157,7 @@ export function EditorChat({
         }),
       });
 
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) throw new Error("LLM request failed");
       if (!res.body) throw new Error("No response body");
 
       const reader = res.body.getReader();
@@ -200,13 +216,12 @@ export function EditorChat({
           break;
         }
       }
-    } catch (err) {
-      const detail = err instanceof Error ? err.message : String(err);
+    } catch {
       setMessages((prev) => {
         const updated = [...prev];
         updated[updated.length - 1] = {
           role: "assistant",
-          content: detail || "Sorry, something went wrong.",
+          content: FALLBACK_ERROR_MESSAGE,
         };
         return updated;
       });
@@ -232,6 +247,9 @@ export function EditorChat({
       prev.includes(idx) ? prev : [...prev, idx]
     );
   };
+
+  const selectedModelLabel = selectedModel?.label ?? "No models available";
+  const canSend = Boolean(input.trim() && !streaming && selectedModel);
 
   return (
     <div className="flex flex-col h-full bg-white border-l border-gray-100">
@@ -378,6 +396,12 @@ export function EditorChat({
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {
+            const nativeEvent = e.nativeEvent as KeyboardEvent & {
+              isComposing?: boolean;
+            };
+            if (nativeEvent.isComposing) {
+              return;
+            }
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
               sendMessage();
@@ -397,19 +421,23 @@ export function EditorChat({
           <div className="relative" ref={modelMenuRef}>
             <button
               ref={modelTriggerRef}
-              onClick={() => setModelMenuOpen((o) => !o)}
+              onClick={() => {
+                if (!selectedModel) return;
+                setModelMenuOpen((o) => !o);
+              }}
               aria-haspopup="listbox"
               aria-expanded={modelMenuOpen}
-              aria-label={`Select AI model. Current: ${selectedModel.label}`}
-              className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 transition-colors"
+              aria-label={`Select AI model. Current: ${selectedModelLabel}`}
+              disabled={!selectedModel}
+              className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 transition-colors disabled:cursor-not-allowed disabled:text-gray-400"
             >
-              {selectedModel.label}
+              {selectedModelLabel}
               <ChevronUp
                 size={12}
                 className={`transition-transform ${modelMenuOpen ? "" : "rotate-180"}`}
               />
             </button>
-            {modelMenuOpen && (
+            {modelMenuOpen && selectedModel ? (
               <div
                 role="listbox"
                 aria-label="AI model options"
@@ -431,12 +459,12 @@ export function EditorChat({
                   </button>
                 ))}
               </div>
-            )}
+            ) : null}
           </div>
 
           <button
             onClick={sendMessage}
-            disabled={!input.trim() || streaming}
+            disabled={!canSend}
             aria-label="Send message"
             className="px-3 py-1.5 bg-[#4f46e5] text-white rounded-xl text-xs font-medium hover:bg-[#4338ca] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >

@@ -4,6 +4,8 @@ import { render, screen, fireEvent } from "@testing-library/react"
 import { useQuery } from "convex/react"
 import Dashboard from "@/app/page"
 
+const mockPush = vi.fn()
+
 vi.mock("convex/react", () => ({ useQuery: vi.fn(), useMutation: vi.fn() }))
 vi.mock("@/convex/_generated/api", () => ({
   api: { posts: { list: "posts:list" } }
@@ -11,15 +13,34 @@ vi.mock("@/convex/_generated/api", () => ({
 vi.mock("@clerk/nextjs", () => ({
   UserButton: () => <div data-testid="user-button" />,
 }))
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: mockPush }),
+}))
 vi.mock("@/components/Calendar/Calendar", () => ({
-  Calendar: ({ onCreatePost }: { onCreatePost: (date: string) => void }) => (
+  Calendar: ({
+    onCreatePost,
+    onEditPost,
+  }: {
+    onCreatePost: (date: string) => void
+    onEditPost: (post: { _id: string; type: "blog" | "linkedin" }) => void
+  }) => (
     <div data-testid="calendar">
       <button onClick={() => onCreatePost("2026-03-04")}>add-post</button>
+      <button onClick={() => onEditPost({ _id: "blog-1", type: "blog" })}>edit-blog</button>
+      <button onClick={() => onEditPost({ _id: "linkedin-1", type: "linkedin" })}>edit-linkedin</button>
     </div>
   ),
 }))
 vi.mock("@/components/ContentLibrary/ContentLibrary", () => ({
-  ContentLibrary: () => <div data-testid="content-library" />,
+  ContentLibrary: ({
+    onEditPost,
+  }: {
+    onEditPost: (post: { _id: string; type: "blog" | "linkedin" }) => void
+  }) => (
+    <div data-testid="content-library">
+      <button onClick={() => onEditPost({ _id: "blog-2", type: "blog" })}>library-edit-blog</button>
+    </div>
+  ),
 }))
 vi.mock("@/components/CreatePostModal/CreatePostModal", () => ({
   CreatePostModal: ({
@@ -38,10 +59,6 @@ vi.mock("@/components/CreatePostModal/CreatePostModal", () => ({
 }))
 vi.mock("@/components/WorkflowBoard/WorkflowBoard", () => ({
   WorkflowBoard: () => <div data-testid="workflow-board" />,
-}))
-vi.mock("@/components/BlogPostEditor/BlogPostEditor", () => ({
-  BlogPostEditor: ({ open, onClose }: { open: boolean; onClose: () => void }) =>
-    open ? <div data-testid="blog-editor"><button onClick={onClose}>close-blog</button></div> : null,
 }))
 vi.mock("@/components/LinkedInPostEditor/LinkedInPostEditor", () => ({
   LinkedInPostEditor: ({ open, onClose }: { open: boolean; onClose: () => void }) =>
@@ -99,11 +116,11 @@ describe("Dashboard", () => {
     expect(screen.getByTestId("create-post-modal")).toBeInTheDocument()
   })
 
-  it("opens BlogPostEditor when blog is selected in modal", () => {
+  it("routes new blog creation to the fullscreen editor", () => {
     render(<Dashboard />)
     fireEvent.click(screen.getByText("add-post"))
     fireEvent.click(screen.getByText("blog"))
-    expect(screen.getByTestId("blog-editor")).toBeInTheDocument()
+    expect(mockPush).toHaveBeenCalledWith("/editor/new?date=2026-03-04")
   })
 
   it("opens LinkedInPostEditor when linkedin is selected in modal", () => {
@@ -111,6 +128,25 @@ describe("Dashboard", () => {
     fireEvent.click(screen.getByText("add-post"))
     fireEvent.click(screen.getByText("linkedin"))
     expect(screen.getByTestId("linkedin-editor")).toBeInTheDocument()
+  })
+
+  it("routes blog edits from the calendar to the fullscreen editor", () => {
+    render(<Dashboard />)
+    fireEvent.click(screen.getByText("edit-blog"))
+    expect(mockPush).toHaveBeenCalledWith("/editor/blog-1")
+  })
+
+  it("keeps LinkedIn edits on the existing modal flow", () => {
+    render(<Dashboard />)
+    fireEvent.click(screen.getByText("edit-linkedin"))
+    expect(screen.getByTestId("linkedin-editor")).toBeInTheDocument()
+  })
+
+  it("routes blog edits from the library to the fullscreen editor", () => {
+    render(<Dashboard />)
+    fireEvent.click(screen.getByText("Library"))
+    fireEvent.click(screen.getByText("library-edit-blog"))
+    expect(mockPush).toHaveBeenCalledWith("/editor/blog-2")
   })
 
   it("renders UserButton in header", () => {

@@ -1,60 +1,65 @@
 # Project Status
 
-Last updated: 04/09/2026 08:42:46 PDT
+Last updated: 04/09/2026 08:55:59 PDT
 
 ## State
 
-Resonate is a working content operations app with calendar planning, shared `posts` editing, workflow review, and captured-idea intake. The active branch is still focused on the blog-first fullscreen editor route.
+`feature/fullscreen-editor` is mid-stream on the blog editor rollout. The fullscreen route is now the primary blog editing path from the dashboard, while LinkedIn editing remains on the legacy modal flow.
 
-## Current Task
+## Current Working Set
 
-Handoff for the current `feature/fullscreen-editor` working set, which now extends the fullscreen editor's AI flow beyond sidebar chrome into actual text selection and replacement.
+- `app/page.tsx` now routes blog create/edit actions from the calendar and library to `/editor/new` and `/editor/[id]`.
+- `components/FullScreenEditor/FullScreenEditor.tsx` stages queued autosave, selection-aware AI rewrite acceptance, image upload/remove flows, and publish handoff.
+- `components/TiptapEditor/TiptapEditor.tsx` exposes selection coordinates/text plus imperative range replacement and Markdown export.
+- `components/EditorChat/EditorChat.tsx` sends selected text as quoted context to `/api/llm` and surfaces `<rewrite>...</rewrite>` suggestions for acceptance.
+- `app/api/publish/route.ts` now validates optional publish metadata and prefers `heroImageUrl` when present.
+- `lib/imageOptimize.ts` preserves WebP uploads, converts GIF uploads to PNG, and still rejects unsupported types or files over 10MB.
 
-## Session Focus
+## Non-Obvious Behavior
 
-- Synced the living docs to the current staged editor work.
-- Captured the now-wired Ask-AI selection flow and its remaining edge cases.
+- Autosave is serialized, not parallel: a save in flight blocks another write, and the latest pending title/content pair is replayed immediately after the current save finishes.
+- Metadata is not stored in that pending payload; saves read the latest local metadata snapshot when they execute.
+- Publish first ensures the post exists in Convex, then sends Markdown rather than HTML to `/api/publish`.
+- Accepting an AI suggestion replaces the stored range directly; if the selected text drifted, the user gets a confirm prompt before overwrite.
+- Dismissing selection state from the sidebar clears sidebar state only; it does not actively clear the browser/editor text selection.
 
-## Last Completed Task
+## Open Risks
 
-- 474f527 feat: phase 4 image handling and publish hardening
+- Publish semantics still depend on whatever local `status` is set when the PR request runs, so the PR handoff model and local post status should be re-checked together.
+- The rewrite path assumes the saved ProseMirror range is still usable; heavy edits between request and acceptance can still produce awkward replacements even with the confirm guard.
+- The docs agent did not run tests, so the current staged suite status is unknown.
+
+## Next Agent Pickup
+
+- Start in the fullscreen editor and verify the current staged behavior before adding more surface area.
+- Check that queued autosave, metadata-only edits, and publish interactions still behave correctly together.
+- Decide whether sidebar dismissal should also clear editor selection and whether publish should normalize post status after PR creation.
+- Run the relevant tests for dashboard routing, editor chat, fullscreen editor behavior, publish route validation, and image optimization before shipping.
 
 ## Recent Commits
 
+- a78192c feat: wire selection-aware editor chat and queued autosave
 - 474f527 feat: phase 4 image handling and publish hardening
 - df246ee feat: Phase 3 — markdown serialization, metadata bar, publish + CodeRabbit fixes
 - 2e5f0b7 feat: Phase 2 — resizable AI chat sidebar + fix TypeScript build error
 - 1ae26ae feat: Phase 1 tracer bullet — full-screen editor route with Tiptap and auto-save
-- 160be4a fix: harden prod auth wiring
 
 ## Local Working Tree
 
-- M  app/editor/[id]/page.tsx
+- M  app/__tests__/page.test.tsx
+- M  app/api/publish/__tests__/route.test.ts
+- M  app/api/publish/route.ts
+- M  app/page.tsx
 - M  components/EditorChat/EditorChat.tsx
 - M  components/EditorChat/__tests__/EditorChat.test.tsx
 - M  components/FullScreenEditor/FullScreenEditor.tsx
+- M  components/FullScreenEditor/MetadataBar.tsx
+- M  components/FullScreenEditor/ResizeHandle.tsx
 - M  components/FullScreenEditor/__tests__/FullScreenEditor.test.tsx
 - M  components/TiptapEditor/TiptapEditor.tsx
-
-## What Changed In-Flight
-
-- `components/TiptapEditor/TiptapEditor.tsx` now emits real selection metadata and shows a floating "Ask AI" button anchored near the selected text.
-- `components/FullScreenEditor/FullScreenEditor.tsx` now stores the selected range, opens and focuses the sidebar from the editor affordance, and can replace the selected range when AI returns a rewrite.
-- `components/EditorChat/EditorChat.tsx` now packages selected text into the prompt, parses `<rewrite>...</rewrite>` responses into suggestion cards, and exposes accept/dismiss actions.
-- The tests in `components/EditorChat/__tests__/EditorChat.test.tsx` and `components/FullScreenEditor/__tests__/FullScreenEditor.test.tsx` were updated to cover the new selection and suggestion flow.
-
-## Non-Obvious Current Behavior
-
-- Dismissing the selection chip in the sidebar clears fullscreen-editor state, but it does not clear the editor's visible text selection.
-- Accepting a suggestion uses the previously captured ProseMirror range. If the text at that range changed, the UI prompts before overwriting.
-- Autosave still runs on a debounce. Accepting a suggestion updates the document immediately but persistence still waits for the normal autosave path.
-- New drafts are still created lazily on first save or publish, so the Ask-AI flow can operate before a `posts` row exists.
-
-## Next Agent Pickup
-
-- Start in [components/FullScreenEditor/FullScreenEditor.tsx](/Users/jacobbutler/Documents/GitHub/resonate/components/FullScreenEditor/FullScreenEditor.tsx) and [components/TiptapEditor/TiptapEditor.tsx](/Users/jacobbutler/Documents/GitHub/resonate/components/TiptapEditor/TiptapEditor.tsx) if the next task touches AI-assisted editing. That is where selection capture, range replacement, and autosave interaction now meet.
-- Validate the current staged behavior before the next commit attempt. The important risks are stale selection ranges, selection-chip state drifting from actual editor selection, and any regressions in autosave after accepted rewrites.
-- If the next task changes product behavior, update only the three living docs again in the same session and keep `docs/changelog.md` append-only.
+- M  components/TiptapEditor/Toolbar.tsx
+- M  lib/__tests__/imageOptimize.test.ts
+- M  lib/imageOptimize.ts
 
 ## Branch
 

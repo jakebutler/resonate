@@ -84,10 +84,11 @@ function extractImageEntries(
   }
 
   for (const fileId of fileIds) {
-    if (!images.has(fileId)) {
+    const resolvedUrl = urlsByFileId[fileId];
+    if (!images.has(fileId) && resolvedUrl) {
       images.set(fileId, {
         fileId,
-        url: urlsByFileId[fileId] || "",
+        url: resolvedUrl,
         altText: "",
       });
     }
@@ -172,6 +173,8 @@ export function FullScreenEditor({ postId, initialDate }: FullScreenEditorProps)
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isSavingRef = useRef(false);
   const pendingSaveRef = useRef<{ title: string; content: string } | null>(null);
+  const createPostPromiseRef = useRef<Promise<Id<"posts">> | null>(null);
+  const previewUrlByFileIdRef = useRef<Record<string, string>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
   const draftSnapshotRef = useRef<DraftSnapshot>(
     createDraftSnapshot(
@@ -241,12 +244,62 @@ export function FullScreenEditor({ postId, initialDate }: FullScreenEditorProps)
 
   useEffect(() => {
     if (!htmlContent || Object.keys(imageUrlByFileId).length === 0) return;
+
+    for (const [fileId, previewUrl] of Object.entries(previewUrlByFileIdRef.current)) {
+      const resolvedUrl = imageUrlByFileId[fileId];
+      if (resolvedUrl && resolvedUrl !== previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+        delete previewUrlByFileIdRef.current[fileId];
+      }
+    }
+
     const nextHtml = replaceImageSources(htmlContent, imageUrlByFileId);
     if (nextHtml !== htmlContent) {
       setHtmlContent(nextHtml);
       editorRef.current?.setContent(nextHtml);
     }
   }, [htmlContent, imageUrlByFileId]);
+
+  const createPostDraft = useCallback(
+    async (
+      titleToSave: string,
+      contentToSave: string,
+      draft: DraftSnapshot
+    ): Promise<Id<"posts">> => {
+      if (currentPostIdRef.current) {
+        return currentPostIdRef.current as Id<"posts">;
+      }
+
+      if (createPostPromiseRef.current) {
+        return createPostPromiseRef.current;
+      }
+
+      const createPromise = createPost({
+        type: "blog",
+        title: titleToSave,
+        content: contentToSave,
+        status: draft.status,
+        scheduledDate: draft.scheduledDate || initialDate,
+        scheduledTime: draft.scheduledTime,
+        tags: draft.tags,
+        seoDescription: draft.seoDescription,
+        fileIds: draft.fileIds,
+        heroImageId: draft.heroImageId ?? undefined,
+      })
+        .then((newId) => {
+          currentPostIdRef.current = newId;
+          router.replace(`/editor/${newId}`);
+          return newId;
+        })
+        .finally(() => {
+          createPostPromiseRef.current = null;
+        });
+
+      createPostPromiseRef.current = createPromise;
+      return createPromise;
+    },
+    [createPost, initialDate, router]
+  );
 
   // ── Auto-save logic ────────────────────────────────────────────────────────
   const performSave = useCallback(
@@ -275,22 +328,7 @@ export function FullScreenEditor({ postId, initialDate }: FullScreenEditorProps)
             heroImageId: draft.heroImageId ?? undefined,
           });
         } else {
-          // Create new post, then redirect to the real ID
-          const newId = await createPost({
-            type: "blog",
-            title: titleToSave,
-            content: contentToSave,
-            status: draft.status,
-            scheduledDate: draft.scheduledDate || initialDate,
-            scheduledTime: draft.scheduledTime,
-            tags: draft.tags,
-            seoDescription: draft.seoDescription,
-            fileIds: draft.fileIds,
-            heroImageId: draft.heroImageId ?? undefined,
-          });
-          currentPostIdRef.current = newId;
-          // Replace history so back-button still works
-          router.replace(`/editor/${newId}`);
+          await createPostDraft(titleToSave, contentToSave, draft);
         }
         setSaveStatus("saved");
       } catch {
@@ -304,7 +342,7 @@ export function FullScreenEditor({ postId, initialDate }: FullScreenEditorProps)
         }
       }
     },
-    [createPost, updatePost, router, initialDate]
+    [createPostDraft, updatePost]
   );
 
   const scheduleAutoSave = useCallback(
@@ -339,25 +377,9 @@ export function FullScreenEditor({ postId, initialDate }: FullScreenEditorProps)
   };
 
   const ensurePersistedPost = useCallback(async () => {
-    if (currentPostIdRef.current) return currentPostIdRef.current as Id<"posts">;
-
     const draft = draftSnapshotRef.current;
-    const newId = await createPost({
-      type: "blog",
-      title,
-      content: htmlContent,
-      status: draft.status,
-      scheduledDate: draft.scheduledDate || initialDate,
-      scheduledTime: draft.scheduledTime,
-      tags: draft.tags,
-      seoDescription: draft.seoDescription,
-      fileIds: draft.fileIds,
-      heroImageId: draft.heroImageId ?? undefined,
-    });
-    currentPostIdRef.current = newId;
-    router.replace(`/editor/${newId}`);
-    return newId;
-  }, [createPost, htmlContent, initialDate, router, title]);
+    return createPostDraft(title, htmlContent, draft);
+  }, [createPostDraft, htmlContent, title]);
 
   const handlePublish = async () => {
     if (!title || !htmlContent) return;
@@ -373,7 +395,7 @@ export function FullScreenEditor({ postId, initialDate }: FullScreenEditorProps)
           title,
           content: markdown,
           scheduledDate,
-          status: "published",
+          status,
           heroImageUrl,
           tags: tags.length ? tags : undefined,
           description: seoDescription || undefined,
@@ -386,7 +408,7 @@ export function FullScreenEditor({ postId, initialDate }: FullScreenEditorProps)
       await updatePost({
         id: persistedPostId,
         githubPrUrl: prUrl,
-        status: "scheduled",
+        status,
       });
     } catch (err) {
       console.error("Publish failed:", err);
@@ -429,6 +451,7 @@ export function FullScreenEditor({ postId, initialDate }: FullScreenEditorProps)
           const previewUrl = URL.createObjectURL(optimizedFile);
           const altText = deriveAltText(file.name);
           const storageFileId = storageId as Id<"_storage">;
+          previewUrlByFileIdRef.current[storageFileId] = previewUrl;
 
           setFileIds((prev) =>
             prev.includes(storageFileId) ? prev : [...prev, storageFileId]
@@ -464,6 +487,12 @@ export function FullScreenEditor({ postId, initialDate }: FullScreenEditorProps)
     const nextFileIds = fileIds.filter((currentFileId) => currentFileId !== fileId);
     const nextHeroImageId = heroImageId === fileId ? null : heroImageId;
     const nextHtml = removeImageFromHtml(htmlContent, fileId);
+    const previewUrl = previewUrlByFileIdRef.current[fileId];
+
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+      delete previewUrlByFileIdRef.current[fileId];
+    }
 
     setFileIds(nextFileIds);
     setHeroImageId(nextHeroImageId);
