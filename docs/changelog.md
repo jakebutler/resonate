@@ -574,3 +574,31 @@ Append-only session log for repository-level updates. Each documentation refresh
 ### Branch
 
 - feature/fullscreen-editor
+
+## 04/09/2026 16:40:14 PDT
+
+### Summary
+
+- Adjusted commit-time automation for documentation refreshes.
+
+### Staged Changes
+
+- M	.github/workflows/test.yml
+- M	playwright.config.ts
+- M	proxy.ts
+
+### Working Tree Snapshot
+
+-  M .githooks/pre-commit
+- M  .github/workflows/test.yml
+-  M package-lock.json
+-  M package.json
+- M  playwright.config.ts
+- M  proxy.ts
+-  M scripts/update-docs.mjs
+- ?? playwright-report/
+- ?? test-results/
+
+### Branch
+
+- feature/fullscreen-editor

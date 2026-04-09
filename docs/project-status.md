@@ -1,6 +1,6 @@
 # Project Status
 
-Last updated: 04/09/2026 16:17:48 PDT
+Last updated: 04/09/2026 16:40:14 PDT
 
 ## State
 
@@ -16,26 +16,27 @@ Maintain the living documentation and preserve a handoff-quality snapshot of the
 
 ## Last Completed Task
 
-- 94d50a5 fix: use clerk-valid placeholder key in e2e
+- 32617d3 fix: flush pending saves before publish
 
 ## Recent Commits
 
+- 32617d3 fix: flush pending saves before publish
 - 94d50a5 fix: use clerk-valid placeholder key in e2e
 - 2c9a6a9 fix: use placeholder envs for e2e build
 - 81844d0 fix: avoid double-saving tags on enter
 - 6bb5f5e fix: make article pane independently scrollable
-- 14a14f0 fix: harden fullscreen editor regressions
 
 ## Local Working Tree
 
 -  M .githooks/pre-commit
-- M  components/FullScreenEditor/FullScreenEditor.tsx
-- M  components/FullScreenEditor/__tests__/FullScreenEditor.test.tsx
-- M  components/TiptapEditor/Toolbar.tsx
-- A  components/TiptapEditor/__tests__/Toolbar.test.tsx
+- M  .github/workflows/test.yml
 -  M package-lock.json
 -  M package.json
+- M  playwright.config.ts
+- M  proxy.ts
 -  M scripts/update-docs.mjs
+- ?? playwright-report/
+- ?? test-results/
 
 ## Next Agent Pickup
 
