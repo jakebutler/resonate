@@ -41,6 +41,12 @@ export function ResizeHandle({ onResize }: ResizeHandleProps) {
     isDraggingRef.current = false;
   }, []);
 
+  // Also reset on pointercancel (e.g. touch interrupted, window blur)
+  // so the drag doesn't get stuck in an active state
+  const handlePointerCancel = useCallback(() => {
+    isDraggingRef.current = false;
+  }, []);
+
   return (
     <div
       role="separator"
@@ -50,6 +56,7 @@ export function ResizeHandle({ onResize }: ResizeHandleProps) {
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerCancel}
     />
   );
 }

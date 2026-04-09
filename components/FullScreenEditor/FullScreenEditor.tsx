@@ -8,6 +8,7 @@ import { Id } from "@/convex/_generated/dataModel";
 import { TiptapEditor, type TiptapEditorHandle } from "@/components/TiptapEditor/TiptapEditor";
 import { EditorChat } from "@/components/EditorChat/EditorChat";
 import { ResizeHandle } from "./ResizeHandle";
+import { MetadataBar } from "./MetadataBar";
 import { ArrowLeft, PanelRightOpen } from "lucide-react";
 
 const SIDEBAR_DEFAULT_WIDTH = 380;
@@ -40,6 +41,15 @@ export function FullScreenEditor({ postId, initialDate }: FullScreenEditorProps)
   const [htmlContent, setHtmlContent] = useState("");
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
 
+  // Metadata
+  const [status, setStatus] = useState<"draft" | "scheduled" | "published">("draft");
+  const [scheduledDate, setScheduledDate] = useState(initialDate ?? "");
+  const [scheduledTime, setScheduledTime] = useState("10:00");
+  const [tags, setTags] = useState<string[]>([]);
+  const [seoDescription, setSeoDescription] = useState("");
+  const [githubPrUrl, setGithubPrUrl] = useState("");
+  const [publishing, setPublishing] = useState(false);
+
   // Sidebar state
   const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT_WIDTH);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -56,6 +66,12 @@ export function FullScreenEditor({ postId, initialDate }: FullScreenEditorProps)
     if (existing) {
       setTitle(existing.title ?? "");
       setHtmlContent(existing.content ?? "");
+      setStatus(existing.status ?? "draft");
+      setScheduledDate(existing.scheduledDate ?? "");
+      setScheduledTime(existing.scheduledTime ?? "10:00");
+      setTags(existing.tags ?? []);
+      setSeoDescription(existing.seoDescription ?? "");
+      setGithubPrUrl(existing.githubPrUrl ?? "");
     }
   }, [existing]);
 
@@ -73,6 +89,11 @@ export function FullScreenEditor({ postId, initialDate }: FullScreenEditorProps)
             id: currentPostIdRef.current as Id<"posts">,
             title: titleToSave,
             content: contentToSave,
+            status,
+            scheduledDate,
+            scheduledTime,
+            tags,
+            seoDescription,
           });
         } else {
           // Create new post, then redirect to the real ID
@@ -126,6 +147,44 @@ export function FullScreenEditor({ postId, initialDate }: FullScreenEditorProps)
   const handleContentChange = (newHtml: string) => {
     setHtmlContent(newHtml);
     scheduleAutoSave(title, newHtml);
+  };
+
+  const handlePublish = async () => {
+    if (!title || !htmlContent) return;
+    setPublishing(true);
+    try {
+      // Convert HTML to markdown for the GitHub file
+      const markdown = editorRef.current?.getHTML() ?? htmlContent;
+      const res = await fetch("/api/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title,
+          content: markdown,
+          scheduledDate,
+          status: "published",
+          tags: tags.length ? tags : undefined,
+          description: seoDescription || undefined,
+        }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const { prUrl } = await res.json();
+      setGithubPrUrl(prUrl);
+
+      if (currentPostIdRef.current) {
+        await updatePost({
+          id: currentPostIdRef.current as Id<"posts">,
+          githubPrUrl: prUrl,
+          status: "scheduled",
+        });
+      }
+    } catch (err) {
+      console.error("Publish failed:", err);
+      // TODO: replace with toast in Phase 8
+      alert("Publish failed: " + (err instanceof Error ? err.message : "Unknown error"));
+    } finally {
+      setPublishing(false);
+    }
   };
 
   const handleResize = useCallback((delta: number) => {
@@ -199,6 +258,25 @@ export function FullScreenEditor({ postId, initialDate }: FullScreenEditorProps)
               aria-label="Post title"
             />
           </div>
+
+          {/* Metadata bar */}
+          <MetadataBar
+            status={status}
+            scheduledDate={scheduledDate}
+            scheduledTime={scheduledTime}
+            tags={tags}
+            seoDescription={seoDescription}
+            onStatusChange={(s) => { setStatus(s); scheduleAutoSave(title, htmlContent); }}
+            onDateChange={(d) => { setScheduledDate(d); scheduleAutoSave(title, htmlContent); }}
+            onTimeChange={(t) => { setScheduledTime(t); scheduleAutoSave(title, htmlContent); }}
+            onTagsChange={(t) => { setTags(t); scheduleAutoSave(title, htmlContent); }}
+            onSeoDescriptionChange={(d) => { setSeoDescription(d); scheduleAutoSave(title, htmlContent); }}
+            onPublish={handlePublish}
+            publishing={publishing}
+            githubPrUrl={githubPrUrl}
+            title={title}
+            hasContent={Boolean(htmlContent)}
+          />
 
           {/* Tiptap WYSIWYG editor */}
           <div className="flex-1 overflow-hidden px-4">

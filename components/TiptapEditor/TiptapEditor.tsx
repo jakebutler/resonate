@@ -5,11 +5,13 @@ import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
+import { Markdown } from "tiptap-markdown";
 import { Toolbar } from "./Toolbar";
 
 export interface TiptapEditorHandle {
   getHTML: () => string;
-  setContent: (html: string) => void;
+  getMarkdown: () => string;
+  setContent: (content: string) => void;
   getEditor: () => ReturnType<typeof useEditor>;
 }
 
@@ -34,6 +36,16 @@ export const TiptapEditor = forwardRef<TiptapEditorHandle, TiptapEditorProps>(
         Placeholder.configure({
           placeholder,
         }),
+        Markdown.configure({
+          html: true,
+          tightLists: true,
+          tightListClass: "tight",
+          bulletListMarker: "-",
+          linkify: false,
+          breaks: false,
+          transformPastedText: true,
+          transformCopiedText: false,
+        }),
       ],
       content: initialContent,
       onUpdate: ({ editor }) => {
@@ -57,7 +69,8 @@ export const TiptapEditor = forwardRef<TiptapEditorHandle, TiptapEditorProps>(
 
     useImperativeHandle(ref, () => ({
       getHTML: () => editor?.getHTML() ?? "",
-      setContent: (html: string) => editor?.commands.setContent(html),
+      getMarkdown: () => (editor?.storage.markdown?.getMarkdown?.() ?? editor?.getHTML() ?? ""),
+      setContent: (content: string) => editor?.commands.setContent(content),
       getEditor: () => editor,
     }));
 

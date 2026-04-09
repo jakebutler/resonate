@@ -181,3 +181,46 @@ Append-only session log for repository-level updates. Each documentation refresh
 ### Branch
 
 - feature/fullscreen-editor
+
+## 04/09/2026 01:19:23 PDT
+
+### Summary
+
+- Refreshed the living docs against the current `feature/fullscreen-editor` working tree after the fullscreen editor picked up metadata controls and a PR-based publish path.
+- Kept `docs/spec.md` high-level while documenting the new scheduling and SEO metadata, the GitHub PR handoff model, and the non-obvious gaps that are still easy to miss in the current editor flow.
+- Replaced the project handoff with the latest pickup guidance centered on aligning publish output, metadata persistence, and the remaining incomplete editor integrations.
+
+### Staged Changes
+
+- M	app/api/publish/route.ts
+- M	components/FullScreenEditor/FullScreenEditor.tsx
+- A	components/FullScreenEditor/MetadataBar.tsx
+- M	components/FullScreenEditor/ResizeHandle.tsx
+- M	components/FullScreenEditor/__tests__/FullScreenEditor.test.tsx
+- A	components/FullScreenEditor/__tests__/MetadataBar.test.tsx
+- M	components/TiptapEditor/TiptapEditor.tsx
+- M	convex/posts.ts
+- M	convex/schema.ts
+- M	lib/github.ts
+- M	package-lock.json
+- M	package.json
+
+### Working Tree Snapshot
+
+- M  app/api/publish/route.ts
+- M  components/FullScreenEditor/FullScreenEditor.tsx
+- A  components/FullScreenEditor/MetadataBar.tsx
+- M  components/FullScreenEditor/ResizeHandle.tsx
+- M  components/FullScreenEditor/__tests__/FullScreenEditor.test.tsx
+- A  components/FullScreenEditor/__tests__/MetadataBar.test.tsx
+- MM components/TiptapEditor/TiptapEditor.tsx
+- M  convex/posts.ts
+- M  convex/schema.ts
+- M  docs/project-status.md
+- M  lib/github.ts
+- M  package-lock.json
+- M  package.json
+
+### Branch
+
+- feature/fullscreen-editor

@@ -10,8 +10,23 @@ function slugify(title: string): string {
     .replace(/^-|-$/g, "");
 }
 
-function buildFrontmatter(title: string, date: string, status: string): string {
-  return `---\ntitle: "${title}"\ndate: "${date}"\nstatus: "${status}"\n---\n\n`;
+function buildFrontmatter(
+  title: string,
+  date: string,
+  status: string,
+  opts?: { heroImage?: string; tags?: string[]; description?: string }
+): string {
+  const lines = [
+    `---`,
+    `title: "${title}"`,
+    `date: "${date}"`,
+    `status: "${status}"`,
+  ];
+  if (opts?.heroImage) lines.push(`heroImage: "${opts.heroImage}"`);
+  if (opts?.tags?.length) lines.push(`tags: [${opts.tags.map((t) => `"${t}"`).join(", ")}]`);
+  if (opts?.description) lines.push(`description: "${opts.description}"`);
+  lines.push(`---`, ``);
+  return lines.join("\n") + "\n";
 }
 
 export async function createBlogPostPR(params: {
@@ -19,6 +34,9 @@ export async function createBlogPostPR(params: {
   content: string;
   scheduledDate: string;
   status: string;
+  heroImage?: string;
+  tags?: string[];
+  description?: string;
 }): Promise<{ prUrl: string; branchName: string }> {
   const slug = slugify(params.title);
   const date = params.scheduledDate || new Date().toISOString().split("T")[0];
@@ -65,7 +83,11 @@ export async function createBlogPostPR(params: {
   }
 
   // Create file
-  const frontmatter = buildFrontmatter(params.title, date, params.status);
+  const frontmatter = buildFrontmatter(params.title, date, params.status, {
+    heroImage: params.heroImage,
+    tags: params.tags,
+    description: params.description,
+  });
   const fileContent = Buffer.from(frontmatter + params.content).toString("base64");
 
   const createFileRes = await fetch(

@@ -50,10 +50,14 @@ describe('FullScreenEditor', () => {
   const mockCreate = vi.fn().mockResolvedValue('new-post-id')
   const mockUpdate = vi.fn().mockResolvedValue(undefined)
 
+  let originalScrollIntoView: typeof HTMLElement.prototype.scrollIntoView | undefined
+
   beforeEach(() => {
     vi.clearAllMocks()
     vi.useFakeTimers()
-    window.HTMLElement.prototype.scrollIntoView = vi.fn()
+    // jsdom doesn't implement scrollIntoView — define it and restore in afterEach
+    originalScrollIntoView = HTMLElement.prototype.scrollIntoView
+    HTMLElement.prototype.scrollIntoView = vi.fn()
 
     vi.mocked(useMutation).mockImplementation((fn: unknown) => {
       const key = fn as string
@@ -69,6 +73,12 @@ describe('FullScreenEditor', () => {
   afterEach(() => {
     vi.useRealTimers()
     vi.unstubAllGlobals()
+    // Restore scrollIntoView to its original value (undefined in jsdom)
+    if (originalScrollIntoView === undefined) {
+      delete (HTMLElement.prototype as Partial<HTMLElement>).scrollIntoView
+    } else {
+      HTMLElement.prototype.scrollIntoView = originalScrollIntoView
+    }
   })
 
   // ── BEHAVIOR 1: renders the core UI ──────────────────────────────────────
