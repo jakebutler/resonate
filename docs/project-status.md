@@ -1,65 +1,49 @@
 # Project Status
 
-Last updated: 04/09/2026 08:55:59 PDT
+Last updated: 04/09/2026 09:00:10 PDT
 
 ## State
 
-`feature/fullscreen-editor` is mid-stream on the blog editor rollout. The fullscreen route is now the primary blog editing path from the dashboard, while LinkedIn editing remains on the legacy modal flow.
+Resonate is a working content operations app with active surfaces for planning, drafting, workflow review, and idea capture. On `feature/fullscreen-editor`, blog drafting now routes through the fullscreen Tiptap editor while LinkedIn still uses the legacy modal path.
 
-## Current Working Set
+## Current Task
 
-- `app/page.tsx` now routes blog create/edit actions from the calendar and library to `/editor/new` and `/editor/[id]`.
-- `components/FullScreenEditor/FullScreenEditor.tsx` stages queued autosave, selection-aware AI rewrite acceptance, image upload/remove flows, and publish handoff.
-- `components/TiptapEditor/TiptapEditor.tsx` exposes selection coordinates/text plus imperative range replacement and Markdown export.
-- `components/EditorChat/EditorChat.tsx` sends selected text as quoted context to `/api/llm` and surfaces `<rewrite>...</rewrite>` suggestions for acceptance.
-- `app/api/publish/route.ts` now validates optional publish metadata and prefers `heroImageUrl` when present.
-- `lib/imageOptimize.ts` preserves WebP uploads, converts GIF uploads to PNG, and still rejects unsupported types or files over 10MB.
+Maintain the living docs and leave a handoff-quality snapshot of the current branch state without touching non-doc product files.
 
-## Non-Obvious Behavior
+## What Is Landed
 
-- Autosave is serialized, not parallel: a save in flight blocks another write, and the latest pending title/content pair is replayed immediately after the current save finishes.
-- Metadata is not stored in that pending payload; saves read the latest local metadata snapshot when they execute.
-- Publish first ensures the post exists in Convex, then sends Markdown rather than HTML to `/api/publish`.
-- Accepting an AI suggestion replaces the stored range directly; if the selected text drifted, the user gets a confirm prompt before overwrite.
-- Dismissing selection state from the sidebar clears sidebar state only; it does not actively clear the browser/editor text selection.
+- `a4b8018` hardened the fullscreen editor around first-save and publish timing, tightened `/api/publish` metadata handling, and routed blog create/edit entry points from the dashboard into `/editor/[id]`.
+- The current editor route supports queued autosave, selection-aware AI chat, inline image upload with hero selection, metadata editing, and PR-based publish handoff.
+- Publish creates a GitHub PR and stores `githubPrUrl` back on the `posts` record; it does not complete the final merge or live-publish step inside Resonate.
 
-## Open Risks
+## Local Working Tree
 
-- Publish semantics still depend on whatever local `status` is set when the PR request runs, so the PR handoff model and local post status should be re-checked together.
-- The rewrite path assumes the saved ProseMirror range is still usable; heavy edits between request and acceptance can still produce awkward replacements even with the confirm guard.
-- The docs agent did not run tests, so the current staged suite status is unknown.
+- `M components/EditorChat/EditorChat.tsx`
+- `M components/FullScreenEditor/__tests__/FullScreenEditor.test.tsx`
 
-## Next Agent Pickup
+Those two non-doc changes were already present during this documentation pass. No code changes were made outside the three docs files.
 
-- Start in the fullscreen editor and verify the current staged behavior before adding more surface area.
-- Check that queued autosave, metadata-only edits, and publish interactions still behave correctly together.
-- Decide whether sidebar dismissal should also clear editor selection and whether publish should normalize post status after PR creation.
-- Run the relevant tests for dashboard routing, editor chat, fullscreen editor behavior, publish route validation, and image optimization before shipping.
+## Non-Obvious Constraints
+
+- The fullscreen editor writes directly to the shared `posts` table, so calendar, library, workflow drafts, and fullscreen edits all converge on the same records.
+- The route is blog-first, not blog-only: new `/editor/new` drafts are always blog posts, but existing non-blog `posts` are not blocked at the route boundary.
+- Autosave is serialized. If a save is in flight, the next title/content pair is buffered and written immediately after the first request resolves.
+- Publish on a brand-new draft must persist the post first. That guard exists to avoid duplicate `posts.create` calls when publish is pressed during the first autosave window.
+- AI rewrites depend on the stored editor selection range still being valid. If the underlying text changed, the editor asks for confirmation before overwriting.
+
+## Recommended Pickup
+
+- Check the local diffs in `components/EditorChat/EditorChat.tsx` and `components/FullScreenEditor/__tests__/FullScreenEditor.test.tsx` before adding more fullscreen-editor work; they are the only non-doc files still marked modified.
+- If product work continues on publish semantics, verify whether post status, `publishedAt`, and GitHub merge completion should stay decoupled or be aligned more explicitly.
+- If AI rewrite polish continues, decide whether dismissing the selection chip should also clear the visible editor selection, not just sidebar state.
 
 ## Recent Commits
 
+- a4b8018 fix: harden fullscreen editor flows and route blog entry points
 - a78192c feat: wire selection-aware editor chat and queued autosave
 - 474f527 feat: phase 4 image handling and publish hardening
 - df246ee feat: Phase 3 — markdown serialization, metadata bar, publish + CodeRabbit fixes
 - 2e5f0b7 feat: Phase 2 — resizable AI chat sidebar + fix TypeScript build error
-- 1ae26ae feat: Phase 1 tracer bullet — full-screen editor route with Tiptap and auto-save
-
-## Local Working Tree
-
-- M  app/__tests__/page.test.tsx
-- M  app/api/publish/__tests__/route.test.ts
-- M  app/api/publish/route.ts
-- M  app/page.tsx
-- M  components/EditorChat/EditorChat.tsx
-- M  components/EditorChat/__tests__/EditorChat.test.tsx
-- M  components/FullScreenEditor/FullScreenEditor.tsx
-- M  components/FullScreenEditor/MetadataBar.tsx
-- M  components/FullScreenEditor/ResizeHandle.tsx
-- M  components/FullScreenEditor/__tests__/FullScreenEditor.test.tsx
-- M  components/TiptapEditor/TiptapEditor.tsx
-- M  components/TiptapEditor/Toolbar.tsx
-- M  lib/__tests__/imageOptimize.test.ts
-- M  lib/imageOptimize.ts
 
 ## Branch
 

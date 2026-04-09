@@ -4,31 +4,31 @@ Last updated: 2026-04-09
 
 ## Purpose
 
-Resonate is Corvo Labs' internal content operations app. It combines editorial planning, drafting, AI assistance, workflow review, and publication handoff in one Next.js + Convex product.
+Resonate is Corvo Labs' internal content operations app. It combines planning, drafting, AI assistance, workflow review, and publication handoff in one Next.js + Convex product.
 
-This spec stays high-level on purpose. It describes the current product shape and the cross-file behavior that is easiest to miss during implementation work.
+This spec stays high-level on purpose. It covers the current product shape and the cross-file behavior that is easiest to miss if you only read one surface.
 
 ## Product Surfaces
 
 ### Dashboard
 
 - `/` is the main workspace.
-- It combines the content calendar, content library, and workflow board in one shell.
-- Blog create/edit actions from the calendar and library now route into `/editor/[id]`.
-- LinkedIn create/edit actions still use the older modal editors.
+- It combines the publishing calendar, content library, and workflow board in one shell.
+- Blog create and edit actions from the calendar and library route into `/editor/[id]`.
+- LinkedIn create and edit actions still use the older modal editor path.
 
 ### Fullscreen Editor
 
-- `/editor/[id]` is the dedicated drafting route for the current blog-first editor work.
+- `/editor/[id]` is the dedicated blog-first drafting route.
 - `/editor/new?date=YYYY-MM-DD` creates a new blog draft on first autosave, then replaces the URL with `/editor/[newId]`.
 - `/editor/[postId]` loads and autosaves the shared `posts` record directly.
-- The layout currently includes:
-  - a selection-aware Tiptap editor with a compact toolbar and inline "Ask AI" affordance
-  - a collapsible, resizable AI sidebar backed by `/api/llm`
-  - an inline metadata bar for status, schedule, tags, SEO description, and PR state
-  - an image workflow with upload, inline insertion, hero-image designation, and image removal
-  - an AI rewrite flow that can replace the selected editor range in place after user confirmation when the underlying text drifted
-  - a publish action that opens a GitHub PR rather than directly pushing live content
+- The current editor experience includes:
+  - a Tiptap document editor with a compact toolbar
+  - inline image upload plus hero-image selection
+  - a selection-aware AI sidebar backed by `/api/llm`
+  - inline metadata controls for status, scheduling, tags, SEO description, and PR state
+  - a publish action that opens a GitHub PR instead of publishing directly
+- On smaller screens the AI sidebar starts collapsed, but the editor route is still the same surface.
 - This route still coexists with the legacy modal editors and is not yet the only editing path.
 
 ### Setup
@@ -53,9 +53,9 @@ This spec stays high-level on purpose. It describes the current product shape an
 ### AI and Publishing
 
 - `/api/llm` is the authenticated server route for editor and workflow AI calls.
-- The fullscreen editor uses `/api/llm` with `assistantType: "blog"` and streams responses into the sidebar chat UI.
-- Selected editor text is sent as quoted prompt context, and the assistant can return `<rewrite>...</rewrite>` blocks that the UI exposes as accept/dismiss suggestions.
-- `/api/publish` creates a GitHub PR for blog publication and can include frontmatter metadata such as tags, description, and hero image URL.
+- The fullscreen editor sends selected text as quoted context and uses `assistantType: "blog"`.
+- The assistant can return `<rewrite>...</rewrite>` blocks, which the sidebar exposes as accept or dismiss actions.
+- `/api/publish` creates a GitHub PR for blog publication and accepts optional frontmatter metadata such as tags, description, and hero image URL.
 - LinkedIn posts stay in-app and do not publish through `/api/publish`.
 - Workflow AI remains synchronous prompt execution on the current record, not background processing.
 
@@ -89,7 +89,7 @@ This spec stays high-level on purpose. It describes the current product shape an
 
 - Shared content record for both blog and LinkedIn.
 - Used by the calendar, content library, modal editors, fullscreen editor, captured-idea draft creation, and workflow drafts.
-- The fullscreen-editor work now relies on `posts` for status, schedule, tags, SEO description, stored GitHub PR URL, uploaded file IDs, and hero image selection.
+- The fullscreen editor relies on `posts` for status, schedule, tags, SEO description, stored GitHub PR URL, uploaded file IDs, and hero image selection.
 - Historical published content can be backfilled idempotently by `externalUrl`.
 
 ### `settings`
@@ -120,39 +120,37 @@ These power the kanban workflow.
 - Workflow drafts are not separate documents. Each `workflowDrafts` row points at a `posts` row, so workflow edits also change what the calendar and library show.
 - The fullscreen editor writes directly to `posts`, not to a separate draft table.
 - The fullscreen route remains blog-oriented even though `posts` is shared:
-  - New drafts created there are always `type: "blog"`.
-  - Existing non-blog records are not blocked at the route layer.
-- Existing post content is pushed back into Tiptap with update emission disabled to avoid autosave loops when async data arrives.
-- Autosave is now explicitly queued:
+  - new drafts created there are always `type: "blog"`
+  - existing non-blog records are not blocked at the route layer
+- Existing content is pushed back into Tiptap with update emission disabled to avoid autosave loops when async data arrives.
+- Autosave is explicitly queued:
   - only one save runs at a time
-  - if edits land during an in-flight save, the latest title/content pair is buffered and saved immediately after
-  - metadata is read from the latest local snapshot at save time rather than from the originally scheduled debounce payload
-- Image handling is split across several layers:
+  - if edits land during an in-flight save, the latest title and content pair is buffered and saved immediately after
+  - metadata is read from the latest local snapshot at save time rather than from the original debounce payload
+- Publish is coupled to persistence for new drafts:
+  - the editor ensures the draft exists before it creates a PR
+  - this prevents duplicate draft creation when publish starts during the first autosave window
+- Publish remains a handoff, not a final state transition:
+  - `/api/publish` creates a GitHub PR and returns a PR URL
+  - the editor stores `githubPrUrl` back on the post and mirrors the currently selected status
+  - merge, live publication, and any final `publishedAt` semantics still happen outside this route
+- Image handling spans several layers:
   - uploads go to Convex storage through a generated upload URL
   - the editor inserts an immediate blob preview for responsiveness
-  - later, a query-driven URL replacement pass swaps those blob URLs for resolved storage URLs in the HTML
-  - the image tray is derived from the current HTML plus stored `fileIds`, so removing an image must update both the document and metadata
+  - later, a query-driven replacement pass swaps blob URLs for resolved storage URLs in the HTML
+  - the image tray is derived from the current HTML plus stored `fileIds`, so removal must update both the document and metadata
 - Client-side image optimization happens before upload:
   - only common image MIME types are accepted
   - files over 10MB are rejected client-side
   - wide images are resized to 2000px max width before upload
-  - JPEG stays JPEG, WebP stays WebP, and GIF uploads are re-encoded as PNG instead of being forced through JPEG
+  - JPEG stays JPEG, WebP stays WebP, and GIF uploads are re-encoded as PNG
 - The image tray is currently the hero-image picker. There is no separate metadata control for hero selection.
-- Metadata changes autosave back to Convex, but publish is a separate PR-creation step.
-- The publish flow is intentionally indirect: creating a PR stores `githubPrUrl` on the post and expects the actual merge to happen outside Resonate.
-- The publish path is still only partially aligned:
-  - the editor now sends Markdown from the Tiptap markdown extension to `/api/publish`
-  - `/api/publish` now validates optional metadata shape and prefers a resolved `heroImageUrl` when both hero-image fields are present
-  - the editor still treats PR creation and local post status as separate steps, so publish semantics depend on the current metadata state when the request is sent
-  - hero image frontmatter depends on resolving the selected storage ID back to a URL at publish time
-- The AI flow now has real editor-selection plumbing:
-  - Tiptap emits selection range + text.
-  - The floating "Ask AI" button opens and focuses the sidebar.
-  - Accepting a suggestion replaces the original range in the document and reschedules autosave.
-- That rewrite path is still optimistic UI:
-  - it relies on the stored ProseMirror range still being valid when the user accepts
-  - if the selection text changed, the user gets a confirm prompt before overwrite
-  - dismissing the sidebar chip only clears sidebar state; it does not visibly clear the editor selection itself
+- The AI rewrite path is selection-based and optimistic:
+  - Tiptap emits selection range plus text
+  - the floating "Ask AI" button opens and focuses the sidebar
+  - accepting a suggestion replaces the original range and reschedules autosave
+  - if the underlying text drifted, the user gets a confirm prompt before overwrite
+- Dismissing the sidebar selection chip clears sidebar state; it does not visibly clear the editor selection highlight itself.
 - Captured-idea draft creation links the source idea to the new post, but workflow draft creation starts from the separate workflow idea model.
 - Sending a workflow item back to inspiration only returns it to workflow `backlog`; it does not create or sync a `/ideas` captured idea.
 - Workflow gate checks in `lib/workflow.ts` are heuristic readiness checks, not model-based validation.

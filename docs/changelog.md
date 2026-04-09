@@ -225,6 +225,29 @@ Append-only session log for repository-level updates. Each documentation refresh
 
 - feature/fullscreen-editor
 
+## 04/09/2026 09:00:10 PDT
+
+### Summary
+
+- Refreshed the living docs against the current `feature/fullscreen-editor` state after the fullscreen editor hardening work landed and blog entry points on `/` were routed into `/editor/[id]`.
+- Kept `docs/spec.md` high-level while tightening the non-obvious behavior around queued autosave, publish-before-first-save protection, selection-aware AI rewrites, and the PR handoff model.
+- Replaced the handoff doc with the latest pickup guidance, explicitly separating committed fullscreen-editor behavior from the two non-doc local changes still present in the working tree.
+
+### Staged Changes
+
+- M	components/EditorChat/EditorChat.tsx
+- M	components/FullScreenEditor/__tests__/FullScreenEditor.test.tsx
+
+### Working Tree Snapshot
+
+- M  components/EditorChat/EditorChat.tsx
+- M  components/FullScreenEditor/__tests__/FullScreenEditor.test.tsx
+-  M docs/project-status.md
+
+### Branch
+
+- feature/fullscreen-editor
+
 ## 04/09/2026 08:55:59 PDT
 
 ### Summary

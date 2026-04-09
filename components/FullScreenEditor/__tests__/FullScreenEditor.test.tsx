@@ -173,8 +173,11 @@ describe('FullScreenEditor', () => {
   let revokeObjectURLSpy: ReturnType<typeof vi.spyOn>
 
   beforeEach(() => {
-    vi.clearAllMocks()
+    vi.resetAllMocks()
     vi.useFakeTimers()
+    mockCreate.mockResolvedValue('new-post-id')
+    mockUpdate.mockResolvedValue(undefined)
+    mockGenerateUploadUrl.mockResolvedValue('https://upload.example.com')
     mockGetHTML.mockReturnValue('<p>Editor content area</p>')
     mockGetMarkdown.mockReturnValue('Editor content area')
     mockInsertImage.mockImplementation(({ src, alt, fileId }) => {

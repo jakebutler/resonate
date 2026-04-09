@@ -157,8 +157,18 @@ export function EditorChat({
         }),
       });
 
-      if (!res.ok) throw new Error("LLM request failed");
-      if (!res.body) throw new Error("No response body");
+      if (!res.ok) {
+        const detail = await res.text();
+        console.error("EditorChat request failed", {
+          status: res.status,
+          detail,
+        });
+        throw new Error(FALLBACK_ERROR_MESSAGE);
+      }
+      if (!res.body) {
+        console.error("EditorChat response missing body");
+        throw new Error(FALLBACK_ERROR_MESSAGE);
+      }
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -216,7 +226,8 @@ export function EditorChat({
           break;
         }
       }
-    } catch {
+    } catch (err) {
+      console.error("EditorChat streaming failed", err);
       setMessages((prev) => {
         const updated = [...prev];
         updated[updated.length - 1] = {
@@ -398,8 +409,9 @@ export function EditorChat({
           onKeyDown={(e) => {
             const nativeEvent = e.nativeEvent as KeyboardEvent & {
               isComposing?: boolean;
+              keyCode?: number;
             };
-            if (nativeEvent.isComposing) {
+            if (nativeEvent.isComposing || nativeEvent.keyCode === 229) {
               return;
             }
             if (e.key === "Enter" && !e.shiftKey) {
