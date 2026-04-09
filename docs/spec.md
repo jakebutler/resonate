@@ -26,6 +26,11 @@ This spec stays intentionally high-level. It focuses on product shape and cross-
   - `/editor/new?date=YYYY-MM-DD` creates a new blog draft on first autosave.
   - `/editor/[postId]` loads an existing `posts` record and autosaves title and HTML content.
 - The editing surface is Tiptap-based rich text with a compact formatting toolbar.
+- The fullscreen layout now includes a right-side AI copilot panel:
+  - collapsible from the header
+  - resizable with a drag handle
+  - backed by `/api/llm` streaming responses
+  - model-selectable from the shared `lib/models.ts` list
 - The toolbar includes an image action affordance, but no image insertion flow is wired yet.
 - This route exists alongside the older modal editors; it is not yet the default dashboard entry point.
 
@@ -61,6 +66,7 @@ This spec stays intentionally high-level. It focuses on product shape and cross-
 ### AI and Publishing
 
 - `/api/llm` is the authenticated server route for editor and workflow AI calls.
+- The fullscreen editor uses `/api/llm` with `assistantType: "blog"` and streams tokens into the sidebar chat UI.
 - `/api/publish` creates a GitHub PR for blog publication.
 - LinkedIn posts stay in-app and do not publish through `/api/publish`.
 - Workflow agents are synchronous prompt runs on the current record, not background workers.
@@ -127,10 +133,12 @@ These power the kanban workflow.
 - The new fullscreen editor also writes directly to `posts`, not to a separate draft table.
 - The fullscreen route is currently blog-oriented even though `posts` is shared:
   - New drafts created there are always `type: "blog"` and `status: "draft"`.
-  - Its UI only edits title and rich HTML body, not status, schedule, assets, or LinkedIn-specific fields.
+  - Its UI edits title and rich HTML body, and now exposes an AI sidebar, but not status, schedule, assets, or LinkedIn-specific fields.
 - Existing non-blog `posts` records are not blocked at the route layer, so behavior depends on whatever shared fields are already on the record.
 - The dashboard still opens the older modal editors, so the repo currently has two parallel blog-editing experiences with different capabilities.
 - `/editor/new?date=...` uses the query param only for the initial create mutation; after the first autosave it redirects to `/editor/[newId]`.
+- The editor sidebar looks selection-aware, but the current fullscreen editor does not yet populate `selectedText` from Tiptap or wire suggestion acceptance back into the document, so that flow is scaffolded rather than complete.
+- Existing post content is reloaded into Tiptap with updates suppressed to avoid an autosave loop when async data arrives.
 - Captured-idea draft creation links the source idea to the new post, but workflow draft creation starts from the separate workflow idea model.
 - Sending a workflow item back to inspiration only returns it to workflow `backlog`; it does not create or sync a `/ideas` captured idea.
 - Workflow gate checks in `lib/workflow.ts` are heuristic readiness checks, not model-based validation.

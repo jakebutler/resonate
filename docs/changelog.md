@@ -152,3 +152,32 @@ Append-only session log for repository-level updates. Each documentation refresh
 ### Branch
 
 - feature/fullscreen-editor
+
+## 04/09/2026 01:09:56 PDT
+
+### Summary
+
+- Refreshed the living docs for the current `feature/fullscreen-editor` working tree after the new editor copilot sidebar was staged.
+- Kept `docs/spec.md` high-level while documenting the fullscreen editor's resizable AI panel, model selection, and the still-unwired text-selection/apply-suggestion path.
+- Replaced the handoff doc with the latest pickup guidance centered on wiring editor selection into the sidebar and deciding whether accepted AI output should patch the document.
+
+### Staged Changes
+
+- A	components/EditorChat/EditorChat.tsx
+- A	components/EditorChat/__tests__/EditorChat.test.tsx
+- M	components/FullScreenEditor/FullScreenEditor.tsx
+- A	components/FullScreenEditor/ResizeHandle.tsx
+- M	components/TiptapEditor/TiptapEditor.tsx
+
+### Working Tree Snapshot
+
+- A  components/EditorChat/EditorChat.tsx
+- A  components/EditorChat/__tests__/EditorChat.test.tsx
+- M  components/FullScreenEditor/FullScreenEditor.tsx
+- A  components/FullScreenEditor/ResizeHandle.tsx
+- M  components/TiptapEditor/TiptapEditor.tsx
+- M  docs/project-status.md
+
+### Branch
+
+- feature/fullscreen-editor

@@ -50,7 +50,8 @@ export const TiptapEditor = forwardRef<TiptapEditorHandle, TiptapEditorProps>(
     // Sync external content changes (e.g. when existing post loads)
     useEffect(() => {
       if (editor && initialContent && editor.getHTML() !== initialContent) {
-        editor.commands.setContent(initialContent, false);
+        // emitUpdate: false prevents triggering onUpdate and causing an auto-save loop
+        editor.commands.setContent(initialContent, false, { preserveWhitespace: "full" });
       }
     }, [editor, initialContent]);
 

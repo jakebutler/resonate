@@ -6,7 +6,13 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { TiptapEditor, type TiptapEditorHandle } from "@/components/TiptapEditor/TiptapEditor";
-import { ArrowLeft } from "lucide-react";
+import { EditorChat } from "@/components/EditorChat/EditorChat";
+import { ResizeHandle } from "./ResizeHandle";
+import { ArrowLeft, PanelRightOpen } from "lucide-react";
+
+const SIDEBAR_DEFAULT_WIDTH = 380;
+const SIDEBAR_MIN_WIDTH = 280;
+const SIDEBAR_MAX_FRACTION = 0.5; // 50% of viewport
 
 type SaveStatus = "idle" | "saving" | "saved" | "error";
 
@@ -33,6 +39,11 @@ export function FullScreenEditor({ postId, initialDate }: FullScreenEditorProps)
   const [title, setTitle] = useState("");
   const [htmlContent, setHtmlContent] = useState("");
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
+
+  // Sidebar state
+  const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT_WIDTH);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [selectedText, setSelectedText] = useState("");
 
   // Track the real post ID once created (starts as null for new posts)
   const currentPostIdRef = useRef<string | null>(isNew ? null : postId);
@@ -117,6 +128,13 @@ export function FullScreenEditor({ postId, initialDate }: FullScreenEditorProps)
     scheduleAutoSave(title, newHtml);
   };
 
+  const handleResize = useCallback((delta: number) => {
+    setSidebarWidth((prev) => {
+      const maxWidth = window.innerWidth * SIDEBAR_MAX_FRACTION;
+      return Math.max(SIDEBAR_MIN_WIDTH, Math.min(maxWidth, prev + delta));
+    });
+  }, []);
+
   // ── Save status label ──────────────────────────────────────────────────────
   const saveStatusLabel =
     saveStatus === "saving"
@@ -141,18 +159,32 @@ export function FullScreenEditor({ postId, initialDate }: FullScreenEditorProps)
           Back
         </button>
 
-        <span
-          data-testid="save-status"
-          className={`text-xs transition-opacity ${
-            saveStatusLabel ? "opacity-100" : "opacity-0"
-          } ${saveStatus === "error" ? "text-red-500" : "text-gray-400"}`}
-          aria-live="polite"
-        >
-          {saveStatusLabel || "Saved"}
-        </span>
+        <div className="flex items-center gap-3">
+          <span
+            data-testid="save-status"
+            className={`text-xs transition-opacity ${
+              saveStatusLabel ? "opacity-100" : "opacity-0"
+            } ${saveStatus === "error" ? "text-red-500" : "text-gray-400"}`}
+            aria-live="polite"
+          >
+            {saveStatusLabel || "Saved"}
+          </span>
+
+          {/* Expand sidebar button (only visible when collapsed) */}
+          {sidebarCollapsed && (
+            <button
+              type="button"
+              onClick={() => setSidebarCollapsed(false)}
+              aria-label="Open AI sidebar"
+              className="p-1.5 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+            >
+              <PanelRightOpen size={16} />
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Editor area */}
+      {/* Two-panel area */}
       <div className="flex flex-1 overflow-hidden">
         {/* Main canvas */}
         <div className="flex flex-col flex-1 overflow-hidden">
@@ -178,6 +210,24 @@ export function FullScreenEditor({ postId, initialDate }: FullScreenEditorProps)
             />
           </div>
         </div>
+
+        {/* Resize handle + Chat sidebar */}
+        {!sidebarCollapsed && (
+          <>
+            <ResizeHandle onResize={handleResize} />
+            <div
+              style={{ width: sidebarWidth }}
+              className="shrink-0 overflow-hidden"
+              data-testid="editor-chat-sidebar"
+            >
+              <EditorChat
+                selectedText={selectedText}
+                onDismissSelection={() => setSelectedText("")}
+                onCollapse={() => setSidebarCollapsed(true)}
+              />
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
