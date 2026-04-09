@@ -271,3 +271,33 @@ Append-only session log for repository-level updates. Each documentation refresh
 ### Branch
 
 - feature/fullscreen-editor
+
+## 04/09/2026 08:42:46 PDT
+
+### Summary
+
+- Refreshed the living docs against the current `feature/fullscreen-editor` working tree after the fullscreen editor picked up real text-selection handoff into the AI sidebar and in-editor suggestion acceptance.
+- Kept `docs/spec.md` high-level while documenting the now-wired Ask-AI flow, the still-easy-to-miss overwrite confirmation behavior, and the remaining split between editor UI state and actual ProseMirror selection state.
+- Replaced the handoff doc with the latest pickup guidance centered on hardening the selection-rewrite path and validating the current editor changes before the next commit attempt.
+
+### Staged Changes
+
+- M	app/editor/[id]/page.tsx
+- M	components/EditorChat/EditorChat.tsx
+- M	components/EditorChat/__tests__/EditorChat.test.tsx
+- M	components/FullScreenEditor/FullScreenEditor.tsx
+- M	components/FullScreenEditor/__tests__/FullScreenEditor.test.tsx
+- M	components/TiptapEditor/TiptapEditor.tsx
+
+### Working Tree Snapshot
+
+- M  app/editor/[id]/page.tsx
+- M  components/EditorChat/EditorChat.tsx
+- M  components/EditorChat/__tests__/EditorChat.test.tsx
+- M  components/FullScreenEditor/FullScreenEditor.tsx
+- M  components/FullScreenEditor/__tests__/FullScreenEditor.test.tsx
+- M  components/TiptapEditor/TiptapEditor.tsx
+
+### Branch
+
+- feature/fullscreen-editor

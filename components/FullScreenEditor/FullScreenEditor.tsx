@@ -5,7 +5,11 @@ import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueries } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { TiptapEditor, type TiptapEditorHandle } from "@/components/TiptapEditor/TiptapEditor";
+import {
+  TiptapEditor,
+  type TiptapEditorHandle,
+  type TiptapEditorSelection,
+} from "@/components/TiptapEditor/TiptapEditor";
 import { EditorChat } from "@/components/EditorChat/EditorChat";
 import { ImageTray } from "@/components/ImageTray/ImageTray";
 import { optimizeImage } from "@/lib/imageOptimize";
@@ -155,12 +159,19 @@ export function FullScreenEditor({ postId, initialDate }: FullScreenEditorProps)
   const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT_WIDTH);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [selectedText, setSelectedText] = useState("");
+  const [selectedRange, setSelectedRange] = useState<{
+    from: number;
+    to: number;
+    text: string;
+  } | null>(null);
+  const [chatFocusRequestId, setChatFocusRequestId] = useState(0);
 
   // Track the real post ID once created (starts as null for new posts)
   const currentPostIdRef = useRef<string | null>(isNew ? null : postId);
   const editorRef = useRef<TiptapEditorHandle>(null);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isSavingRef = useRef(false);
+  const pendingSaveRef = useRef<{ title: string; content: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const draftSnapshotRef = useRef<DraftSnapshot>(
     createDraftSnapshot(
@@ -211,6 +222,12 @@ export function FullScreenEditor({ postId, initialDate }: FullScreenEditorProps)
   }, [existing]);
 
   useEffect(() => {
+    if (window.innerWidth < 768) {
+      setSidebarCollapsed(true);
+    }
+  }, []);
+
+  useEffect(() => {
     draftSnapshotRef.current = createDraftSnapshot(
       status,
       scheduledDate,
@@ -234,7 +251,10 @@ export function FullScreenEditor({ postId, initialDate }: FullScreenEditorProps)
   // ── Auto-save logic ────────────────────────────────────────────────────────
   const performSave = useCallback(
     async (titleToSave: string, contentToSave: string) => {
-      if (isSavingRef.current) return;
+      if (isSavingRef.current) {
+        pendingSaveRef.current = { title: titleToSave, content: contentToSave };
+        return;
+      }
       isSavingRef.current = true;
       setSaveStatus("saving");
 
@@ -277,6 +297,11 @@ export function FullScreenEditor({ postId, initialDate }: FullScreenEditorProps)
         setSaveStatus("error");
       } finally {
         isSavingRef.current = false;
+        const pendingSave = pendingSaveRef.current;
+        if (pendingSave) {
+          pendingSaveRef.current = null;
+          void performSave(pendingSave.title, pendingSave.content);
+        }
       }
     },
     [createPost, updatePost, router, initialDate]
@@ -459,6 +484,61 @@ export function FullScreenEditor({ postId, initialDate }: FullScreenEditorProps)
       ?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
 
+  const handleSelectionChange = (selection: TiptapEditorSelection | null) => {
+    setSelectedText(selection?.text ?? "");
+    setSelectedRange(
+      selection
+        ? { from: selection.from, to: selection.to, text: selection.text }
+        : null
+    );
+  };
+
+  const handleAskAI = (selection: TiptapEditorSelection) => {
+    setSelectedText(selection.text);
+    setSelectedRange({
+      from: selection.from,
+      to: selection.to,
+      text: selection.text,
+    });
+    setSidebarCollapsed(false);
+    setChatFocusRequestId((current) => current + 1);
+  };
+
+  const clearSelection = () => {
+    setSelectedText("");
+    setSelectedRange(null);
+  };
+
+  const handleAcceptSuggestion = (suggestion: string, originalText: string) => {
+    if (!selectedRange) return;
+
+    const currentSelectionText =
+      editorRef.current?.getTextBetween({
+        from: selectedRange.from,
+        to: selectedRange.to,
+      }) ?? "";
+
+    if (
+      currentSelectionText &&
+      currentSelectionText !== originalText &&
+      !window.confirm(
+        "The selected text changed since you asked AI. Replace the current text anyway?"
+      )
+    ) {
+      return;
+    }
+
+    editorRef.current?.replaceRange(
+      { from: selectedRange.from, to: selectedRange.to },
+      suggestion
+    );
+    const nextHtml = editorRef.current?.getHTML() ?? htmlContent;
+    setHtmlContent(nextHtml);
+    clearSelection();
+    editorRef.current?.focus();
+    scheduleAutoSave(title, nextHtml);
+  };
+
   // ── Save status label ──────────────────────────────────────────────────────
   const saveStatusLabel =
     saveStatus === "saving"
@@ -468,6 +548,22 @@ export function FullScreenEditor({ postId, initialDate }: FullScreenEditorProps)
       : saveStatus === "error"
       ? "Save failed"
       : "";
+
+  if (!isNew && existing === undefined) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-white text-sm text-gray-500">
+        Loading post...
+      </div>
+    );
+  }
+
+  if (!isNew && existing === null) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-white text-sm text-gray-500">
+        Post not found.
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-screen bg-white">
@@ -551,6 +647,8 @@ export function FullScreenEditor({ postId, initialDate }: FullScreenEditorProps)
               onChange={handleContentChange}
               placeholder="Start writing your post..."
               onImageInsert={() => fileInputRef.current?.click()}
+              onSelectionChange={handleSelectionChange}
+              onAskAI={handleAskAI}
             />
           </div>
 
@@ -589,8 +687,10 @@ export function FullScreenEditor({ postId, initialDate }: FullScreenEditorProps)
             >
               <EditorChat
                 selectedText={selectedText}
-                onDismissSelection={() => setSelectedText("")}
+                onDismissSelection={clearSelection}
                 onCollapse={() => setSidebarCollapsed(true)}
+                onAcceptSuggestion={handleAcceptSuggestion}
+                focusRequestId={chatFocusRequestId}
               />
             </div>
           </>

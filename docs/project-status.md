@@ -1,57 +1,60 @@
 # Project Status
 
-Last updated: 04/09/2026 01:47:24 PDT
+Last updated: 04/09/2026 08:42:46 PDT
 
 ## State
 
-`feature/fullscreen-editor` is in the middle of extending the fullscreen blog editor beyond plain text drafting. The active working set adds image upload and management, client-side image optimization, and publish-route changes that carry more metadata into the GitHub PR flow.
+Resonate is a working content operations app with calendar planning, shared `posts` editing, workflow review, and captured-idea intake. The active branch is still focused on the blog-first fullscreen editor route.
 
-## What Changed In This Working Set
+## Current Task
 
-- The fullscreen editor now uploads images to Convex storage, inserts them into Tiptap, and derives an image tray from the current document plus stored `fileIds`.
-- The image tray can scroll to an image, remove it from the document, and toggle which uploaded image is the hero image.
-- Tiptap now exposes Markdown for publish, and the toolbar includes image insertion.
-- `/api/publish` and `lib/github.ts` now accept richer metadata including `heroImageUrl`, tags, and description.
-- `lib/imageOptimize.ts` adds client-side validation and compression before upload, with new tests around that path.
+Handoff for the current `feature/fullscreen-editor` working set, which now extends the fullscreen editor's AI flow beyond sidebar chrome into actual text selection and replacement.
 
-## Non-Obvious Current Behavior
+## Session Focus
 
-- Uploads are optimistic in the editor: the inserted image initially uses a blob preview URL, then later HTML is rewritten with resolved storage URLs from Convex.
-- The image tray is derived from editor HTML and `fileIds`, so image removal is not just UI state; it also has to remove the matching `img[data-file-id]` node from the document.
-- Publish now sends Markdown to GitHub, but the local post is still patched to `scheduled` after creating a PR even though the outbound frontmatter status is `"published"`.
-- Hero image frontmatter depends on converting the selected storage ID back into a URL during publish; if that resolution fails, the post can still save locally without a usable hero image URL for GitHub output.
+- Synced the living docs to the current staged editor work.
+- Captured the now-wired Ask-AI selection flow and its remaining edge cases.
+
+## Last Completed Task
+
+- 474f527 feat: phase 4 image handling and publish hardening
 
 ## Recent Commits
 
+- 474f527 feat: phase 4 image handling and publish hardening
 - df246ee feat: Phase 3 — markdown serialization, metadata bar, publish + CodeRabbit fixes
 - 2e5f0b7 feat: Phase 2 — resizable AI chat sidebar + fix TypeScript build error
 - 1ae26ae feat: Phase 1 tracer bullet — full-screen editor route with Tiptap and auto-save
 - 160be4a fix: harden prod auth wiring
-- 0a744a3 docs: add living documentation workflow
 
 ## Local Working Tree
 
-- M  app/api/publish/__tests__/route.test.ts
-- M  app/api/publish/route.ts
+- M  app/editor/[id]/page.tsx
+- M  components/EditorChat/EditorChat.tsx
+- M  components/EditorChat/__tests__/EditorChat.test.tsx
 - M  components/FullScreenEditor/FullScreenEditor.tsx
 - M  components/FullScreenEditor/__tests__/FullScreenEditor.test.tsx
-- A  components/ImageTray/ImageTray.tsx
-- A  components/ImageTray/__tests__/ImageTray.test.tsx
 - M  components/TiptapEditor/TiptapEditor.tsx
-- M  components/TiptapEditor/Toolbar.tsx
-- M  lib/__tests__/github.test.ts
-- A  lib/__tests__/imageOptimize.test.ts
-- M  lib/github.ts
-- A  lib/imageOptimize.ts
-- M  package-lock.json
-- M  package.json
+
+## What Changed In-Flight
+
+- `components/TiptapEditor/TiptapEditor.tsx` now emits real selection metadata and shows a floating "Ask AI" button anchored near the selected text.
+- `components/FullScreenEditor/FullScreenEditor.tsx` now stores the selected range, opens and focuses the sidebar from the editor affordance, and can replace the selected range when AI returns a rewrite.
+- `components/EditorChat/EditorChat.tsx` now packages selected text into the prompt, parses `<rewrite>...</rewrite>` responses into suggestion cards, and exposes accept/dismiss actions.
+- The tests in `components/EditorChat/__tests__/EditorChat.test.tsx` and `components/FullScreenEditor/__tests__/FullScreenEditor.test.tsx` were updated to cover the new selection and suggestion flow.
+
+## Non-Obvious Current Behavior
+
+- Dismissing the selection chip in the sidebar clears fullscreen-editor state, but it does not clear the editor's visible text selection.
+- Accepting a suggestion uses the previously captured ProseMirror range. If the text at that range changed, the UI prompts before overwriting.
+- Autosave still runs on a debounce. Accepting a suggestion updates the document immediately but persistence still waits for the normal autosave path.
+- New drafts are still created lazily on first save or publish, so the Ask-AI flow can operate before a `posts` row exists.
 
 ## Next Agent Pickup
 
-- Verify the new image workflow end to end: upload, autosave, reload existing post, hero-image selection, image removal, and publish with resolved image URLs.
-- Decide whether the post status mismatch is intentional. Right now GitHub frontmatter receives `"published"` while Convex is updated to `scheduled` after PR creation.
-- Check for any remaining editor/publish format drift. The editor now emits Markdown for publish, but the runtime path still depends on HTML for local editing and image-tray derivation.
-- Keep documentation synced only if the working set changes behavior again; otherwise focus on stabilizing the editor path instead of expanding scope.
+- Start in [components/FullScreenEditor/FullScreenEditor.tsx](/Users/jacobbutler/Documents/GitHub/resonate/components/FullScreenEditor/FullScreenEditor.tsx) and [components/TiptapEditor/TiptapEditor.tsx](/Users/jacobbutler/Documents/GitHub/resonate/components/TiptapEditor/TiptapEditor.tsx) if the next task touches AI-assisted editing. That is where selection capture, range replacement, and autosave interaction now meet.
+- Validate the current staged behavior before the next commit attempt. The important risks are stale selection ranges, selection-chip state drifting from actual editor selection, and any regressions in autosave after accepted rewrites.
+- If the next task changes product behavior, update only the three living docs again in the same session and keep `docs/changelog.md` append-only.
 
 ## Branch
 

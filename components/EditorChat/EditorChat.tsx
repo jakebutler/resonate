@@ -19,6 +19,7 @@ interface EditorChatProps {
   /** Called when the user accepts a suggestion (rewrite) */
   onAcceptSuggestion?: (suggestion: string, originalText: string) => void;
   models?: ModelOption[];
+  focusRequestId?: number;
 }
 
 const GREETING =
@@ -29,6 +30,22 @@ const SELECTION_TRUNCATE_LENGTH = 80;
 function truncate(text: string, maxLen: number): string {
   if (text.length <= maxLen) return text;
   return text.slice(0, maxLen) + "...";
+}
+
+function extractRewrite(content: string) {
+  const match = content.match(/<rewrite>([\s\S]*?)<\/rewrite>/i);
+  if (!match) {
+    return {
+      rewrite: null,
+      message: content,
+    };
+  }
+
+  const message = content.replace(match[0], "").trim();
+  return {
+    rewrite: match[1].trim(),
+    message: message || "Suggested rewrite",
+  };
 }
 
 function makeStream(chunks: string[]): ReadableStream {
@@ -50,6 +67,7 @@ export function EditorChat({
   onCollapse,
   onAcceptSuggestion,
   models = MODELS,
+  focusRequestId = 0,
 }: EditorChatProps) {
   const initialModel = models.find((m) => m.id === DEFAULT_MODEL.id) ?? models[0];
   const [messages, setMessages] = useState<Message[]>([
@@ -60,13 +78,21 @@ export function EditorChat({
   const [copied, setCopied] = useState<number | null>(null);
   const [selectedModel, setSelectedModel] = useState<ModelOption>(initialModel);
   const [modelMenuOpen, setModelMenuOpen] = useState(false);
+  const [dismissedSuggestions, setDismissedSuggestions] = useState<number[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
   const modelMenuRef = useRef<HTMLDivElement>(null);
   const modelTriggerRef = useRef<HTMLButtonElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, streaming]);
+
+  useEffect(() => {
+    if (focusRequestId > 0) {
+      inputRef.current?.focus();
+    }
+  }, [focusRequestId]);
 
   useEffect(() => {
     if (!modelMenuOpen) return;
@@ -81,7 +107,13 @@ export function EditorChat({
 
   const buildUserContent = (text: string): string => {
     if (!selectedText) return text;
-    return `> "${selectedText}"\n\n${text}`;
+    return [
+      `> "${selectedText}"`,
+      "",
+      text,
+      "",
+      "If you're proposing replacement copy for the selected text, wrap only the rewrite in <rewrite>...</rewrite>.",
+    ].join("\n");
   };
 
   const sendMessage = async () => {
@@ -195,6 +227,12 @@ export function EditorChat({
     }
   };
 
+  const handleDismissSuggestion = (idx: number) => {
+    setDismissedSuggestions((prev) =>
+      prev.includes(idx) ? prev : [...prev, idx]
+    );
+  };
+
   return (
     <div className="flex flex-col h-full bg-white border-l border-gray-100">
       {/* Header */}
@@ -238,43 +276,84 @@ export function EditorChat({
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
-        {messages.map((msg, i) => (
-          <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-            {msg.role === "assistant" && (
-              <div className="w-7 h-7 rounded-full bg-[#4f46e5] flex items-center justify-center shrink-0 mr-2 mt-0.5">
-                <Sparkles size={13} className="text-white" />
-              </div>
-            )}
+        {messages.map((msg, i) => {
+          const { rewrite, message } =
+            msg.role === "assistant"
+              ? extractRewrite(msg.content)
+              : { rewrite: null, message: msg.content };
+          const suggestionDismissed = dismissedSuggestions.includes(i);
+
+          return (
             <div
-              className={`max-w-[85%] px-3 py-2.5 rounded-2xl text-sm ${
-                msg.role === "user"
-                  ? "bg-[#001524] text-white rounded-tr-sm"
-                  : "bg-gray-100 text-[#001524] rounded-tl-sm"
-              }`}
+              key={i}
+              className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
             >
-              <p className="whitespace-pre-wrap">{msg.content}</p>
-              {msg.role === "assistant" && msg.content && i > 0 && (
-                <div className="flex items-center gap-2 mt-2 pt-2 border-t border-gray-200">
-                  <button
-                    onClick={() => handleCopy(i, msg.content)}
-                    className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 transition-colors"
-                  >
-                    {copied === i ? <CheckCheck size={11} /> : <Copy size={11} />}
-                    {copied === i ? "Copied" : "Copy"}
-                  </button>
-                  {selectedText && onAcceptSuggestion && (
-                    <button
-                      onClick={() => handleAcceptSuggestion(msg.content)}
-                      className="flex items-center gap-1 text-xs font-medium text-[#ff7d00] hover:text-[#e67200] transition-colors"
-                    >
-                      Accept →
-                    </button>
-                  )}
+              {msg.role === "assistant" && (
+                <div className="w-7 h-7 rounded-full bg-[#4f46e5] flex items-center justify-center shrink-0 mr-2 mt-0.5">
+                  <Sparkles size={13} className="text-white" />
                 </div>
               )}
+              <div
+                className={`max-w-[85%] px-3 py-2.5 rounded-2xl text-sm ${
+                  msg.role === "user"
+                    ? "bg-[#001524] text-white rounded-tr-sm"
+                    : "bg-gray-100 text-[#001524] rounded-tl-sm"
+                }`}
+              >
+                <p className="whitespace-pre-wrap">{message}</p>
+                {rewrite && !suggestionDismissed ? (
+                  <div
+                    data-testid={`suggestion-card-${i}`}
+                    className="mt-3 rounded-xl border border-[#c7d2fe] bg-white px-3 py-3 text-[#001524]"
+                  >
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#4f46e5]">
+                      Suggested rewrite
+                    </p>
+                    <p className="mt-2 whitespace-pre-wrap text-sm">{rewrite}</p>
+                    <div className="mt-3 flex items-center gap-2">
+                      {selectedText && onAcceptSuggestion ? (
+                        <button
+                          onClick={() => handleAcceptSuggestion(rewrite)}
+                          className="rounded-full bg-[#4f46e5] px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-[#4338ca]"
+                        >
+                          Accept
+                        </button>
+                      ) : null}
+                      <button
+                        onClick={() => handleDismissSuggestion(i)}
+                        className="text-xs text-gray-500 transition-colors hover:text-gray-700"
+                      >
+                        Dismiss
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+                {rewrite && suggestionDismissed ? (
+                  <p className="mt-3 text-xs text-gray-500">Suggestion dismissed.</p>
+                ) : null}
+                {msg.role === "assistant" && msg.content && i > 0 ? (
+                  <div className="flex items-center gap-2 mt-2 pt-2 border-t border-gray-200">
+                    <button
+                      onClick={() => handleCopy(i, msg.content)}
+                      className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 transition-colors"
+                    >
+                      {copied === i ? <CheckCheck size={11} /> : <Copy size={11} />}
+                      {copied === i ? "Copied" : "Copy"}
+                    </button>
+                    {selectedText && onAcceptSuggestion && !rewrite ? (
+                      <button
+                        onClick={() => handleAcceptSuggestion(msg.content)}
+                        className="flex items-center gap-1 text-xs font-medium text-[#ff7d00] hover:text-[#e67200] transition-colors"
+                      >
+                        Accept →
+                      </button>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
         {streaming && (
           <div className="flex justify-start">
             <div className="w-7 h-7 rounded-full bg-[#4f46e5] flex items-center justify-center shrink-0 mr-2">
@@ -295,6 +374,7 @@ export function EditorChat({
       {/* Input area */}
       <div className="px-4 pb-4 pt-2 shrink-0">
         <textarea
+          ref={inputRef}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {

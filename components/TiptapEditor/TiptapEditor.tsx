@@ -1,19 +1,31 @@
 "use client";
 
-import { useEffect, useImperativeHandle, forwardRef } from "react";
+import { useEffect, useImperativeHandle, forwardRef, useState } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
 import Image from "@tiptap/extension-image";
+import { Sparkles } from "lucide-react";
 import { Markdown } from "tiptap-markdown";
 import { Toolbar } from "./Toolbar";
+
+export interface TiptapEditorSelection {
+  text: string;
+  from: number;
+  to: number;
+  top: number;
+  left: number;
+}
 
 export interface TiptapEditorHandle {
   getHTML: () => string;
   getMarkdown: () => string;
   setContent: (content: string) => void;
   insertImage: (attrs: { src: string; alt?: string; fileId?: string }) => void;
+  replaceRange: (range: { from: number; to: number }, content: string) => void;
+  getTextBetween: (range: { from: number; to: number }) => string;
+  focus: () => void;
   getEditor: () => ReturnType<typeof useEditor>;
 }
 
@@ -22,10 +34,24 @@ interface TiptapEditorProps {
   onChange?: (html: string) => void;
   placeholder?: string;
   onImageInsert?: () => void;
+  onSelectionChange?: (selection: TiptapEditorSelection | null) => void;
+  onAskAI?: (selection: TiptapEditorSelection) => void;
 }
 
 export const TiptapEditor = forwardRef<TiptapEditorHandle, TiptapEditorProps>(
-  function TiptapEditor({ initialContent = "", onChange, placeholder = "Start writing your post...", onImageInsert }, ref) {
+  function TiptapEditor(
+    {
+      initialContent = "",
+      onChange,
+      placeholder = "Start writing your post...",
+      onImageInsert,
+      onSelectionChange,
+      onAskAI,
+    },
+    ref
+  ) {
+    const [selection, setSelection] = useState<TiptapEditorSelection | null>(null);
+
     const editor = useEditor({
       extensions: [
         StarterKit.configure({
@@ -71,6 +97,34 @@ export const TiptapEditor = forwardRef<TiptapEditorHandle, TiptapEditorProps>(
       onUpdate: ({ editor }) => {
         onChange?.(editor.getHTML());
       },
+      onSelectionUpdate: ({ editor }) => {
+        const { from, to, empty } = editor.state.selection;
+        if (empty) {
+          setSelection(null);
+          onSelectionChange?.(null);
+          return;
+        }
+
+        const text = editor.state.doc.textBetween(from, to, "\n").trim();
+        if (!text) {
+          setSelection(null);
+          onSelectionChange?.(null);
+          return;
+        }
+
+        const start = editor.view.coordsAtPos(from);
+        const end = editor.view.coordsAtPos(to);
+        const nextSelection = {
+          text,
+          from,
+          to,
+          top: Math.max(Math.min(start.top, end.top) - 44, 12),
+          left: (start.left + end.left) / 2,
+        };
+
+        setSelection(nextSelection);
+        onSelectionChange?.(nextSelection);
+      },
       editorProps: {
         attributes: {
           class:
@@ -115,6 +169,11 @@ export const TiptapEditor = forwardRef<TiptapEditorHandle, TiptapEditorProps>(
             `<img src="${src}" alt="${alt ?? ""}"${fileId ? ` data-file-id="${fileId}"` : ""} />`
           )
           .run(),
+      replaceRange: (range, content) =>
+        editor?.chain().focus().insertContentAt(range, content).run(),
+      getTextBetween: (range) =>
+        editor?.state.doc.textBetween(range.from, range.to, "\n") ?? "",
+      focus: () => editor?.commands.focus(),
       getEditor: () => editor,
     }));
 
@@ -124,6 +183,22 @@ export const TiptapEditor = forwardRef<TiptapEditorHandle, TiptapEditorProps>(
         <div className="flex-1 overflow-y-auto px-8 py-2">
           <EditorContent editor={editor} className="h-full" />
         </div>
+        {selection && onAskAI ? (
+          <button
+            type="button"
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => onAskAI(selection)}
+            className="fixed z-20 inline-flex items-center gap-1 rounded-full bg-[#4f46e5] px-3 py-1.5 text-xs font-medium text-white shadow-lg transition-colors hover:bg-[#4338ca]"
+            style={{
+              top: `${selection.top}px`,
+              left: `${selection.left}px`,
+              transform: "translateX(-50%)",
+            }}
+          >
+            <Sparkles size={12} />
+            Ask AI
+          </button>
+        ) : null}
       </div>
     );
   }

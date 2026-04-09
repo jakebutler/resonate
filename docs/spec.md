@@ -22,10 +22,11 @@ This spec stays high-level on purpose. It describes the current product shape an
 - `/editor/new?date=YYYY-MM-DD` creates a new blog draft on first autosave, then replaces the URL with `/editor/[newId]`.
 - `/editor/[postId]` loads and autosaves the shared `posts` record directly.
 - The layout currently includes:
-  - a Tiptap editor with a compact toolbar
+  - a selection-aware Tiptap editor with a compact toolbar and inline "Ask AI" affordance
   - a collapsible, resizable AI sidebar backed by `/api/llm`
   - an inline metadata bar for status, schedule, tags, SEO description, and PR state
   - an image workflow with upload, inline insertion, hero-image designation, and image removal
+  - an AI rewrite flow that can replace the selected editor range in place
   - a publish action that opens a GitHub PR rather than directly pushing live content
 - This route still coexists with the legacy modal editors and is not yet the only editing path.
 
@@ -52,6 +53,7 @@ This spec stays high-level on purpose. It describes the current product shape an
 
 - `/api/llm` is the authenticated server route for editor and workflow AI calls.
 - The fullscreen editor uses `/api/llm` with `assistantType: "blog"` and streams responses into the sidebar chat UI.
+- Selected editor text is sent as quoted prompt context, and the assistant can return `<rewrite>...</rewrite>` blocks that the UI exposes as accept/dismiss suggestions.
 - `/api/publish` creates a GitHub PR for blog publication and can include frontmatter metadata such as tags, description, and hero image URL.
 - LinkedIn posts stay in-app and do not publish through `/api/publish`.
 - Workflow AI remains synchronous prompt execution on the current record, not background processing.
@@ -136,7 +138,14 @@ These power the kanban workflow.
   - the editor now sends Markdown from the Tiptap markdown extension to `/api/publish`
   - the editor sends `status: "published"` to the PR helper, but the local post is patched to `scheduled` after PR creation
   - hero image frontmatter depends on resolving the selected storage ID back to a URL at publish time
-- The AI sidebar looks selection-aware, but the fullscreen editor still does not wire actual editor selection into `selectedText` or apply accepted suggestions back into the document.
+- The AI flow now has real editor-selection plumbing:
+  - Tiptap emits selection range + text.
+  - The floating "Ask AI" button opens and focuses the sidebar.
+  - Accepting a suggestion replaces the original range in the document and reschedules autosave.
+- That rewrite path is still optimistic UI:
+  - it relies on the stored ProseMirror range still being valid when the user accepts
+  - if the selection text changed, the user gets a confirm prompt before overwrite
+  - dismissing the sidebar chip only clears sidebar state; it does not visibly clear the editor selection itself
 - Captured-idea draft creation links the source idea to the new post, but workflow draft creation starts from the separate workflow idea model.
 - Sending a workflow item back to inspiration only returns it to workflow `backlog`; it does not create or sync a `/ideas` captured idea.
 - Workflow gate checks in `lib/workflow.ts` are heuristic readiness checks, not model-based validation.

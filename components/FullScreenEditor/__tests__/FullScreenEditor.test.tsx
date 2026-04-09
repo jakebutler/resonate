@@ -35,33 +35,58 @@ vi.mock('next/navigation', () => ({
 const mockInsertImage = vi.fn()
 const mockGetHTML = vi.fn(() => '<p>Editor content area</p>')
 const mockGetMarkdown = vi.fn(() => 'Editor content area')
+const mockReplaceRange = vi.fn()
+const mockGetTextBetween = vi.fn(() => 'Selected text')
+const mockFocusEditor = vi.fn()
 
 vi.mock('@/components/TiptapEditor/TiptapEditor', async () => {
   const React = await import('react')
   const MockTiptapEditor = React.forwardRef(
     (
-      {
-        onChange,
-        placeholder,
-        onImageInsert,
-      }: {
-        onChange?: (html: string) => void
-        placeholder?: string
-        onImageInsert?: () => void
-      },
-      ref: React.ForwardedRef<{
-        getHTML: () => string
-        getMarkdown: () => string
-        setContent: (content: string) => void
-        insertImage: (attrs: { src: string; alt?: string; fileId?: string }) => void
-      }>
-    ) => {
-      React.useImperativeHandle(ref, () => ({
-        getHTML: mockGetHTML,
-        getMarkdown: mockGetMarkdown,
-        setContent: vi.fn(),
-        insertImage: mockInsertImage,
-      }))
+        {
+          onChange,
+          placeholder,
+          onImageInsert,
+          onSelectionChange,
+          onAskAI,
+        }: {
+          onChange?: (html: string) => void
+          placeholder?: string
+          onImageInsert?: () => void
+          onSelectionChange?: (selection: {
+            text: string
+            from: number
+            to: number
+            top: number
+            left: number
+          } | null) => void
+          onAskAI?: (selection: {
+            text: string
+            from: number
+            to: number
+            top: number
+            left: number
+          }) => void
+        },
+        ref: React.ForwardedRef<{
+          getHTML: () => string
+          getMarkdown: () => string
+          setContent: (content: string) => void
+          insertImage: (attrs: { src: string; alt?: string; fileId?: string }) => void
+          replaceRange: (range: { from: number; to: number }, content: string) => void
+          getTextBetween: (range: { from: number; to: number }) => string
+          focus: () => void
+        }>
+      ) => {
+        React.useImperativeHandle(ref, () => ({
+          getHTML: mockGetHTML,
+          getMarkdown: mockGetMarkdown,
+          setContent: vi.fn(),
+          insertImage: mockInsertImage,
+          replaceRange: mockReplaceRange,
+          getTextBetween: mockGetTextBetween,
+          focus: mockFocusEditor,
+        }))
 
       return (
         <div>
@@ -82,6 +107,38 @@ vi.mock('@/components/TiptapEditor/TiptapEditor', async () => {
           {onImageInsert ? (
             <button type="button" onClick={onImageInsert}>
               Insert image
+            </button>
+          ) : null}
+          {onSelectionChange ? (
+            <button
+              type="button"
+              onClick={() =>
+                onSelectionChange({
+                  text: 'Selected text',
+                  from: 2,
+                  to: 9,
+                  top: 100,
+                  left: 120,
+                })
+              }
+            >
+              Emit selection
+            </button>
+          ) : null}
+          {onAskAI ? (
+            <button
+              type="button"
+              onClick={() =>
+                onAskAI({
+                  text: 'Selected text',
+                  from: 2,
+                  to: 9,
+                  top: 100,
+                  left: 120,
+                })
+              }
+            >
+              Ask AI
             </button>
           ) : null}
         </div>
@@ -129,6 +186,7 @@ describe('FullScreenEditor', () => {
     }) as never)
     vi.mocked(useQueries).mockReturnValue({})
     vi.stubGlobal('fetch', vi.fn())
+    vi.stubGlobal('confirm', vi.fn(() => true))
     vi.stubGlobal('URL', {
       ...URL,
       createObjectURL: vi.fn(() => 'blob:preview-image'),
@@ -372,6 +430,72 @@ describe('FullScreenEditor', () => {
       expect.objectContaining({
         fileId: 'storage-1',
         alt: 'hero',
+      })
+    )
+  })
+
+  it('shows the selection chip when the editor emits a selection', () => {
+    render(<FullScreenEditor postId="new" />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Emit selection' }))
+
+    expect(screen.getByTestId('selection-chip')).toHaveTextContent('Selected text')
+  })
+
+  it('queues a second autosave while the first save is in flight', async () => {
+    let resolveFirstSave!: () => void
+    mockUpdate
+      .mockReturnValueOnce(
+        new Promise<void>((resolve) => {
+          resolveFirstSave = resolve
+        })
+      )
+      .mockResolvedValueOnce(undefined)
+
+    vi.mocked(useQuery).mockReturnValue({
+      _id: 'post-123',
+      type: 'blog',
+      title: 'Existing Post Title',
+      content: '<p>Existing content</p>',
+      status: 'draft',
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    })
+
+    render(<FullScreenEditor postId="post-123" />)
+
+    fireEvent.change(screen.getByDisplayValue('Existing Post Title'), {
+      target: { value: 'First title' },
+    })
+
+    await act(async () => {
+      vi.advanceTimersByTime(3100)
+      await Promise.resolve()
+    })
+
+    fireEvent.change(screen.getByDisplayValue('First title'), {
+      target: { value: 'Second title' },
+    })
+
+    await act(async () => {
+      vi.advanceTimersByTime(3100)
+      await Promise.resolve()
+    })
+
+    expect(mockUpdate).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      resolveFirstSave()
+      await Promise.resolve()
+    })
+
+    await flushPromises()
+
+    expect(mockUpdate).toHaveBeenCalledTimes(2)
+    expect(mockUpdate).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        id: 'post-123',
+        title: 'Second title',
       })
     )
   })

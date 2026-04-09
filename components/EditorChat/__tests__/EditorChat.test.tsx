@@ -118,6 +118,56 @@ describe('EditorChat', () => {
       const lastUserMessage = body.messages.find((m: { role: string }) => m.role === 'user')
       expect(lastUserMessage.content).toContain('Key passage about AI')
       expect(lastUserMessage.content).toContain('Rewrite this')
+      expect(lastUserMessage.content).toContain('<rewrite>')
     })
+  })
+
+  it('focuses the input when focusRequestId changes', () => {
+    const { rerender } = render(<EditorChat />)
+    const textbox = screen.getByRole('textbox')
+
+    rerender(<EditorChat focusRequestId={1} />)
+
+    expect(textbox).toHaveFocus()
+  })
+
+  it('renders rewrite responses as suggestion cards and accepts them', async () => {
+    const onAcceptSuggestion = vi.fn()
+    const stream = makeStream([
+      'data: {"type":"response.output_text.delta","delta":"<rewrite>Sharper line</rewrite>"}\n\n',
+      'data: {"type":"response.completed","response":{}}\n\n',
+    ])
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(stream, { status: 200 }))
+
+    render(
+      <EditorChat
+        selectedText="Original line"
+        onAcceptSuggestion={onAcceptSuggestion}
+      />
+    )
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Rewrite it' } })
+    fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter' })
+
+    await waitFor(() => expect(screen.getByTestId('suggestion-card-2')).toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button', { name: 'Accept' }))
+
+    expect(onAcceptSuggestion).toHaveBeenCalledWith('Sharper line', 'Original line')
+  })
+
+  it('dismisses rendered suggestion cards', async () => {
+    const stream = makeStream([
+      'data: {"type":"response.output_text.delta","delta":"<rewrite>Sharper line</rewrite>"}\n\n',
+      'data: {"type":"response.completed","response":{}}\n\n',
+    ])
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(stream, { status: 200 }))
+
+    render(<EditorChat selectedText="Original line" onAcceptSuggestion={vi.fn()} />)
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Rewrite it' } })
+    fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter' })
+
+    await waitFor(() => expect(screen.getByTestId('suggestion-card-2')).toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
+
+    expect(screen.getByText(/suggestion dismissed/i)).toBeInTheDocument()
   })
 })
