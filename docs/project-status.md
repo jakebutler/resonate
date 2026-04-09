@@ -1,6 +1,6 @@
 # Project Status
 
-Last updated: 04/09/2026 14:13:59 PDT
+Last updated: 04/09/2026 14:16:32 PDT
 
 ## State
 
@@ -16,15 +16,15 @@ Maintain the living documentation and preserve a handoff-quality snapshot of the
 
 ## Last Completed Task
 
-- 81844d0 fix: avoid double-saving tags on enter
+- 2c9a6a9 fix: use placeholder envs for e2e build
 
 ## Recent Commits
 
+- 2c9a6a9 fix: use placeholder envs for e2e build
 - 81844d0 fix: avoid double-saving tags on enter
 - 6bb5f5e fix: make article pane independently scrollable
 - 14a14f0 fix: harden fullscreen editor regressions
 - 60d151b fix: disable tiptap immediate render
-- 2c89a34 fix: stabilize fullscreen editor file queries
 
 ## Local Working Tree
 

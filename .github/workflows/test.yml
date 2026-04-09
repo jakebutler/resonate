@@ -51,7 +51,7 @@ jobs:
       # Current Playwright coverage only exercises unauthenticated smoke paths,
       # so placeholder values are sufficient to boot the production app in CI.
       NEXT_PUBLIC_CONVEX_URL: https://convex.test
-      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ci_placeholder
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_Y2xlcmsuYWNjb3VudHMuZGV2JA==
       CLERK_SECRET_KEY: sk_test_ci_placeholder
       CLERK_JWT_ISSUER_DOMAIN: https://clerk.test
       CORTEX_API_KEY: test_key
