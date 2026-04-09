@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
+import { renderToString } from 'react-dom/server'
 import { useQuery, useMutation, useQueries } from 'convex/react'
 import { FullScreenEditor } from '@/components/FullScreenEditor/FullScreenEditor'
 
@@ -76,6 +77,7 @@ vi.mock('@/components/TiptapEditor/TiptapEditor', async () => {
           replaceRange: (range: { from: number; to: number }, content: string) => void
           getTextBetween: (range: { from: number; to: number }) => string
           focus: () => void
+          getEditor: () => null
         }>
       ) => {
         React.useImperativeHandle(ref, () => ({
@@ -86,6 +88,7 @@ vi.mock('@/components/TiptapEditor/TiptapEditor', async () => {
           replaceRange: mockReplaceRange,
           getTextBetween: mockGetTextBetween,
           focus: mockFocusEditor,
+          getEditor: () => null,
         }))
 
       return (
@@ -633,5 +636,21 @@ describe('FullScreenEditor', () => {
         title: 'Second title',
       })
     )
+  })
+
+  it('server-renders safely when document is unavailable', () => {
+    const originalDocument = globalThis.document
+
+    // Simulate the server render path where browser globals are unavailable.
+    Reflect.deleteProperty(globalThis, 'document')
+
+    try {
+      expect(() => renderToString(<FullScreenEditor postId="new" />)).not.toThrow()
+    } finally {
+      Object.defineProperty(globalThis, 'document', {
+        configurable: true,
+        value: originalDocument,
+      })
+    }
   })
 })

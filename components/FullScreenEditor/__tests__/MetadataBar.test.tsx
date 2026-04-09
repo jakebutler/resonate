@@ -88,6 +88,22 @@ describe('MetadataBar', () => {
     expect(screen.getByLabelText(/seo description/i)).toBeInTheDocument()
   })
 
+  it('preserves tag separators while typing and commits parsed tags on blur', () => {
+    render(<MetadataBar {...defaultProps} />)
+    fireEvent.click(screen.getByRole('button', { name: /settings/i }))
+
+    const tagsInput = screen.getByLabelText(/tags/i)
+    fireEvent.focus(tagsInput)
+    fireEvent.change(tagsInput, { target: { value: 'ai, ' } })
+
+    expect(tagsInput).toHaveValue('ai, ')
+    expect(defaultProps.onTagsChange).toHaveBeenCalledWith(['ai'])
+
+    fireEvent.blur(tagsInput)
+
+    expect(defaultProps.onTagsChange).toHaveBeenCalledWith(['ai'])
+  })
+
   // ── BEHAVIOR 6: GitHub PR link ──────────────────────────────────────────
   it('shows a PR link when githubPrUrl is set', () => {
     render(<MetadataBar {...defaultProps} githubPrUrl="https://github.com/pr/1" />)

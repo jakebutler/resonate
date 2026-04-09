@@ -65,22 +65,24 @@ function extractImageEntries(
   fileIds: Id<"_storage">[],
   urlsByFileId: Record<string, string>
 ) {
-  const container = document.createElement("div");
-  container.innerHTML = html;
-
   const images = new Map<
     string,
     { fileId: string; url: string; altText: string }
   >();
 
-  for (const img of Array.from(container.querySelectorAll("img[data-file-id]"))) {
-    const fileId = img.getAttribute("data-file-id");
-    if (!fileId) continue;
-    images.set(fileId, {
-      fileId,
-      url: urlsByFileId[fileId] || img.getAttribute("src") || "",
-      altText: img.getAttribute("alt") || "",
-    });
+  if (typeof document !== "undefined") {
+    const container = document.createElement("div");
+    container.innerHTML = html;
+
+    for (const img of Array.from(container.querySelectorAll("img[data-file-id]"))) {
+      const fileId = img.getAttribute("data-file-id");
+      if (!fileId) continue;
+      images.set(fileId, {
+        fileId,
+        url: urlsByFileId[fileId] || img.getAttribute("src") || "",
+        altText: img.getAttribute("alt") || "",
+      });
+    }
   }
 
   for (const fileId of fileIds) {
@@ -598,7 +600,7 @@ export function FullScreenEditor({ postId, initialDate }: FullScreenEditorProps)
   }
 
   return (
-    <div className="flex flex-col h-screen bg-white">
+    <div className="flex h-screen flex-col overflow-hidden bg-white">
       {/* Top bar */}
       <div className="flex items-center justify-between px-6 py-3 border-b border-gray-100 shrink-0">
         <button
@@ -637,9 +639,9 @@ export function FullScreenEditor({ postId, initialDate }: FullScreenEditorProps)
       </div>
 
       {/* Two-panel area */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex min-h-0 flex-1 overflow-hidden">
         {/* Main canvas */}
-        <div className="flex flex-col flex-1 overflow-hidden">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           {/* Title */}
           <div className="px-12 pt-8 pb-2 shrink-0">
             <input
@@ -672,7 +674,7 @@ export function FullScreenEditor({ postId, initialDate }: FullScreenEditorProps)
           />
 
           {/* Tiptap WYSIWYG editor */}
-          <div className="flex-1 overflow-hidden px-4">
+          <div className="min-h-0 flex-1 overflow-hidden px-4">
             <TiptapEditor
               ref={editorRef}
               initialContent={existing?.content ?? ""}

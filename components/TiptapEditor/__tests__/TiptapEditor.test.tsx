@@ -59,9 +59,15 @@ describe("TiptapEditor", () => {
     expect(mockUseEditor).toHaveBeenCalledWith(
       expect.objectContaining({
         immediatelyRender: false,
+        editorProps: expect.objectContaining({
+          attributes: expect.objectContaining({
+            class: expect.stringContaining("[&_ul]:list-disc"),
+          }),
+        }),
       })
     )
     expect(screen.getByTestId("toolbar")).toBeInTheDocument()
     expect(screen.getByTestId("editor-content")).toHaveTextContent("false")
+    expect(screen.getByTestId("editor-scroll-region")).toHaveClass("min-h-0")
   })
 })

@@ -21,6 +21,13 @@ const TIMES = Array.from({ length: 24 }, (_, hour) =>
   `${String(hour).padStart(2, "0")}:00`
 );
 
+function parseTagsInput(value: string) {
+  return value
+    .split(",")
+    .map((tag) => tag.trim())
+    .filter(Boolean);
+}
+
 interface MetadataBarProps {
   status: Status;
   scheduledDate: string;
@@ -57,12 +64,16 @@ export function MetadataBar({
   hasContent,
 }: MetadataBarProps) {
   const [expanded, setExpanded] = useState(false);
-  const locale =
-    typeof navigator !== "undefined" && navigator.language
-      ? navigator.language
-      : undefined;
+  const [tagsInput, setTagsInput] = useState(tags.join(", "));
+  const [isEditingTags, setIsEditingTags] = useState(false);
 
   const canPublish = Boolean(title && hasContent && !publishing);
+
+  const commitTags = (value: string) => {
+    const nextTags = parseTagsInput(value);
+    onTagsChange(nextTags);
+    setTagsInput(nextTags.join(", "));
+  };
 
   return (
     <div className="px-12 pb-4 shrink-0">
@@ -116,7 +127,7 @@ export function MetadataBar({
         >
           {TIMES.map((t) => (
             <option key={t} value={t}>
-              {new Date(`2000-01-01T${t}`).toLocaleTimeString(locale, {
+              {new Date(`2000-01-01T${t}`).toLocaleTimeString(undefined, {
                 hour: "numeric",
                 minute: "2-digit",
                 hour12: true,
@@ -164,15 +175,27 @@ export function MetadataBar({
             <input
               id="meta-tags"
               type="text"
-              value={tags.join(", ")}
-              onChange={(e) =>
-                onTagsChange(
-                  e.target.value
-                    .split(",")
-                    .map((t) => t.trim())
-                    .filter(Boolean)
-                )
-              }
+              value={isEditingTags ? tagsInput : tags.join(", ")}
+              onFocus={() => {
+                setTagsInput(tags.join(", "));
+                setIsEditingTags(true);
+              }}
+              onChange={(e) => {
+                const nextValue = e.target.value;
+                setTagsInput(nextValue);
+                onTagsChange(parseTagsInput(nextValue));
+              }}
+              onBlur={(e) => {
+                setIsEditingTags(false);
+                commitTags(e.target.value);
+              }}
+              onKeyDown={(e) => {
+                if (e.key !== "Enter") return;
+                e.preventDefault();
+                setIsEditingTags(false);
+                commitTags(tagsInput);
+                e.currentTarget.blur();
+              }}
               placeholder="ai, leadership, strategy"
               aria-label="Tags"
               className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#ff7d00]"

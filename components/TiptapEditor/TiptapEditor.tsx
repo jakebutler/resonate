@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useImperativeHandle, forwardRef, useState } from "react";
-import { useEditor, EditorContent } from "@tiptap/react";
+import { useEditor, EditorContent, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
@@ -26,7 +26,7 @@ export interface TiptapEditorHandle {
   replaceRange: (range: { from: number; to: number }, content: string) => void;
   getTextBetween: (range: { from: number; to: number }) => string;
   focus: () => void;
-  getEditor: () => ReturnType<typeof useEditor>;
+  getEditor: () => Editor | null;
 }
 
 interface TiptapEditorProps {
@@ -37,6 +37,18 @@ interface TiptapEditorProps {
   onSelectionChange?: (selection: TiptapEditorSelection | null) => void;
   onAskAI?: (selection: TiptapEditorSelection) => void;
 }
+
+const EDITOR_CONTENT_CLASSES =
+  "focus:outline-none min-h-[400px] px-0 py-4 text-[1.0625rem] leading-8 text-[#001524] " +
+  "[&_p]:my-4 [&_h2]:mt-10 [&_h2]:mb-4 [&_h2]:font-forum [&_h2]:text-4xl [&_h2]:leading-tight " +
+  "[&_h3]:mt-8 [&_h3]:mb-3 [&_h3]:font-forum [&_h3]:text-3xl [&_h3]:leading-tight " +
+  "[&_ul]:my-5 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:my-5 [&_ol]:list-decimal [&_ol]:pl-6 " +
+  "[&_li]:my-1.5 [&_blockquote]:my-6 [&_blockquote]:border-l-4 [&_blockquote]:border-[#ffecd1] " +
+  "[&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-gray-600 " +
+  "[&_a]:font-medium [&_a]:text-[#15616d] [&_a]:underline [&_a]:underline-offset-4 " +
+  "[&_code]:rounded [&_code]:bg-gray-100 [&_code]:px-1.5 [&_code]:py-0.5 [&_pre]:my-6 " +
+  "[&_pre]:overflow-x-auto [&_pre]:rounded-2xl [&_pre]:bg-[#001524] [&_pre]:p-4 [&_pre]:text-white " +
+  "[&_img]:my-6 [&_img]:max-h-[52vh] [&_img]:max-w-full [&_img]:rounded-2xl [&_img]:object-contain";
 
 export const TiptapEditor = forwardRef<TiptapEditorHandle, TiptapEditorProps>(
   function TiptapEditor(
@@ -128,8 +140,7 @@ export const TiptapEditor = forwardRef<TiptapEditorHandle, TiptapEditorProps>(
       },
       editorProps: {
         attributes: {
-          class:
-            "prose prose-lg max-w-none focus:outline-none min-h-[400px] px-0 py-4",
+          class: EDITOR_CONTENT_CLASSES,
         },
       },
     });
@@ -184,10 +195,13 @@ export const TiptapEditor = forwardRef<TiptapEditorHandle, TiptapEditorProps>(
     }));
 
     return (
-      <div className="flex flex-col flex-1 overflow-hidden">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <Toolbar editor={editor} onImageInsert={onImageInsert} />
-        <div className="flex-1 overflow-y-auto px-8 py-2">
-          <EditorContent editor={editor} className="h-full" />
+        <div
+          data-testid="editor-scroll-region"
+          className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-8 py-2"
+        >
+          <EditorContent editor={editor} className="min-h-full" />
         </div>
         {selection && onAskAI ? (
           <button
