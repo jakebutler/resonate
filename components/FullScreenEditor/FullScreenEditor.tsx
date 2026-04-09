@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueries } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -187,17 +187,20 @@ export function FullScreenEditor({ postId, initialDate }: FullScreenEditorProps)
       null
     )
   );
-  const fileUrlResults = useQueries(
-    Object.fromEntries(
-      fileIds.map((fileId) => [
-        fileId,
-        {
-          query: api.posts.getFileUrl,
-          args: { fileId },
-        },
-      ])
-    )
+  const fileUrlQueries = useMemo(
+    () =>
+      Object.fromEntries(
+        fileIds.map((fileId) => [
+          fileId,
+          {
+            query: api.posts.getFileUrl,
+            args: { fileId },
+          },
+        ])
+      ),
+    [fileIds]
   );
+  const fileUrlResults = useQueries(fileUrlQueries);
   const imageUrlByFileId = Object.fromEntries(
     fileIds
       .map((fileId) => {

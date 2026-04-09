@@ -556,6 +556,27 @@ describe('FullScreenEditor', () => {
     expect(screen.getByTestId('selection-chip')).toHaveTextContent('Selected text')
   })
 
+  it('keeps file URL queries stable across rerenders when the image list is unchanged', () => {
+    let previousQueries: Record<string, unknown> | null = null
+
+    vi.mocked(useQueries).mockImplementation(((queries: Record<string, unknown>) => {
+      if (previousQueries && previousQueries !== queries) {
+        throw new Error('file URL queries changed without any image updates')
+      }
+
+      previousQueries = queries
+      return {}
+    }) as never)
+
+    render(<FullScreenEditor postId="new" />)
+
+    expect(() => {
+      fireEvent.change(screen.getByPlaceholderText(/untitled post/i), {
+        target: { value: 'Draft title' },
+      })
+    }).not.toThrow()
+  })
+
   it('queues a second autosave while the first save is in flight', async () => {
     let resolveFirstSave!: () => void
     mockUpdate
