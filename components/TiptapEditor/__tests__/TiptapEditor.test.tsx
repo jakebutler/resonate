@@ -68,6 +68,6 @@ describe("TiptapEditor", () => {
     )
     expect(screen.getByTestId("toolbar")).toBeInTheDocument()
     expect(screen.getByTestId("editor-content")).toHaveTextContent("false")
-    expect(screen.getByTestId("editor-scroll-region")).toHaveClass("min-h-0")
+    expect(screen.getByTestId("editor-scroll-region")).toHaveClass("overflow-visible")
   })
 })

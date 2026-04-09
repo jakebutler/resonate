@@ -240,6 +240,12 @@ describe('FullScreenEditor', () => {
     expect(screen.getByTestId('tiptap-editor')).toBeInTheDocument()
   })
 
+  it('uses the main article pane as the scroll container', () => {
+    render(<FullScreenEditor postId="new" />)
+
+    expect(screen.getByTestId('editor-main-pane')).toHaveClass('overflow-y-auto')
+  })
+
   it('renders a save status indicator', () => {
     render(<FullScreenEditor postId="new" />)
     // Initially shows "Saved" or similar status

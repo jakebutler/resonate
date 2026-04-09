@@ -641,7 +641,10 @@ export function FullScreenEditor({ postId, initialDate }: FullScreenEditorProps)
       {/* Two-panel area */}
       <div className="flex min-h-0 flex-1 overflow-hidden">
         {/* Main canvas */}
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div
+          data-testid="editor-main-pane"
+          className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden"
+        >
           {/* Title */}
           <div className="px-12 pt-8 pb-2 shrink-0">
             <input
@@ -674,7 +677,7 @@ export function FullScreenEditor({ postId, initialDate }: FullScreenEditorProps)
           />
 
           {/* Tiptap WYSIWYG editor */}
-          <div className="min-h-0 flex-1 overflow-hidden px-4">
+          <div className="flex-1 px-4">
             <TiptapEditor
               ref={editorRef}
               initialContent={existing?.content ?? ""}
