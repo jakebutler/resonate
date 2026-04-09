@@ -53,6 +53,7 @@ export const TiptapEditor = forwardRef<TiptapEditorHandle, TiptapEditorProps>(
     const [selection, setSelection] = useState<TiptapEditorSelection | null>(null);
 
     const editor = useEditor({
+      immediatelyRender: false,
       extensions: [
         StarterKit.configure({
           heading: { levels: [2, 3] },
