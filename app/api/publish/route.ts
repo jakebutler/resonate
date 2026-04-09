@@ -8,14 +8,31 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { title, content, scheduledDate, status, heroImage, tags, description } = await req.json();
+  const {
+    title,
+    content,
+    scheduledDate,
+    status,
+    heroImage,
+    heroImageUrl,
+    tags,
+    description,
+  } = await req.json();
 
   if (!title || !content) {
     return NextResponse.json({ error: "title and content are required" }, { status: 400 });
   }
 
   try {
-    const result = await createBlogPostPR({ title, content, scheduledDate, status, heroImage, tags, description });
+    const result = await createBlogPostPR({
+      title,
+      content,
+      scheduledDate,
+      status,
+      heroImage: heroImageUrl ?? heroImage,
+      tags,
+      description,
+    });
     return NextResponse.json({ prUrl: result.prUrl, branchName: result.branchName });
   } catch (err) {
     console.error("GitHub publish error:", err);

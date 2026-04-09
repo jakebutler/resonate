@@ -4,40 +4,40 @@ Last updated: 2026-04-09
 
 ## Purpose
 
-Resonate is Corvo Labs' internal content operations app. It combines planning, drafting, workflow review, idea capture, AI assistance, and blog publication in one Next.js + Convex product.
+Resonate is Corvo Labs' internal content operations app. It combines editorial planning, drafting, AI assistance, workflow review, and publication handoff in one Next.js + Convex product.
 
-This spec stays intentionally high-level. It focuses on product shape and repo-wide behavior that is easy to miss if you read only one route or component.
+This spec stays high-level on purpose. It describes the current product shape and the cross-file behavior that is easiest to miss during implementation work.
 
 ## Product Surfaces
 
 ### Dashboard
 
 - `/` is the main workspace.
-- It combines the publishing calendar, content library, and workflow board in one shell.
-- Calendar and library actions still open the legacy modal editors for blog and LinkedIn posts.
+- It combines the content calendar, content library, and workflow board in one shell.
+- Dashboard-driven edit actions still use the older modal editors.
 
 ### Fullscreen Editor
 
-- `/editor/[id]` is the newer dedicated drafting route.
-- It is currently blog-first:
-  - `/editor/new?date=YYYY-MM-DD` creates a new blog draft on first autosave.
-  - `/editor/[postId]` loads and autosaves a shared `posts` record.
-- The editor uses Tiptap rich text with a compact toolbar.
-- The fullscreen layout now includes:
-  - a right-side AI copilot panel that is collapsible and resizable
-  - an inline metadata bar for status, publish date/time, tags, SEO description, and PR state
-  - a publish action that opens a GitHub PR instead of directly publishing content
-- The route still coexists with the older modal editors and is not yet the default entry point from the dashboard.
+- `/editor/[id]` is the dedicated drafting route for the current blog-first editor work.
+- `/editor/new?date=YYYY-MM-DD` creates a new blog draft on first autosave, then replaces the URL with `/editor/[newId]`.
+- `/editor/[postId]` loads and autosaves the shared `posts` record directly.
+- The layout currently includes:
+  - a Tiptap editor with a compact toolbar
+  - a collapsible, resizable AI sidebar backed by `/api/llm`
+  - an inline metadata bar for status, schedule, tags, SEO description, and PR state
+  - an image workflow with upload, inline insertion, hero-image designation, and image removal
+  - a publish action that opens a GitHub PR rather than directly pushing live content
+- This route still coexists with the legacy modal editors and is not yet the only editing path.
 
 ### Setup
 
 - `/setup` controls whether blog and LinkedIn are enabled and how often each should publish.
-- These settings behave like one shared app record, not per-user preferences.
+- These settings behave like one shared app-level record, not per-user preferences.
 
 ### Captured Ideas
 
 - `/ideas` is the lightweight capture inbox.
-- A captured idea stores source metadata, tags, and appended note entries.
+- Captured ideas store source metadata, tags, and appended note entries.
 - A captured idea can spawn a blog or LinkedIn draft into the shared `posts` table.
 
 ### Workflow Board
@@ -52,25 +52,25 @@ This spec stays intentionally high-level. It focuses on product shape and repo-w
 
 - `/api/llm` is the authenticated server route for editor and workflow AI calls.
 - The fullscreen editor uses `/api/llm` with `assistantType: "blog"` and streams responses into the sidebar chat UI.
-- `/api/publish` opens a GitHub PR for blog publication and now supports extra frontmatter inputs such as tags and description.
+- `/api/publish` creates a GitHub PR for blog publication and can include frontmatter metadata such as tags, description, and hero image URL.
 - LinkedIn posts stay in-app and do not publish through `/api/publish`.
-- Workflow agents are synchronous prompt runs on the current record, not background workers.
+- Workflow AI remains synchronous prompt execution on the current record, not background processing.
 
 ## System Boundaries
 
 ### Frontend
 
 - Next.js App Router app.
-- Clerk route protection is implemented in `proxy.ts`; sign-in and sign-up are the only public routes.
-- Convex React owns most client data flow.
-- The app currently has two parallel editing paradigms:
-  - legacy slide-over editors for dashboard-driven flows
-  - a newer fullscreen Tiptap route for blog drafting
+- Clerk route protection is implemented in `proxy.ts`; sign-in and sign-up are the public routes.
+- Convex React owns most client-side data flow.
+- The repo currently supports two editing paradigms in parallel:
+  - legacy slide-over editors for dashboard flows
+  - the newer fullscreen Tiptap route for blog drafting
 
 ### Backend
 
 - Convex stores most app data and business logic.
-- Next.js route handlers own external side effects such as LLM requests and GitHub publishing.
+- Next.js route handlers own external side effects such as LLM requests and GitHub PR creation.
 - Clerk auth is bridged into Convex with the `convex` JWT template.
 
 ### AI
@@ -86,7 +86,7 @@ This spec stays intentionally high-level. It focuses on product shape and repo-w
 
 - Shared content record for both blog and LinkedIn.
 - Used by the calendar, content library, modal editors, fullscreen editor, captured-idea draft creation, and workflow drafts.
-- It now carries additional fullscreen-editor metadata such as tags, SEO description, and a stored GitHub PR URL.
+- The fullscreen-editor work now relies on `posts` for status, schedule, tags, SEO description, stored GitHub PR URL, uploaded file IDs, and hero image selection.
 - Historical published content can be backfilled idempotently by `externalUrl`.
 
 ### `settings`
@@ -115,20 +115,28 @@ These power the kanban workflow.
   - `/ideas` uses `capturedIdeas` for note capture and source tracking.
   - The workflow board uses `ideas` for editorial progression.
 - Workflow drafts are not separate documents. Each `workflowDrafts` row points at a `posts` row, so workflow edits also change what the calendar and library show.
-- The fullscreen editor also writes directly to `posts`, not to a separate draft table.
+- The fullscreen editor writes directly to `posts`, not to a separate draft table.
 - The fullscreen route remains blog-oriented even though `posts` is shared:
-  - New drafts created there are always `type: "blog"` and `status: "draft"`.
+  - New drafts created there are always `type: "blog"`.
   - Existing non-blog records are not blocked at the route layer.
-- `/editor/new?date=...` uses the query param only for the initial create mutation; after the first autosave it redirects to `/editor/[newId]`.
-- Metadata edits in the fullscreen editor autosave back to Convex, but the publish action is a separate PR-creation step.
-- The publish flow is intentionally indirect: creating a PR stores `githubPrUrl` on the post and the UI tells the user to review and merge externally.
-- The current publish path is only partially aligned:
-  - the editor exposes tags and SEO description, and the GitHub helper includes them in frontmatter
-  - hero image storage exists in the schema, but the fullscreen UI does not expose a hero-image picker yet
-  - the editor has a Markdown-capable Tiptap handle, but the publish action still sends HTML content into the GitHub file path today
-  - after PR creation, the post is patched to `scheduled` even though the outbound PR payload uses `status: "published"`
-- The editor sidebar looks selection-aware, but the fullscreen editor still does not populate `selectedText` from Tiptap or apply accepted suggestions back into the document.
-- Existing post content is reloaded into Tiptap with updates suppressed to avoid autosave loops when async data arrives.
+- Existing post content is pushed back into Tiptap with update emission disabled to avoid autosave loops when async data arrives.
+- Image handling is split across several layers:
+  - uploads go to Convex storage through a generated upload URL
+  - the editor inserts an immediate blob preview for responsiveness
+  - later, a query-driven URL replacement pass swaps those blob URLs for resolved storage URLs in the HTML
+  - the image tray is derived from the current HTML plus stored `fileIds`, so removing an image must update both the document and metadata
+- Client-side image optimization happens before upload:
+  - only common image MIME types are accepted
+  - files over 10MB are rejected client-side
+  - wide images are resized to 2000px max width before upload
+- The image tray is currently the hero-image picker. There is no separate metadata control for hero selection.
+- Metadata changes autosave back to Convex, but publish is a separate PR-creation step.
+- The publish flow is intentionally indirect: creating a PR stores `githubPrUrl` on the post and expects the actual merge to happen outside Resonate.
+- The publish path is still only partially aligned:
+  - the editor now sends Markdown from the Tiptap markdown extension to `/api/publish`
+  - the editor sends `status: "published"` to the PR helper, but the local post is patched to `scheduled` after PR creation
+  - hero image frontmatter depends on resolving the selected storage ID back to a URL at publish time
+- The AI sidebar looks selection-aware, but the fullscreen editor still does not wire actual editor selection into `selectedText` or apply accepted suggestions back into the document.
 - Captured-idea draft creation links the source idea to the new post, but workflow draft creation starts from the separate workflow idea model.
 - Sending a workflow item back to inspiration only returns it to workflow `backlog`; it does not create or sync a `/ideas` captured idea.
 - Workflow gate checks in `lib/workflow.ts` are heuristic readiness checks, not model-based validation.
@@ -136,10 +144,9 @@ These power the kanban workflow.
 - `capturedIdeas`, `capturedIdeaEntries`, `capturedIdeaPostLinks`, `ideas`, and `workflowDrafts` are user-scoped. `posts` and `settings` are not scoped the same way.
 - That scoping difference matters because the dashboard and fullscreen editor read `posts` directly, while the idea and workflow systems enforce ownership inside Convex functions.
 - Auth and env wiring is intentionally strict:
-  - `CLERK_JWT_ISSUER_DOMAIN` is required by `convex/auth.config.ts`.
-  - `NEXT_PUBLIC_CONVEX_URL` is required by `components/ConvexClientProvider.tsx`.
-  - `app/layout.tsx` passes real env values instead of placeholder defaults.
-- A user can be signed into Clerk but still fail Convex-backed screens if the Clerk-to-Convex JWT bridge is misconfigured.
+  - `CLERK_JWT_ISSUER_DOMAIN` is required by `convex/auth.config.ts`
+  - `NEXT_PUBLIC_CONVEX_URL` is required by the Convex client provider
+  - a user can be signed into Clerk but still fail Convex-backed screens if the Clerk-to-Convex JWT bridge is misconfigured
 
 ## Current Route Inventory
 
@@ -156,4 +163,4 @@ These power the kanban workflow.
 
 - Keep captured ideas and workflow ideas separate until there is a deliberate migration plan.
 - Preserve the simplified kanban UI while keeping the stricter backend stage model.
-- Keep the spec aligned with the current editor split until one editing flow replaces the other.
+- Keep the spec aligned with the current split between legacy modal editing and the fullscreen editor until one path replaces the other.

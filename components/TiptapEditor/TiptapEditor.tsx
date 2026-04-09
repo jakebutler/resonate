@@ -5,6 +5,7 @@ import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
+import Image from "@tiptap/extension-image";
 import { Markdown } from "tiptap-markdown";
 import { Toolbar } from "./Toolbar";
 
@@ -12,6 +13,7 @@ export interface TiptapEditorHandle {
   getHTML: () => string;
   getMarkdown: () => string;
   setContent: (content: string) => void;
+  insertImage: (attrs: { src: string; alt?: string; fileId?: string }) => void;
   getEditor: () => ReturnType<typeof useEditor>;
 }
 
@@ -36,6 +38,24 @@ export const TiptapEditor = forwardRef<TiptapEditorHandle, TiptapEditorProps>(
         Placeholder.configure({
           placeholder,
         }),
+        Image.extend({
+          addAttributes() {
+            return {
+              ...this.parent?.(),
+              fileId: {
+                default: null,
+                parseHTML: (element) => element.getAttribute("data-file-id"),
+                renderHTML: (attributes) =>
+                  attributes.fileId
+                    ? { "data-file-id": attributes.fileId }
+                    : {},
+              },
+            };
+          },
+        }).configure({
+          inline: false,
+          allowBase64: true,
+        }),
         Markdown.configure({
           html: true,
           tightLists: true,
@@ -59,18 +79,42 @@ export const TiptapEditor = forwardRef<TiptapEditorHandle, TiptapEditorProps>(
       },
     });
 
-    // Sync external content changes (e.g. when existing post loads)
+    // Sync external content changes (e.g. when existing post loads or content is cleared)
+    // Note: we check against both undefined and empty string so clearing the editor works correctly
     useEffect(() => {
-      if (editor && initialContent && editor.getHTML() !== initialContent) {
+      if (!editor) return;
+      const currentHTML = editor.getHTML();
+      if (currentHTML !== initialContent) {
         // emitUpdate: false prevents triggering onUpdate and causing an auto-save loop
-        editor.commands.setContent(initialContent, false, { preserveWhitespace: "full" });
+        editor.commands.setContent(initialContent ?? "", {
+          emitUpdate: false,
+          parseOptions: { preserveWhitespace: "full" },
+        });
       }
     }, [editor, initialContent]);
 
     useImperativeHandle(ref, () => ({
       getHTML: () => editor?.getHTML() ?? "",
-      getMarkdown: () => (editor?.storage.markdown?.getMarkdown?.() ?? editor?.getHTML() ?? ""),
-      setContent: (content: string) => editor?.commands.setContent(content),
+      getMarkdown: () =>
+        (
+          (editor?.storage as { markdown?: { getMarkdown?: () => string } } | undefined)
+            ?.markdown?.getMarkdown?.() ??
+          editor?.getHTML() ??
+          ""
+        ),
+      setContent: (content: string) =>
+        editor?.commands.setContent(content, {
+          emitUpdate: false,
+          parseOptions: { preserveWhitespace: "full" },
+        }),
+      insertImage: ({ src, alt, fileId }) =>
+        editor
+          ?.chain()
+          .focus()
+          .insertContent(
+            `<img src="${src}" alt="${alt ?? ""}"${fileId ? ` data-file-id="${fileId}"` : ""} />`
+          )
+          .run(),
       getEditor: () => editor,
     }));
 

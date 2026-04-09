@@ -125,15 +125,17 @@ export function Toolbar({ editor, onImageInsert }: ToolbarProps) {
       <div className="w-px h-5 bg-gray-200 mx-1" role="separator" />
 
       {/* Image insert */}
-      <button
-        type="button"
-        onClick={onImageInsert}
-        title="Insert Image"
-        aria-label="Insert image"
-        className="p-1.5 rounded-md text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors"
-      >
-        <ImageIcon size={16} />
-      </button>
+      {onImageInsert ? (
+        <button
+          type="button"
+          onClick={onImageInsert}
+          title="Insert Image"
+          aria-label="Insert image"
+          className="p-1.5 rounded-md text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors"
+        >
+          <ImageIcon size={16} />
+        </button>
+      ) : null}
     </div>
   );
 }

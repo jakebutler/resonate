@@ -224,3 +224,50 @@ Append-only session log for repository-level updates. Each documentation refresh
 ### Branch
 
 - feature/fullscreen-editor
+
+## 04/09/2026 01:47:24 PDT
+
+### Summary
+
+- Refreshed the living docs against the current `feature/fullscreen-editor` working tree after the editor picked up image upload, image tray, hero-image selection, and publish-path adjustments.
+- Kept `docs/spec.md` high-level while documenting the split image flow across Tiptap HTML, Convex storage, and GitHub frontmatter, plus the still-easy-to-miss publish status mismatch.
+- Replaced the handoff doc with the latest pickup guidance centered on validating the image workflow and finishing the remaining editor-to-publish alignment work.
+
+### Staged Changes
+
+- M	app/api/publish/__tests__/route.test.ts
+- M	app/api/publish/route.ts
+- M	components/FullScreenEditor/FullScreenEditor.tsx
+- M	components/FullScreenEditor/__tests__/FullScreenEditor.test.tsx
+- A	components/ImageTray/ImageTray.tsx
+- A	components/ImageTray/__tests__/ImageTray.test.tsx
+- M	components/TiptapEditor/TiptapEditor.tsx
+- M	components/TiptapEditor/Toolbar.tsx
+- M	lib/__tests__/github.test.ts
+- A	lib/__tests__/imageOptimize.test.ts
+- M	lib/github.ts
+- A	lib/imageOptimize.ts
+- M	package-lock.json
+- M	package.json
+
+### Working Tree Snapshot
+
+- M  app/api/publish/__tests__/route.test.ts
+- M  app/api/publish/route.ts
+- M  components/FullScreenEditor/FullScreenEditor.tsx
+- M  components/FullScreenEditor/__tests__/FullScreenEditor.test.tsx
+- A  components/ImageTray/ImageTray.tsx
+- A  components/ImageTray/__tests__/ImageTray.test.tsx
+- M  components/TiptapEditor/TiptapEditor.tsx
+- M  components/TiptapEditor/Toolbar.tsx
+- M  docs/project-status.md
+- M  lib/__tests__/github.test.ts
+- A  lib/__tests__/imageOptimize.test.ts
+- M  lib/github.ts
+- A  lib/imageOptimize.ts
+- M  package-lock.json
+- M  package.json
+
+### Branch
+
+- feature/fullscreen-editor

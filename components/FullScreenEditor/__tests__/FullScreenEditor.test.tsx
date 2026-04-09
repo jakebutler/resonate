@@ -1,13 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
-import { useQuery, useMutation } from 'convex/react'
+import { render, screen, fireEvent, act } from '@testing-library/react'
+import { useQuery, useMutation, useQueries } from 'convex/react'
 import { FullScreenEditor } from '@/components/FullScreenEditor/FullScreenEditor'
 
 // ── Convex ──────────────────────────────────────────────────────────────────
 vi.mock('convex/react', () => ({
   useQuery: vi.fn(),
   useMutation: vi.fn(),
+  useQueries: vi.fn(),
 }))
 
 vi.mock('@/convex/_generated/api', () => ({
@@ -16,6 +16,8 @@ vi.mock('@/convex/_generated/api', () => ({
       getById: 'posts:getById',
       create: 'posts:create',
       update: 'posts:update',
+      generateUploadUrl: 'posts:generateUploadUrl',
+      getFileUrl: 'posts:getFileUrl',
     },
   },
 }))
@@ -30,25 +32,84 @@ vi.mock('next/navigation', () => ({
 }))
 
 // ── TiptapEditor — mock the whole component so ProseMirror doesn't run in jsdom ──
-vi.mock('@/components/TiptapEditor/TiptapEditor', () => ({
-  TiptapEditor: vi.fn(
-    ({ onChange, placeholder }: { onChange?: (html: string) => void; placeholder?: string }) => (
-      <div
-        data-testid="tiptap-editor"
-        contentEditable
-        suppressContentEditableWarning
-        placeholder={placeholder}
-        onInput={(e) => onChange?.((e.target as HTMLElement).innerHTML)}
-      >
-        <p>Editor content area</p>
-      </div>
-    )
-  ),
+const mockInsertImage = vi.fn()
+const mockGetHTML = vi.fn(() => '<p>Editor content area</p>')
+const mockGetMarkdown = vi.fn(() => 'Editor content area')
+
+vi.mock('@/components/TiptapEditor/TiptapEditor', async () => {
+  const React = await import('react')
+  const MockTiptapEditor = React.forwardRef(
+    (
+      {
+        onChange,
+        placeholder,
+        onImageInsert,
+      }: {
+        onChange?: (html: string) => void
+        placeholder?: string
+        onImageInsert?: () => void
+      },
+      ref: React.ForwardedRef<{
+        getHTML: () => string
+        getMarkdown: () => string
+        setContent: (content: string) => void
+        insertImage: (attrs: { src: string; alt?: string; fileId?: string }) => void
+      }>
+    ) => {
+      React.useImperativeHandle(ref, () => ({
+        getHTML: mockGetHTML,
+        getMarkdown: mockGetMarkdown,
+        setContent: vi.fn(),
+        insertImage: mockInsertImage,
+      }))
+
+      return (
+        <div>
+          <div
+            data-testid="tiptap-editor"
+            contentEditable
+            suppressContentEditableWarning
+            data-placeholder={placeholder}
+            onInput={(e) => {
+              const html = (e.target as HTMLElement).innerHTML
+              mockGetHTML.mockReturnValue(html)
+              mockGetMarkdown.mockReturnValue(html)
+              onChange?.(html)
+            }}
+          >
+            <p>Editor content area</p>
+          </div>
+          {onImageInsert ? (
+            <button type="button" onClick={onImageInsert}>
+              Insert image
+            </button>
+          ) : null}
+        </div>
+      )
+    }
+  )
+
+  MockTiptapEditor.displayName = 'MockTiptapEditor'
+
+  return {
+    TiptapEditor: MockTiptapEditor,
+  }
+})
+
+vi.mock('@/lib/imageOptimize', () => ({
+  optimizeImage: vi.fn(async (file: File) => file),
 }))
+
+async function flushPromises() {
+  await act(async () => {
+    await Promise.resolve()
+  })
+}
 
 describe('FullScreenEditor', () => {
   const mockCreate = vi.fn().mockResolvedValue('new-post-id')
   const mockUpdate = vi.fn().mockResolvedValue(undefined)
+  const mockGenerateUploadUrl = vi.fn().mockResolvedValue('https://upload.example.com')
 
   let originalScrollIntoView: typeof HTMLElement.prototype.scrollIntoView | undefined
 
@@ -59,11 +120,19 @@ describe('FullScreenEditor', () => {
     originalScrollIntoView = HTMLElement.prototype.scrollIntoView
     HTMLElement.prototype.scrollIntoView = vi.fn()
 
-    vi.mocked(useMutation).mockImplementation((fn: unknown) => {
+    vi.mocked(useMutation).mockImplementation(((fn: unknown) => {
       const key = fn as string
       if (key === 'posts:create') return mockCreate
       if (key === 'posts:update') return mockUpdate
+      if (key === 'posts:generateUploadUrl') return mockGenerateUploadUrl
       return vi.fn()
+    }) as never)
+    vi.mocked(useQueries).mockReturnValue({})
+    vi.stubGlobal('fetch', vi.fn())
+    vi.stubGlobal('URL', {
+      ...URL,
+      createObjectURL: vi.fn(() => 'blob:preview-image'),
+      revokeObjectURL: vi.fn(),
     })
 
     // Default: no existing post (new post mode)
@@ -126,6 +195,7 @@ describe('FullScreenEditor', () => {
     // Advance past the 3s debounce
     await act(async () => {
       vi.advanceTimersByTime(3100)
+      await Promise.resolve()
     })
 
     expect(mockCreate).toHaveBeenCalledWith(
@@ -134,6 +204,7 @@ describe('FullScreenEditor', () => {
         title: 'My New Post',
       })
     )
+    expect(mockReplace).toHaveBeenCalledWith('/editor/new-post-id')
   })
 
   it('shows "Saving..." while auto-save is in flight', async () => {
@@ -209,5 +280,99 @@ describe('FullScreenEditor', () => {
       })
     )
     expect(mockCreate).not.toHaveBeenCalled()
+  })
+
+  it('autosaves the latest metadata state after status changes', async () => {
+    vi.mocked(useQuery).mockReturnValue({
+      _id: 'post-123',
+      type: 'blog',
+      title: 'Existing Post Title',
+      content: '<p>Existing content</p>',
+      status: 'draft',
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    })
+
+    render(<FullScreenEditor postId="post-123" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /change status/i }))
+
+    await act(async () => {
+      vi.advanceTimersByTime(3100)
+      await Promise.resolve()
+    })
+
+    expect(mockUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'post-123',
+        status: 'scheduled',
+      })
+    )
+  })
+
+  it('publishes a new editor by persisting the post before saving PR metadata', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          prUrl: 'https://github.com/jakebutler/resonate-blog/pull/42',
+        }),
+        { status: 200 }
+      )
+    )
+
+    render(<FullScreenEditor postId="new" />)
+
+    fireEvent.change(screen.getByPlaceholderText(/untitled post/i), {
+      target: { value: 'Launch Post' },
+    })
+    fireEvent.input(screen.getByTestId('tiptap-editor'), {
+      target: { innerHTML: '<p>Publish me</p>' },
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /^publish$/i }))
+
+    await flushPromises()
+    await flushPromises()
+
+    expect(mockCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'blog',
+        title: 'Launch Post',
+        content: '<p>Publish me</p>',
+      })
+    )
+
+    expect(mockUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'new-post-id',
+        githubPrUrl: 'https://github.com/jakebutler/resonate-blog/pull/42',
+        status: 'scheduled',
+      })
+    )
+  })
+
+  it('uploads an image and inserts it into the editor', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ storageId: 'storage-1' }), { status: 200 })
+    )
+
+    render(<FullScreenEditor postId="new" />)
+
+    const file = new File(['image'], 'hero.png', { type: 'image/png' })
+    fireEvent.click(screen.getByRole('button', { name: /insert image/i }))
+    fireEvent.change(screen.getByLabelText(/upload image/i), {
+      target: { files: [file] },
+    })
+
+    await flushPromises()
+    await flushPromises()
+
+    expect(mockGenerateUploadUrl).toHaveBeenCalled()
+    expect(mockInsertImage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        fileId: 'storage-1',
+        alt: 'hero',
+      })
+    )
   })
 })

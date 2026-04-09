@@ -2,11 +2,13 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { useMutation, useQuery } from "convex/react";
+import { useMutation, useQuery, useQueries } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { TiptapEditor, type TiptapEditorHandle } from "@/components/TiptapEditor/TiptapEditor";
 import { EditorChat } from "@/components/EditorChat/EditorChat";
+import { ImageTray } from "@/components/ImageTray/ImageTray";
+import { optimizeImage } from "@/lib/imageOptimize";
 import { ResizeHandle } from "./ResizeHandle";
 import { MetadataBar } from "./MetadataBar";
 import { ArrowLeft, PanelRightOpen } from "lucide-react";
@@ -24,6 +26,101 @@ interface FullScreenEditorProps {
 
 const AUTOSAVE_DEBOUNCE_MS = 3000;
 
+type DraftSnapshot = {
+  status: "draft" | "scheduled" | "published";
+  scheduledDate: string;
+  scheduledTime: string;
+  tags: string[];
+  seoDescription: string;
+  fileIds: Id<"_storage">[];
+  heroImageId: Id<"_storage"> | null;
+};
+
+function createDraftSnapshot(
+  status: DraftSnapshot["status"],
+  scheduledDate: string,
+  scheduledTime: string,
+  tags: string[],
+  seoDescription: string,
+  fileIds: Id<"_storage">[],
+  heroImageId: Id<"_storage"> | null
+): DraftSnapshot {
+  return {
+    status,
+    scheduledDate,
+    scheduledTime,
+    tags,
+    seoDescription,
+    fileIds,
+    heroImageId,
+  };
+}
+
+function extractImageEntries(
+  html: string,
+  fileIds: Id<"_storage">[],
+  urlsByFileId: Record<string, string>
+) {
+  const container = document.createElement("div");
+  container.innerHTML = html;
+
+  const images = new Map<
+    string,
+    { fileId: string; url: string; altText: string }
+  >();
+
+  for (const img of Array.from(container.querySelectorAll("img[data-file-id]"))) {
+    const fileId = img.getAttribute("data-file-id");
+    if (!fileId) continue;
+    images.set(fileId, {
+      fileId,
+      url: urlsByFileId[fileId] || img.getAttribute("src") || "",
+      altText: img.getAttribute("alt") || "",
+    });
+  }
+
+  for (const fileId of fileIds) {
+    if (!images.has(fileId)) {
+      images.set(fileId, {
+        fileId,
+        url: urlsByFileId[fileId] || "",
+        altText: "",
+      });
+    }
+  }
+
+  return Array.from(images.values());
+}
+
+function replaceImageSources(html: string, urlsByFileId: Record<string, string>) {
+  const container = document.createElement("div");
+  container.innerHTML = html;
+  let changed = false;
+
+  for (const img of Array.from(container.querySelectorAll("img[data-file-id]"))) {
+    const fileId = img.getAttribute("data-file-id");
+    if (!fileId) continue;
+    const resolvedUrl = urlsByFileId[fileId];
+    if (resolvedUrl && img.getAttribute("src") !== resolvedUrl) {
+      img.setAttribute("src", resolvedUrl);
+      changed = true;
+    }
+  }
+
+  return changed ? container.innerHTML : html;
+}
+
+function removeImageFromHtml(html: string, fileId: string) {
+  const container = document.createElement("div");
+  container.innerHTML = html;
+  container.querySelector(`img[data-file-id="${fileId}"]`)?.remove();
+  return container.innerHTML;
+}
+
+function deriveAltText(fileName: string) {
+  return fileName.replace(/\.[^/.]+$/, "").trim() || "Post image";
+}
+
 export function FullScreenEditor({ postId, initialDate }: FullScreenEditorProps) {
   const router = useRouter();
   const isNew = postId === "new";
@@ -35,6 +132,7 @@ export function FullScreenEditor({ postId, initialDate }: FullScreenEditorProps)
   );
   const createPost = useMutation(api.posts.create);
   const updatePost = useMutation(api.posts.update);
+  const generateUploadUrl = useMutation(api.posts.generateUploadUrl);
 
   // Local state
   const [title, setTitle] = useState("");
@@ -49,6 +147,9 @@ export function FullScreenEditor({ postId, initialDate }: FullScreenEditorProps)
   const [seoDescription, setSeoDescription] = useState("");
   const [githubPrUrl, setGithubPrUrl] = useState("");
   const [publishing, setPublishing] = useState(false);
+  const [fileIds, setFileIds] = useState<Id<"_storage">[]>([]);
+  const [heroImageId, setHeroImageId] = useState<Id<"_storage"> | null>(null);
+  const [imageError, setImageError] = useState("");
 
   // Sidebar state
   const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT_WIDTH);
@@ -60,6 +161,38 @@ export function FullScreenEditor({ postId, initialDate }: FullScreenEditorProps)
   const editorRef = useRef<TiptapEditorHandle>(null);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isSavingRef = useRef(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const draftSnapshotRef = useRef<DraftSnapshot>(
+    createDraftSnapshot(
+      "draft",
+      initialDate ?? "",
+      "10:00",
+      [],
+      "",
+      [],
+      null
+    )
+  );
+  const fileUrlResults = useQueries(
+    Object.fromEntries(
+      fileIds.map((fileId) => [
+        fileId,
+        {
+          query: api.posts.getFileUrl,
+          args: { fileId },
+        },
+      ])
+    )
+  );
+  const imageUrlByFileId = Object.fromEntries(
+    fileIds
+      .map((fileId) => {
+        const result = fileUrlResults[fileId];
+        return typeof result === "string" ? [fileId, result] : null;
+      })
+      .filter((entry): entry is [string, string] => Boolean(entry))
+  );
+  const images = extractImageEntries(htmlContent, fileIds, imageUrlByFileId);
 
   // Load existing post into local state
   useEffect(() => {
@@ -72,8 +205,31 @@ export function FullScreenEditor({ postId, initialDate }: FullScreenEditorProps)
       setTags(existing.tags ?? []);
       setSeoDescription(existing.seoDescription ?? "");
       setGithubPrUrl(existing.githubPrUrl ?? "");
+      setFileIds((existing.fileIds as Id<"_storage">[]) ?? []);
+      setHeroImageId((existing.heroImageId as Id<"_storage"> | undefined) ?? null);
     }
   }, [existing]);
+
+  useEffect(() => {
+    draftSnapshotRef.current = createDraftSnapshot(
+      status,
+      scheduledDate,
+      scheduledTime,
+      tags,
+      seoDescription,
+      fileIds,
+      heroImageId
+    );
+  }, [status, scheduledDate, scheduledTime, tags, seoDescription, fileIds, heroImageId]);
+
+  useEffect(() => {
+    if (!htmlContent || Object.keys(imageUrlByFileId).length === 0) return;
+    const nextHtml = replaceImageSources(htmlContent, imageUrlByFileId);
+    if (nextHtml !== htmlContent) {
+      setHtmlContent(nextHtml);
+      editorRef.current?.setContent(nextHtml);
+    }
+  }, [htmlContent, imageUrlByFileId]);
 
   // ── Auto-save logic ────────────────────────────────────────────────────────
   const performSave = useCallback(
@@ -83,17 +239,20 @@ export function FullScreenEditor({ postId, initialDate }: FullScreenEditorProps)
       setSaveStatus("saving");
 
       try {
+        const draft = draftSnapshotRef.current;
         if (currentPostIdRef.current) {
           // Update existing post
           await updatePost({
             id: currentPostIdRef.current as Id<"posts">,
             title: titleToSave,
             content: contentToSave,
-            status,
-            scheduledDate,
-            scheduledTime,
-            tags,
-            seoDescription,
+            status: draft.status,
+            scheduledDate: draft.scheduledDate,
+            scheduledTime: draft.scheduledTime,
+            tags: draft.tags,
+            seoDescription: draft.seoDescription,
+            fileIds: draft.fileIds,
+            heroImageId: draft.heroImageId ?? undefined,
           });
         } else {
           // Create new post, then redirect to the real ID
@@ -101,8 +260,13 @@ export function FullScreenEditor({ postId, initialDate }: FullScreenEditorProps)
             type: "blog",
             title: titleToSave,
             content: contentToSave,
-            status: "draft",
-            scheduledDate: initialDate,
+            status: draft.status,
+            scheduledDate: draft.scheduledDate || initialDate,
+            scheduledTime: draft.scheduledTime,
+            tags: draft.tags,
+            seoDescription: draft.seoDescription,
+            fileIds: draft.fileIds,
+            heroImageId: draft.heroImageId ?? undefined,
           });
           currentPostIdRef.current = newId;
           // Replace history so back-button still works
@@ -149,12 +313,34 @@ export function FullScreenEditor({ postId, initialDate }: FullScreenEditorProps)
     scheduleAutoSave(title, newHtml);
   };
 
+  const ensurePersistedPost = useCallback(async () => {
+    if (currentPostIdRef.current) return currentPostIdRef.current as Id<"posts">;
+
+    const draft = draftSnapshotRef.current;
+    const newId = await createPost({
+      type: "blog",
+      title,
+      content: htmlContent,
+      status: draft.status,
+      scheduledDate: draft.scheduledDate || initialDate,
+      scheduledTime: draft.scheduledTime,
+      tags: draft.tags,
+      seoDescription: draft.seoDescription,
+      fileIds: draft.fileIds,
+      heroImageId: draft.heroImageId ?? undefined,
+    });
+    currentPostIdRef.current = newId;
+    router.replace(`/editor/${newId}`);
+    return newId;
+  }, [createPost, htmlContent, initialDate, router, title]);
+
   const handlePublish = async () => {
     if (!title || !htmlContent) return;
     setPublishing(true);
     try {
-      // Convert HTML to markdown for the GitHub file
-      const markdown = editorRef.current?.getHTML() ?? htmlContent;
+      const persistedPostId = await ensurePersistedPost();
+      const markdown = editorRef.current?.getMarkdown() ?? htmlContent;
+      const heroImageUrl = heroImageId ? imageUrlByFileId[heroImageId] : undefined;
       const res = await fetch("/api/publish", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -163,6 +349,7 @@ export function FullScreenEditor({ postId, initialDate }: FullScreenEditorProps)
           content: markdown,
           scheduledDate,
           status: "published",
+          heroImageUrl,
           tags: tags.length ? tags : undefined,
           description: seoDescription || undefined,
         }),
@@ -171,13 +358,11 @@ export function FullScreenEditor({ postId, initialDate }: FullScreenEditorProps)
       const { prUrl } = await res.json();
       setGithubPrUrl(prUrl);
 
-      if (currentPostIdRef.current) {
-        await updatePost({
-          id: currentPostIdRef.current as Id<"posts">,
-          githubPrUrl: prUrl,
-          status: "scheduled",
-        });
-      }
+      await updatePost({
+        id: persistedPostId,
+        githubPrUrl: prUrl,
+        status: "scheduled",
+      });
     } catch (err) {
       console.error("Publish failed:", err);
       // TODO: replace with toast in Phase 8
@@ -193,6 +378,86 @@ export function FullScreenEditor({ postId, initialDate }: FullScreenEditorProps)
       return Math.max(SIDEBAR_MIN_WIDTH, Math.min(maxWidth, prev + delta));
     });
   }, []);
+
+  const handleImageUpload = useCallback(
+    async (files: FileList | null) => {
+      if (!files?.length) return;
+
+      setImageError("");
+
+      for (const file of Array.from(files)) {
+        try {
+          const optimizedFile = await optimizeImage(file);
+          const uploadUrl = await generateUploadUrl();
+          const uploadRes = await fetch(uploadUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": optimizedFile.type || file.type || "application/octet-stream",
+            },
+            body: optimizedFile,
+          });
+          if (!uploadRes.ok) {
+            throw new Error("Image upload failed.");
+          }
+
+          const { storageId } = await uploadRes.json();
+          const previewUrl = URL.createObjectURL(optimizedFile);
+          const altText = deriveAltText(file.name);
+          const storageFileId = storageId as Id<"_storage">;
+
+          setFileIds((prev) =>
+            prev.includes(storageFileId) ? prev : [...prev, storageFileId]
+          );
+          editorRef.current?.insertImage?.({
+            src: previewUrl,
+            alt: altText,
+            fileId: storageId,
+          });
+
+          const nextHtml = editorRef.current?.getHTML() ?? htmlContent;
+          setHtmlContent(nextHtml);
+          scheduleAutoSave(title, nextHtml);
+        } catch (err) {
+          setImageError(
+            err instanceof Error ? err.message : "Image upload failed."
+          );
+          break;
+        }
+      }
+    },
+    [generateUploadUrl, htmlContent, scheduleAutoSave, title]
+  );
+
+  const handleImageInputChange = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    await handleImageUpload(event.target.files);
+    event.target.value = "";
+  };
+
+  const handleRemoveImage = (fileId: string) => {
+    const nextFileIds = fileIds.filter((currentFileId) => currentFileId !== fileId);
+    const nextHeroImageId = heroImageId === fileId ? null : heroImageId;
+    const nextHtml = removeImageFromHtml(htmlContent, fileId);
+
+    setFileIds(nextFileIds);
+    setHeroImageId(nextHeroImageId);
+    setHtmlContent(nextHtml);
+    editorRef.current?.setContent(nextHtml);
+    scheduleAutoSave(title, nextHtml);
+  };
+
+  const handleHeroChange = (fileId: string | null) => {
+    const nextHeroImageId = (fileId as Id<"_storage"> | null) ?? null;
+    setHeroImageId(nextHeroImageId);
+    scheduleAutoSave(title, htmlContent);
+  };
+
+  const handleScrollToImage = (fileId: string) => {
+    document
+      .querySelector(`img[data-file-id="${fileId}"]`)
+      ?.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
 
   // ── Save status label ──────────────────────────────────────────────────────
   const saveStatusLabel =
@@ -285,8 +550,32 @@ export function FullScreenEditor({ postId, initialDate }: FullScreenEditorProps)
               initialContent={existing?.content ?? ""}
               onChange={handleContentChange}
               placeholder="Start writing your post..."
+              onImageInsert={() => fileInputRef.current?.click()}
             />
           </div>
+
+          <ImageTray
+            images={images}
+            heroFileId={heroImageId}
+            onHeroChange={handleHeroChange}
+            onRemove={handleRemoveImage}
+            onScrollToImage={handleScrollToImage}
+          />
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            aria-label="Upload image"
+            onChange={handleImageInputChange}
+          />
+
+          {imageError ? (
+            <div className="px-12 pb-3 text-xs text-red-500" role="status" aria-live="polite">
+              {imageError}
+            </div>
+          ) : null}
         </div>
 
         {/* Resize handle + Chat sidebar */}

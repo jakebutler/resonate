@@ -10,6 +10,10 @@ function slugify(title: string): string {
     .replace(/^-|-$/g, "");
 }
 
+function escapeYamlString(value: string): string {
+  return value.replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/"/g, '\\"');
+}
+
 function buildFrontmatter(
   title: string,
   date: string,
@@ -18,13 +22,19 @@ function buildFrontmatter(
 ): string {
   const lines = [
     `---`,
-    `title: "${title}"`,
-    `date: "${date}"`,
-    `status: "${status}"`,
+    `title: "${escapeYamlString(title)}"`,
+    `date: "${escapeYamlString(date)}"`,
+    `status: "${escapeYamlString(status)}"`,
   ];
-  if (opts?.heroImage) lines.push(`heroImage: "${opts.heroImage}"`);
-  if (opts?.tags?.length) lines.push(`tags: [${opts.tags.map((t) => `"${t}"`).join(", ")}]`);
-  if (opts?.description) lines.push(`description: "${opts.description}"`);
+  if (opts?.heroImage) lines.push(`heroImage: "${escapeYamlString(opts.heroImage)}"`);
+  if (opts?.tags?.length) {
+    lines.push(
+      `tags: [${opts.tags.map((tag) => `"${escapeYamlString(tag)}"`).join(", ")}]`
+    );
+  }
+  if (opts?.description) {
+    lines.push(`description: "${escapeYamlString(opts.description)}"`);
+  }
   lines.push(`---`, ``);
   return lines.join("\n") + "\n";
 }
