@@ -78,6 +78,28 @@ describe('createBlogPostPR', () => {
     expect(decoded).toContain('Body text here')
   })
 
+  it('escapes frontmatter strings before writing YAML', async () => {
+    mockGitHubSuccess()
+    await createBlogPostPR({
+      title: 'He said "hello"',
+      content: 'Body',
+      scheduledDate: '2026-03-04',
+      status: 'draft',
+      heroImage: 'https://example.com/hero"image.jpg',
+      tags: ['ai', 'quote "heavy"'],
+      description: 'Line one\nLine "two"',
+    })
+
+    const createFileCall = vi.mocked(fetch).mock.calls[3]
+    const body = JSON.parse((createFileCall[1] as RequestInit).body as string)
+    const decoded = Buffer.from(body.content, 'base64').toString('utf-8')
+
+    expect(decoded).toContain('title: "He said \\"hello\\""')
+    expect(decoded).toContain('heroImage: "https://example.com/hero\\"image.jpg"')
+    expect(decoded).toContain('tags: ["ai", "quote \\"heavy\\""]')
+    expect(decoded).toContain('description: "Line one\\nLine \\"two\\""')
+  })
+
   it('throws when repo fetch fails', async () => {
     vi.mocked(fetch).mockResolvedValueOnce(new Response('', { status: 404 }))
     await expect(createBlogPostPR({ title: 'T', content: 'x', scheduledDate: '2026-03-04', status: 'draft' }))

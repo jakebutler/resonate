@@ -2,8 +2,9 @@ import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 
 const isPublicRoute = createRouteMatcher(["/sign-in(.*)", "/sign-up(.*)"]);
+const bypassAuthForE2E = process.env.E2E_BYPASS_AUTH === "1";
 
-export default clerkMiddleware(async (auth, req) => {
+const authProxy = clerkMiddleware(async (auth, req) => {
   if (isPublicRoute(req)) return;
 
   const { userId, redirectToSignIn } = await auth();
@@ -15,6 +16,12 @@ export default clerkMiddleware(async (auth, req) => {
   // Email allowlist check is handled in the app via currentUser()
   return NextResponse.next();
 });
+
+export default bypassAuthForE2E
+  ? function proxy() {
+      return NextResponse.next();
+    }
+  : authProxy;
 
 export const config = {
   matcher: [

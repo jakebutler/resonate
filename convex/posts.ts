@@ -41,6 +41,10 @@ export const create = mutation({
     externalUrl: v.optional(v.string()),
     isRepost: v.optional(v.boolean()),
     githubPrUrl: v.optional(v.string()),
+    // Full-screen editor fields
+    heroImageId: v.optional(v.id("_storage")),
+    tags: v.optional(v.array(v.string())),
+    seoDescription: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
@@ -72,6 +76,10 @@ export const update = mutation({
     isRepost: v.optional(v.boolean()),
     githubPrUrl: v.optional(v.string()),
     publishedAt: v.optional(v.number()),
+    // Full-screen editor fields
+    heroImageId: v.optional(v.id("_storage")),
+    tags: v.optional(v.array(v.string())),
+    seoDescription: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const { id, ...fields } = args;

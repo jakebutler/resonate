@@ -67,6 +67,10 @@ export default defineSchema({
     isRepost: v.optional(v.boolean()),
     githubPrUrl: v.optional(v.string()),
     publishedAt: v.optional(v.number()),
+    // Full-screen editor fields (all optional for backward compatibility)
+    heroImageId: v.optional(v.id("_storage")),
+    tags: v.optional(v.array(v.string())),
+    seoDescription: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })

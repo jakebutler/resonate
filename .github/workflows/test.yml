@@ -13,9 +13,9 @@ jobs:
     timeout-minutes: 15
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: '22'
           cache: 'npm'
@@ -47,11 +47,24 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     if: github.event_name == 'pull_request'
+    env:
+      # Current Playwright coverage only exercises unauthenticated smoke paths,
+      # so placeholder values are sufficient to boot the production app in CI.
+      NEXT_PUBLIC_CONVEX_URL: https://convex.test
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_Y2xlcmsuYWNjb3VudHMuZGV2JA==
+      CLERK_SECRET_KEY: sk_test_ci_placeholder
+      CLERK_JWT_ISSUER_DOMAIN: https://clerk.test
+      CORTEX_API_KEY: test_key
+      GITHUB_TOKEN: test_token
+      BLOG_REPO_OWNER: test-owner
+      BLOG_REPO_NAME: test-repo
+      BLOG_CONTENT_PATH: content/posts
+      E2E_BYPASS_AUTH: "1"
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: '22'
           cache: 'npm'
@@ -63,14 +76,6 @@ jobs:
 
       - name: Build Next.js
         run: npm run build
-        env:
-          NEXT_PUBLIC_CONVEX_URL: ${{ secrets.NEXT_PUBLIC_CONVEX_URL_TEST }}
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY_TEST }}
-          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY_TEST }}
-          CORTEX_API_KEY: ${{ secrets.CORTEX_API_KEY_TEST }}
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
-          BLOG_REPO_OWNER: ${{ secrets.BLOG_REPO_OWNER }}
-          BLOG_REPO_NAME: ${{ secrets.BLOG_REPO_NAME }}
 
       - name: Run Playwright E2E
         run: npm run test:e2e
