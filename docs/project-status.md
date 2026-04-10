@@ -1,6 +1,6 @@
 # Project Status
 
-Last updated: 04/09/2026 18:50:46 PDT
+Last updated: 04/09/2026 19:02:21 PDT
 
 ## State
 
@@ -16,25 +16,24 @@ Maintain the living documentation and preserve a handoff-quality snapshot of the
 
 ## Last Completed Task
 
-- c19151d fix: stabilize e2e auth bypass and startup
+- e20785e chore: bump github actions to v5
 
 ## Recent Commits
 
+- e20785e chore: bump github actions to v5
 - c19151d fix: stabilize e2e auth bypass and startup
 - 32617d3 fix: flush pending saves before publish
 - 94d50a5 fix: use clerk-valid placeholder key in e2e
 - 2c9a6a9 fix: use placeholder envs for e2e build
-- 81844d0 fix: avoid double-saving tags on enter
 
 ## Local Working Tree
 
--  M .githooks/pre-commit
-- M  .github/workflows/test.yml
+- M  .githooks/pre-commit
+- A  .githooks/pre-commit.local.example
+- M  .gitignore
 -  M package-lock.json
--  M package.json
--  M scripts/update-docs.mjs
-- ?? playwright-report/
-- ?? test-results/
+- M  package.json
+- M  scripts/update-docs.mjs
 
 ## Next Agent Pickup
 

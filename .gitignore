@@ -12,6 +12,8 @@
 
 # testing
 /coverage
+/playwright-report/
+/test-results/
 
 # next.js
 /.next/
@@ -24,6 +26,8 @@
 .DS_Store
 .worktrees/
 *.pem
+.githooks/*.local
+!.githooks/*.local.example
 
 # debug
 npm-debug.log*

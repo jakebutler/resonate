@@ -626,3 +626,30 @@ Append-only session log for repository-level updates. Each documentation refresh
 ### Branch
 
 - feature/fullscreen-editor
+
+## 04/09/2026 19:02:21 PDT
+
+### Summary
+
+- Adjusted commit-time automation for documentation refreshes.
+
+### Staged Changes
+
+- M	.githooks/pre-commit
+- A	.githooks/pre-commit.local.example
+- M	.gitignore
+- M	package.json
+- M	scripts/update-docs.mjs
+
+### Working Tree Snapshot
+
+- M  .githooks/pre-commit
+- A  .githooks/pre-commit.local.example
+- M  .gitignore
+-  M package-lock.json
+- M  package.json
+- M  scripts/update-docs.mjs
+
+### Branch
+
+- feature/fullscreen-editor
