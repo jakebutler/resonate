@@ -1,6 +1,6 @@
 # Project Status
 
-Last updated: 04/09/2026 16:40:14 PDT
+Last updated: 04/09/2026 18:50:46 PDT
 
 ## State
 
@@ -16,15 +16,15 @@ Maintain the living documentation and preserve a handoff-quality snapshot of the
 
 ## Last Completed Task
 
-- 32617d3 fix: flush pending saves before publish
+- c19151d fix: stabilize e2e auth bypass and startup
 
 ## Recent Commits
 
+- c19151d fix: stabilize e2e auth bypass and startup
 - 32617d3 fix: flush pending saves before publish
 - 94d50a5 fix: use clerk-valid placeholder key in e2e
 - 2c9a6a9 fix: use placeholder envs for e2e build
 - 81844d0 fix: avoid double-saving tags on enter
-- 6bb5f5e fix: make article pane independently scrollable
 
 ## Local Working Tree
 
@@ -32,8 +32,6 @@ Maintain the living documentation and preserve a handoff-quality snapshot of the
 - M  .github/workflows/test.yml
 -  M package-lock.json
 -  M package.json
-- M  playwright.config.ts
-- M  proxy.ts
 -  M scripts/update-docs.mjs
 - ?? playwright-report/
 - ?? test-results/
