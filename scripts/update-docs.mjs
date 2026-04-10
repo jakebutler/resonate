@@ -1,22 +1,48 @@
 #!/usr/bin/env node
 
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  closeSync,
+  existsSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  statSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
 import path from "node:path";
 
 const repoRoot = execFileSync("git", ["rev-parse", "--show-toplevel"], {
   cwd: process.cwd(),
   encoding: "utf8",
 }).trim();
+const gitDir = resolveGitDir();
 const docsDir = path.join(repoRoot, "docs");
 const specPath = path.join(docsDir, "spec.md");
 const changelogPath = path.join(docsDir, "changelog.md");
 const projectStatusPath = path.join(docsDir, "project-status.md");
 const promptPath = path.join(repoRoot, ".codex", "prompts", "documentation-subagent.md");
+const managedDocPaths = new Set([specPath, changelogPath, projectStatusPath]);
+const managedDocFiles = new Set(
+  [...managedDocPaths].map((filePath) => path.relative(repoRoot, filePath))
+);
+const lockPath = path.join(gitDir, "resonate-docs-update.lock");
 
-const args = new Set(process.argv.slice(2));
+const rawArgs = process.argv.slice(2);
+const args = new Set(rawArgs);
 const skipAgent = args.has("--skip-agent");
 const skipChangelog = args.has("--skip-changelog");
+const strict = args.has("--strict") || process.env.RESONATE_DOCS_HOOK_STRICT === "1";
+const runContext = process.env.RESONATE_DOCS_CONTEXT ?? "manual";
+const requestedMode = getStringOption(rawArgs, "--mode=") ?? process.env.RESONATE_DOCS_MODE ?? "auto";
+const resolvedMode = resolveMode({
+  requestedMode,
+  skipAgent,
+  runContext,
+});
+const agentTimeoutMs = getNumberOption(rawArgs, "--agent-timeout-ms=", 15000, process.env.RESONATE_DOCS_AGENT_TIMEOUT_MS);
+const staleLockMs = getNumberOption(rawArgs, "--stale-lock-ms=", 10 * 60 * 1000, process.env.RESONATE_DOCS_STALE_LOCK_MS);
 
 mkdirSync(docsDir, { recursive: true });
 
@@ -27,54 +53,73 @@ const recentCommits = splitLines(safeRun(["git", "log", "--oneline", "-5"]));
 const stagedChanges = splitLines(safeRun(["git", "diff", "--cached", "--name-status"]));
 const workingTreeChanges = splitLines(safeRun(["git", "status", "--short"]));
 const changedFiles = getChangedFiles(stagedChanges, workingTreeChanges);
+const skipReason = getSkipReason({
+  runContext,
+  stagedChanges,
+});
 
-if (!existsSync(specPath)) {
-  writeFileSync(
-    specPath,
-    "# Resonate Spec\n\nLast updated: " + now.toISOString().slice(0, 10) + "\n",
-    "utf8"
-  );
+const exitCode = main();
+if (typeof exitCode === "number") {
+  process.exitCode = exitCode;
 }
 
-if (!existsSync(changelogPath)) {
-  writeFileSync(
-    changelogPath,
-    "# Changelog\n\nAppend-only session log for repository-level updates.\n",
-    "utf8"
-  );
-}
+function main() {
+  if (skipReason) {
+    console.log(skipReason);
+    return 0;
+  }
 
-writeFileSync(projectStatusPath, buildProjectStatus({
-  timestamp,
-  branch,
-  recentCommits,
-  workingTreeChanges,
-  changedFiles,
-}), "utf8");
+  if (resolvedMode === "off") {
+    console.log("Documentation refresh disabled by configuration.");
+    return 0;
+  }
 
-const shouldRunAgent = !skipAgent && canRunDocumentationAgent(promptPath);
-const agentSucceeded = shouldRunAgent
-  ? runDocumentationAgent({
-      repoRoot,
-      promptPath,
+  const releaseLock = acquireLock(lockPath, staleLockMs);
+  if (!releaseLock) {
+    return failOrWarn(`Documentation refresh already running; skipping this pass.`, strict);
+  }
+
+  try {
+    ensureDocFiles(now);
+
+    writeFileSync(projectStatusPath, buildProjectStatus({
       timestamp,
       branch,
       recentCommits,
-      stagedChanges,
       workingTreeChanges,
-    })
-  : false;
+      changedFiles,
+    }), "utf8");
 
-if (!skipChangelog && !agentSucceeded) {
-  const existing = readFileSync(changelogPath, "utf8").trimEnd();
-  const appended = `${existing}\n\n${buildChangelogEntry({
-    timestamp,
-    branch,
-    stagedChanges,
-    workingTreeChanges,
-    changedFiles,
-  })}\n`;
-  writeFileSync(changelogPath, appended, "utf8");
+    const shouldRunAgent = resolvedMode === "agent" && canRunDocumentationAgent(promptPath);
+    const agentSucceeded = shouldRunAgent
+      ? runDocumentationAgent({
+          repoRoot,
+          promptPath,
+          timestamp,
+          branch,
+          recentCommits,
+          stagedChanges,
+          workingTreeChanges,
+          agentTimeoutMs,
+        })
+      : false;
+
+    if (!skipChangelog && !agentSucceeded) {
+      const existing = readFileSync(changelogPath, "utf8").trimEnd();
+      const appended = `${existing}\n\n${buildChangelogEntry({
+        timestamp,
+        branch,
+        stagedChanges,
+        workingTreeChanges,
+        changedFiles,
+      })}\n`;
+      writeFileSync(changelogPath, appended, "utf8");
+    }
+
+    return 0;
+  } finally {
+    releaseLock();
+  }
 }
 
 function buildProjectStatus(input) {
@@ -243,6 +288,78 @@ function getChangedFiles(stagedChanges, workingTreeChanges) {
   return [...files];
 }
 
+function getSkipReason(input) {
+  if (process.env.RESONATE_DOCS_HOOK_ACTIVE === "1") {
+    return "Documentation refresh skipped: hook already active in this process tree.";
+  }
+
+  if (input.runContext !== "hook") {
+    return null;
+  }
+
+  if (input.stagedChanges.length === 0 && docsExist()) {
+    return "Documentation refresh skipped: no staged changes detected.";
+  }
+
+  const stagedFiles = getChangedFiles(input.stagedChanges, []);
+  if (stagedFiles.length > 0 && stagedFiles.every((file) => managedDocFiles.has(file)) && docsExist()) {
+    return "Documentation refresh skipped: staged changes only touch managed docs.";
+  }
+
+  return null;
+}
+
+function docsExist() {
+  return [...managedDocPaths].every((filePath) => existsSync(filePath));
+}
+
+function ensureDocFiles(now) {
+  if (!existsSync(specPath)) {
+    writeFileSync(
+      specPath,
+      "# Resonate Spec\n\nLast updated: " + now.toISOString().slice(0, 10) + "\n",
+      "utf8"
+    );
+  }
+
+  if (!existsSync(changelogPath)) {
+    writeFileSync(
+      changelogPath,
+      "# Changelog\n\nAppend-only session log for repository-level updates.\n",
+      "utf8"
+    );
+  }
+}
+
+function resolveMode(input) {
+  const normalized = input.requestedMode.toLowerCase();
+  if (normalized === "baseline" || normalized === "agent" || normalized === "off") {
+    return normalized;
+  }
+
+  if (normalized !== "auto") {
+    console.warn(`Unknown docs update mode "${input.requestedMode}", falling back to auto.`);
+  }
+
+  if (input.skipAgent) {
+    return "baseline";
+  }
+
+  if (input.runContext === "hook") {
+    return "baseline";
+  }
+
+  if (process.env.CI || process.env.CODEX_CI === "1" || process.env.CODEX_THREAD_ID) {
+    return "baseline";
+  }
+
+  if (!process.stdin.isTTY || !process.stdout.isTTY) {
+    return "baseline";
+  }
+
+  return "agent";
+}
+
 function canRunDocumentationAgent(promptFilePath) {
   if (!existsSync(promptFilePath)) {
     console.warn("Documentation prompt not found; keeping baseline documentation update.");
@@ -292,7 +409,16 @@ function runDocumentationAgent(input) {
       "--skip-git-repo-check",
       "--ephemeral",
       prompt,
-    ], { stdio: "inherit" });
+    ], {
+      env: {
+        ...process.env,
+        RESONATE_DOCS_CONTEXT: "agent",
+        RESONATE_DOCS_HOOK_ACTIVE: "1",
+        RESONATE_DOCS_HOOK_SKIP: "1",
+      },
+      stdio: "inherit",
+      timeout: input.agentTimeoutMs,
+    });
     return true;
   } catch (error) {
     console.warn(`Codex documentation subagent failed: ${formatError(error)}`);
@@ -321,6 +447,66 @@ function splitLines(value) {
     .filter(Boolean);
 }
 
+function resolveGitDir() {
+  const gitDirValue = safeRun(["git", "rev-parse", "--git-dir"]).trim();
+  if (!gitDirValue) {
+    return path.join(repoRoot, ".git");
+  }
+
+  return path.isAbsolute(gitDirValue)
+    ? gitDirValue
+    : path.resolve(repoRoot, gitDirValue);
+}
+
+function acquireLock(targetPath, staleMs) {
+  try {
+    const fd = openSync(targetPath, "wx");
+    closeSync(fd);
+    return () => safeUnlink(targetPath);
+  } catch (error) {
+    if (!isAlreadyExistsError(error)) {
+      console.warn(`Unable to create docs refresh lock: ${formatError(error)}`);
+      return null;
+    }
+  }
+
+  try {
+    const ageMs = Date.now() - statSync(targetPath).mtimeMs;
+    if (ageMs > staleMs) {
+      safeUnlink(targetPath);
+      const fd = openSync(targetPath, "wx");
+      closeSync(fd);
+      return () => safeUnlink(targetPath);
+    }
+  } catch (error) {
+    console.warn(`Unable to inspect docs refresh lock: ${formatError(error)}`);
+  }
+
+  return null;
+}
+
+function safeUnlink(targetPath) {
+  try {
+    unlinkSync(targetPath);
+  } catch {
+    // Ignore lock cleanup failures.
+  }
+}
+
+function isAlreadyExistsError(error) {
+  return Boolean(error) && typeof error === "object" && "code" in error && error.code === "EEXIST";
+}
+
+function getStringOption(argv, prefix) {
+  return argv.find((arg) => arg.startsWith(prefix))?.slice(prefix.length) ?? null;
+}
+
+function getNumberOption(argv, prefix, fallback, envValue) {
+  const raw = getStringOption(argv, prefix) ?? envValue ?? "";
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
 function run(command, options = {}) {
   return execFileSync(command[0], command.slice(1), {
     cwd: repoRoot,
@@ -343,4 +529,14 @@ function formatError(error) {
     return error.message;
   }
   return String(error ?? "unknown error");
+}
+
+function failOrWarn(message, shouldFail) {
+  if (shouldFail) {
+    console.error(message);
+    return 1;
+  }
+
+  console.warn(message);
+  return 0;
 }
