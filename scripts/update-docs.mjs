@@ -25,7 +25,9 @@ const projectStatusPath = path.join(docsDir, "project-status.md");
 const promptPath = path.join(repoRoot, ".codex", "prompts", "documentation-subagent.md");
 const managedDocPaths = new Set([specPath, changelogPath, projectStatusPath]);
 const managedDocFiles = new Set(
-  [...managedDocPaths].map((filePath) => path.relative(repoRoot, filePath))
+  [...managedDocPaths].map((filePath) =>
+    normalizeRepoRelativePath(path.relative(repoRoot, filePath))
+  )
 );
 const lockPath = path.join(gitDir, "resonate-docs-update.lock");
 
@@ -282,10 +284,14 @@ function getChangedFiles(stagedChanges, workingTreeChanges) {
     if (!normalized) continue;
     const parts = normalized.split(/\s+/);
     const maybeFile = parts.at(-1);
-    if (maybeFile) files.add(maybeFile);
+    if (maybeFile) files.add(normalizeRepoRelativePath(maybeFile));
   }
 
   return [...files];
+}
+
+function normalizeRepoRelativePath(filePath) {
+  return filePath.replaceAll(path.sep, "/").replaceAll("\\", "/");
 }
 
 function getSkipReason(input) {
