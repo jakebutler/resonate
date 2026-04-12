@@ -12,9 +12,17 @@ vi.mock("@/lib/github", () => ({
   }),
 }))
 
+vi.mock("@/lib/imageAlt", () => ({
+  enrichPublishImageAlts: vi.fn(async ({ coverImageAlt, images }) => ({
+    coverImageAlt,
+    images,
+  })),
+}))
+
 import { POST } from "@/app/api/publish/route"
 import { auth } from "@clerk/nextjs/server"
 import { createBlogPostPR } from "@/lib/github"
+import { enrichPublishImageAlts } from "@/lib/imageAlt"
 
 function makeRequest(body: object): NextRequest {
   return new Request("http://localhost/api/publish", {
@@ -61,15 +69,26 @@ describe("POST /api/publish", () => {
     })
   })
 
-  it("forwards optional heroImageUrl metadata", async () => {
+  it("forwards repo-specific publish metadata", async () => {
     await POST(makeRequest({
       title: "My Post",
       content: "Content here",
       scheduledDate: "2026-05-01",
       status: "scheduled",
-      heroImageUrl: "https://cdn.example.com/hero.jpg",
+      subtitle: "A subtitle",
+      excerpt: "SEO",
+      author: "Jake Butler",
       tags: ["ai"],
-      description: "SEO",
+      category: "strategy",
+      featured: true,
+      coverImageAlt: "A descriptive cover image caption.",
+      images: [
+        {
+          sourceUrl: "https://cdn.example.com/hero.webp",
+          alt: "A descriptive cover image caption.",
+          isCover: true,
+        },
+      ],
     }))
 
     expect(createBlogPostPR).toHaveBeenCalledWith({
@@ -77,9 +96,32 @@ describe("POST /api/publish", () => {
       content: "Content here",
       scheduledDate: "2026-05-01",
       status: "scheduled",
-      heroImage: "https://cdn.example.com/hero.jpg",
+      subtitle: "A subtitle",
+      excerpt: "SEO",
+      author: "Jake Butler",
       tags: ["ai"],
-      description: "SEO",
+      category: "strategy",
+      featured: true,
+      coverImageAlt: "A descriptive cover image caption.",
+      images: [
+        {
+          sourceUrl: "https://cdn.example.com/hero.webp",
+          alt: "A descriptive cover image caption.",
+          isCover: true,
+        },
+      ],
+    })
+    expect(enrichPublishImageAlts).toHaveBeenCalledWith({
+      title: "My Post",
+      excerpt: "SEO",
+      coverImageAlt: "A descriptive cover image caption.",
+      images: [
+        {
+          sourceUrl: "https://cdn.example.com/hero.webp",
+          alt: "A descriptive cover image caption.",
+          isCover: true,
+        },
+      ],
     })
   })
 
@@ -88,9 +130,9 @@ describe("POST /api/publish", () => {
       makeRequest({
         title: "My Post",
         content: "Content here",
-        heroImageUrl: ["https://cdn.example.com/hero.jpg"],
+        images: [{ sourceUrl: 123 }],
         tags: "ai",
-        description: { text: "SEO" },
+        featured: "true",
       })
     )
 

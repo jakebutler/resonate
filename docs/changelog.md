@@ -653,3 +653,57 @@ Append-only session log for repository-level updates. Each documentation refresh
 ### Branch
 
 - feature/fullscreen-editor
+
+## 04/12/2026 01:10:56 PDT
+
+### Summary
+
+- Adjusted commit-time automation for documentation refreshes.
+
+### Staged Changes
+
+- M	.env.local.example
+- M	app/api/publish/__tests__/route.test.ts
+- M	app/api/publish/route.ts
+- M	components/FullScreenEditor/FullScreenEditor.tsx
+- M	components/FullScreenEditor/MetadataBar.tsx
+- M	components/FullScreenEditor/__tests__/MetadataBar.test.tsx
+- M	convex/posts.ts
+- M	convex/schema.ts
+- M	lib/__tests__/github.test.ts
+- A	lib/__tests__/imageAlt.test.ts
+- M	lib/__tests__/imageOptimize.test.ts
+- M	lib/github.ts
+- A	lib/imageAlt.ts
+- M	lib/imageOptimize.ts
+
+### Working Tree Snapshot
+
+- M  .env.local.example
+-  M .github/workflows/test.yml
+-  M README.md
+- M  app/api/publish/__tests__/route.test.ts
+- M  app/api/publish/route.ts
+- MM components/FullScreenEditor/FullScreenEditor.tsx
+- M  components/FullScreenEditor/MetadataBar.tsx
+-  M components/FullScreenEditor/__tests__/FullScreenEditor.test.tsx
+- M  components/FullScreenEditor/__tests__/MetadataBar.test.tsx
+-  M components/ImageTray/ImageTray.tsx
+-  M components/ImageTray/__tests__/ImageTray.test.tsx
+-  M components/TiptapEditor/TiptapEditor.tsx
+-  M components/TiptapEditor/__tests__/TiptapEditor.test.tsx
+- M  convex/posts.ts
+- M  convex/schema.ts
+- M  lib/__tests__/github.test.ts
+- A  lib/__tests__/imageAlt.test.ts
+- M  lib/__tests__/imageOptimize.test.ts
+- M  lib/github.ts
+- A  lib/imageAlt.ts
+- M  lib/imageOptimize.ts
+-  M package-lock.json
+-  M scripts/update-docs.mjs
+- ?? scripts/__tests__/
+
+### Branch
+
+- resonate/zai-alt-text-blog-publish

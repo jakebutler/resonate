@@ -1,6 +1,6 @@
 # Project Status
 
-Last updated: 04/09/2026 19:02:21 PDT
+Last updated: 04/12/2026 01:10:56 PDT
 
 ## State
 
@@ -16,24 +16,42 @@ Maintain the living documentation and preserve a handoff-quality snapshot of the
 
 ## Last Completed Task
 
-- e20785e chore: bump github actions to v5
+- 173a228 chore: harden docs pre-commit workflow
 
 ## Recent Commits
 
+- 173a228 chore: harden docs pre-commit workflow
 - e20785e chore: bump github actions to v5
 - c19151d fix: stabilize e2e auth bypass and startup
 - 32617d3 fix: flush pending saves before publish
 - 94d50a5 fix: use clerk-valid placeholder key in e2e
-- 2c9a6a9 fix: use placeholder envs for e2e build
 
 ## Local Working Tree
 
-- M  .githooks/pre-commit
-- A  .githooks/pre-commit.local.example
-- M  .gitignore
+- M  .env.local.example
+-  M .github/workflows/test.yml
+-  M README.md
+- M  app/api/publish/__tests__/route.test.ts
+- M  app/api/publish/route.ts
+- MM components/FullScreenEditor/FullScreenEditor.tsx
+- M  components/FullScreenEditor/MetadataBar.tsx
+-  M components/FullScreenEditor/__tests__/FullScreenEditor.test.tsx
+- M  components/FullScreenEditor/__tests__/MetadataBar.test.tsx
+-  M components/ImageTray/ImageTray.tsx
+-  M components/ImageTray/__tests__/ImageTray.test.tsx
+-  M components/TiptapEditor/TiptapEditor.tsx
+-  M components/TiptapEditor/__tests__/TiptapEditor.test.tsx
+- M  convex/posts.ts
+- M  convex/schema.ts
+- M  lib/__tests__/github.test.ts
+- A  lib/__tests__/imageAlt.test.ts
+- M  lib/__tests__/imageOptimize.test.ts
+- M  lib/github.ts
+- A  lib/imageAlt.ts
+- M  lib/imageOptimize.ts
 -  M package-lock.json
-- M  package.json
-- M  scripts/update-docs.mjs
+-  M scripts/update-docs.mjs
+- ?? scripts/__tests__/
 
 ## Next Agent Pickup
 
@@ -42,4 +60,4 @@ Maintain the living documentation and preserve a handoff-quality snapshot of the
 
 ## Branch
 
-- feature/fullscreen-editor
+- resonate/zai-alt-text-blog-publish

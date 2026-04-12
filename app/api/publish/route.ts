@@ -1,9 +1,33 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createBlogPostPR } from "@/lib/github";
+import { enrichPublishImageAlts } from "@/lib/imageAlt";
 import { auth } from "@clerk/nextjs/server";
 
 function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((entry) => typeof entry === "string");
+}
+
+function isImageAssetArray(
+  value: unknown
+): value is Array<{ sourceUrl: string; alt?: string; isCover?: boolean }> {
+  return (
+    Array.isArray(value) &&
+    value.every((entry) => {
+      if (!entry || typeof entry !== "object") return false;
+
+      const candidate = entry as {
+        sourceUrl?: unknown;
+        alt?: unknown;
+        isCover?: unknown;
+      };
+
+      return (
+        typeof candidate.sourceUrl === "string" &&
+        (candidate.alt === undefined || typeof candidate.alt === "string") &&
+        (candidate.isCover === undefined || typeof candidate.isCover === "boolean")
+      );
+    })
+  );
 }
 
 export async function POST(req: NextRequest) {
@@ -18,10 +42,14 @@ export async function POST(req: NextRequest) {
     content,
     scheduledDate,
     status,
-    heroImage,
-    heroImageUrl,
+    subtitle,
+    excerpt,
+    author,
     tags,
-    description,
+    category,
+    featured,
+    coverImageAlt,
+    images,
   } = body;
 
   if (!title || !content) {
@@ -29,26 +57,45 @@ export async function POST(req: NextRequest) {
   }
 
   if (
-    (heroImage !== undefined && typeof heroImage !== "string") ||
-    (heroImageUrl !== undefined && typeof heroImageUrl !== "string") ||
+    (subtitle !== undefined && typeof subtitle !== "string") ||
+    (excerpt !== undefined && typeof excerpt !== "string") ||
+    (author !== undefined && typeof author !== "string") ||
     (tags !== undefined && !isStringArray(tags)) ||
-    (description !== undefined && typeof description !== "string")
+    (category !== undefined && typeof category !== "string") ||
+    (featured !== undefined && typeof featured !== "boolean") ||
+    (coverImageAlt !== undefined && typeof coverImageAlt !== "string") ||
+    (images !== undefined && !isImageAssetArray(images))
   ) {
     return NextResponse.json(
-      { error: "Optional publish metadata must be strings or string arrays." },
+      {
+        error:
+          "Optional publish metadata must use strings, booleans, string arrays, and image asset objects.",
+      },
       { status: 400 }
     );
   }
 
   try {
+    const altTextResult = await enrichPublishImageAlts({
+      title,
+      excerpt,
+      coverImageAlt,
+      images,
+    });
+
     const result = await createBlogPostPR({
       title,
       content,
       scheduledDate,
       status,
-      heroImage: heroImageUrl ?? heroImage,
+      subtitle,
+      excerpt,
+      author,
       tags,
-      description,
+      category,
+      featured,
+      coverImageAlt: altTextResult.coverImageAlt ?? coverImageAlt,
+      images: altTextResult.images ?? images,
     });
     return NextResponse.json({ prUrl: result.prUrl, branchName: result.branchName });
   } catch (err) {

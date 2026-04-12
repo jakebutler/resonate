@@ -20,6 +20,8 @@ import { ArrowLeft, PanelRightOpen } from "lucide-react";
 const SIDEBAR_DEFAULT_WIDTH = 380;
 const SIDEBAR_MIN_WIDTH = 280;
 const SIDEBAR_MAX_FRACTION = 0.5; // 50% of viewport
+const DEFAULT_AUTHOR = "Jake Butler";
+const DEFAULT_CATEGORY = "strategy";
 
 type SaveStatus = "idle" | "saving" | "saved" | "error";
 
@@ -35,7 +37,12 @@ type DraftSnapshot = {
   scheduledDate: string;
   scheduledTime: string;
   tags: string[];
-  seoDescription: string;
+  subtitle: string;
+  excerpt: string;
+  author: string;
+  category: string;
+  featured: boolean;
+  coverImageAlt: string;
   fileIds: Id<"_storage">[];
   heroImageId: Id<"_storage"> | null;
 };
@@ -45,7 +52,12 @@ function createDraftSnapshot(
   scheduledDate: string,
   scheduledTime: string,
   tags: string[],
-  seoDescription: string,
+  subtitle: string,
+  excerpt: string,
+  author: string,
+  category: string,
+  featured: boolean,
+  coverImageAlt: string,
   fileIds: Id<"_storage">[],
   heroImageId: Id<"_storage"> | null
 ): DraftSnapshot {
@@ -54,7 +66,12 @@ function createDraftSnapshot(
     scheduledDate,
     scheduledTime,
     tags,
-    seoDescription,
+    subtitle,
+    excerpt,
+    author,
+    category,
+    featured,
+    coverImageAlt,
     fileIds,
     heroImageId,
   };
@@ -151,7 +168,12 @@ export function FullScreenEditor({ postId, initialDate }: FullScreenEditorProps)
   const [scheduledDate, setScheduledDate] = useState(initialDate ?? "");
   const [scheduledTime, setScheduledTime] = useState("10:00");
   const [tags, setTags] = useState<string[]>([]);
-  const [seoDescription, setSeoDescription] = useState("");
+  const [subtitle, setSubtitle] = useState("");
+  const [excerpt, setExcerpt] = useState("");
+  const [author, setAuthor] = useState(DEFAULT_AUTHOR);
+  const [category, setCategory] = useState(DEFAULT_CATEGORY);
+  const [featured, setFeatured] = useState(false);
+  const [coverImageAlt, setCoverImageAlt] = useState("");
   const [githubPrUrl, setGithubPrUrl] = useState("");
   const [publishing, setPublishing] = useState(false);
   const [fileIds, setFileIds] = useState<Id<"_storage">[]>([]);
@@ -185,6 +207,11 @@ export function FullScreenEditor({ postId, initialDate }: FullScreenEditorProps)
       initialDate ?? "",
       "10:00",
       [],
+      "",
+      "",
+      DEFAULT_AUTHOR,
+      DEFAULT_CATEGORY,
+      false,
       "",
       [],
       null
@@ -223,7 +250,12 @@ export function FullScreenEditor({ postId, initialDate }: FullScreenEditorProps)
       setScheduledDate(existing.scheduledDate ?? "");
       setScheduledTime(existing.scheduledTime ?? "10:00");
       setTags(existing.tags ?? []);
-      setSeoDescription(existing.seoDescription ?? "");
+      setSubtitle(existing.subtitle ?? "");
+      setExcerpt(existing.excerpt ?? existing.seoDescription ?? "");
+      setAuthor(existing.author ?? DEFAULT_AUTHOR);
+      setCategory(existing.category ?? DEFAULT_CATEGORY);
+      setFeatured(existing.featured ?? false);
+      setCoverImageAlt(existing.coverImageAlt ?? "");
       setGithubPrUrl(existing.githubPrUrl ?? "");
       setFileIds((existing.fileIds as Id<"_storage">[]) ?? []);
       setHeroImageId((existing.heroImageId as Id<"_storage"> | undefined) ?? null);
@@ -242,11 +274,29 @@ export function FullScreenEditor({ postId, initialDate }: FullScreenEditorProps)
       scheduledDate,
       scheduledTime,
       tags,
-      seoDescription,
+      subtitle,
+      excerpt,
+      author,
+      category,
+      featured,
+      coverImageAlt,
       fileIds,
       heroImageId
     );
-  }, [status, scheduledDate, scheduledTime, tags, seoDescription, fileIds, heroImageId]);
+  }, [
+    status,
+    scheduledDate,
+    scheduledTime,
+    tags,
+    subtitle,
+    excerpt,
+    author,
+    category,
+    featured,
+    coverImageAlt,
+    fileIds,
+    heroImageId,
+  ]);
 
   useEffect(() => {
     if (!htmlContent || Object.keys(imageUrlByFileId).length === 0) return;
@@ -288,7 +338,12 @@ export function FullScreenEditor({ postId, initialDate }: FullScreenEditorProps)
         scheduledDate: draft.scheduledDate || initialDate,
         scheduledTime: draft.scheduledTime,
         tags: draft.tags,
-        seoDescription: draft.seoDescription,
+        subtitle: draft.subtitle,
+        excerpt: draft.excerpt,
+        author: draft.author,
+        category: draft.category,
+        featured: draft.featured,
+        coverImageAlt: draft.coverImageAlt,
         fileIds: draft.fileIds,
         heroImageId: draft.heroImageId ?? undefined,
       })
@@ -330,7 +385,12 @@ export function FullScreenEditor({ postId, initialDate }: FullScreenEditorProps)
               scheduledDate: draft.scheduledDate,
               scheduledTime: draft.scheduledTime,
               tags: draft.tags,
-              seoDescription: draft.seoDescription,
+              subtitle: draft.subtitle,
+              excerpt: draft.excerpt,
+              author: draft.author,
+              category: draft.category,
+              featured: draft.featured,
+              coverImageAlt: draft.coverImageAlt,
               fileIds: draft.fileIds,
               heroImageId: draft.heroImageId ?? undefined,
             });
@@ -427,7 +487,18 @@ export function FullScreenEditor({ postId, initialDate }: FullScreenEditorProps)
     try {
       const persistedPostId = await ensurePersistedPost();
       const markdown = editorRef.current?.getMarkdown() ?? htmlContent;
-      const heroImageUrl = heroImageId ? imageUrlByFileId[heroImageId] : undefined;
+      const publishImages = images.map((image) => {
+        const sourceUrl = imageUrlByFileId[image.fileId];
+        if (!sourceUrl) {
+          throw new Error("Wait for image uploads to finish before publishing.");
+        }
+
+        return {
+          sourceUrl,
+          alt: image.altText,
+          isCover: image.fileId === heroImageId,
+        };
+      });
       const res = await fetch("/api/publish", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -436,9 +507,14 @@ export function FullScreenEditor({ postId, initialDate }: FullScreenEditorProps)
           content: markdown,
           scheduledDate,
           status,
-          heroImageUrl,
+          subtitle: subtitle || undefined,
+          excerpt: excerpt || undefined,
+          author: author || undefined,
           tags: tags.length ? tags : undefined,
-          description: seoDescription || undefined,
+          category: category || undefined,
+          featured,
+          coverImageAlt: coverImageAlt || undefined,
+          images: publishImages,
         }),
       });
       if (!res.ok) throw new Error(await res.text());
@@ -698,12 +774,22 @@ export function FullScreenEditor({ postId, initialDate }: FullScreenEditorProps)
             scheduledDate={scheduledDate}
             scheduledTime={scheduledTime}
             tags={tags}
-            seoDescription={seoDescription}
+            subtitle={subtitle}
+            excerpt={excerpt}
+            author={author}
+            category={category}
+            featured={featured}
+            coverImageAlt={coverImageAlt}
             onStatusChange={(s) => { setStatus(s); scheduleAutoSave(title, htmlContent); }}
             onDateChange={(d) => { setScheduledDate(d); scheduleAutoSave(title, htmlContent); }}
             onTimeChange={(t) => { setScheduledTime(t); scheduleAutoSave(title, htmlContent); }}
             onTagsChange={(t) => { setTags(t); scheduleAutoSave(title, htmlContent); }}
-            onSeoDescriptionChange={(d) => { setSeoDescription(d); scheduleAutoSave(title, htmlContent); }}
+            onSubtitleChange={(value) => { setSubtitle(value); scheduleAutoSave(title, htmlContent); }}
+            onExcerptChange={(value) => { setExcerpt(value); scheduleAutoSave(title, htmlContent); }}
+            onAuthorChange={(value) => { setAuthor(value); scheduleAutoSave(title, htmlContent); }}
+            onCategoryChange={(value) => { setCategory(value); scheduleAutoSave(title, htmlContent); }}
+            onFeaturedChange={(value) => { setFeatured(value); scheduleAutoSave(title, htmlContent); }}
+            onCoverImageAltChange={(value) => { setCoverImageAlt(value); scheduleAutoSave(title, htmlContent); }}
             onPublish={handlePublish}
             publishing={publishing}
             githubPrUrl={githubPrUrl}
