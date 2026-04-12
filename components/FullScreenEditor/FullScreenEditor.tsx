@@ -678,50 +678,52 @@ export function FullScreenEditor({ postId, initialDate }: FullScreenEditorProps)
         {/* Main canvas */}
         <div
           data-testid="editor-main-pane"
-          className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden"
+          className="flex min-h-0 flex-1 flex-col overflow-hidden"
         >
-          {/* Title */}
-          <div className="px-12 pt-8 pb-2 shrink-0">
-            <input
-              type="text"
-              value={title}
-              onChange={handleTitleChange}
-              placeholder="Untitled post"
-              className="w-full text-4xl font-forum text-[#001524] placeholder:text-gray-300 border-none outline-none bg-transparent"
-              aria-label="Post title"
-            />
-          </div>
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            {/* Title */}
+            <div className="px-12 pt-8 pb-2 shrink-0">
+              <input
+                type="text"
+                value={title}
+                onChange={handleTitleChange}
+                placeholder="Untitled post"
+                className="w-full text-4xl font-forum text-[#001524] placeholder:text-gray-300 border-none outline-none bg-transparent"
+                aria-label="Post title"
+              />
+            </div>
 
-          {/* Metadata bar */}
-          <MetadataBar
-            status={status}
-            scheduledDate={scheduledDate}
-            scheduledTime={scheduledTime}
-            tags={tags}
-            seoDescription={seoDescription}
-            onStatusChange={(s) => { setStatus(s); scheduleAutoSave(title, htmlContent); }}
-            onDateChange={(d) => { setScheduledDate(d); scheduleAutoSave(title, htmlContent); }}
-            onTimeChange={(t) => { setScheduledTime(t); scheduleAutoSave(title, htmlContent); }}
-            onTagsChange={(t) => { setTags(t); scheduleAutoSave(title, htmlContent); }}
-            onSeoDescriptionChange={(d) => { setSeoDescription(d); scheduleAutoSave(title, htmlContent); }}
-            onPublish={handlePublish}
-            publishing={publishing}
-            githubPrUrl={githubPrUrl}
-            title={title}
-            hasContent={Boolean(htmlContent)}
-          />
-
-          {/* Tiptap WYSIWYG editor */}
-          <div className="flex-1 px-4">
-            <TiptapEditor
-              ref={editorRef}
-              initialContent={existing?.content ?? ""}
-              onChange={handleContentChange}
-              placeholder="Start writing your post..."
-              onImageInsert={() => fileInputRef.current?.click()}
-              onSelectionChange={handleSelectionChange}
-              onAskAI={handleAskAI}
+            {/* Metadata bar */}
+            <MetadataBar
+              status={status}
+              scheduledDate={scheduledDate}
+              scheduledTime={scheduledTime}
+              tags={tags}
+              seoDescription={seoDescription}
+              onStatusChange={(s) => { setStatus(s); scheduleAutoSave(title, htmlContent); }}
+              onDateChange={(d) => { setScheduledDate(d); scheduleAutoSave(title, htmlContent); }}
+              onTimeChange={(t) => { setScheduledTime(t); scheduleAutoSave(title, htmlContent); }}
+              onTagsChange={(t) => { setTags(t); scheduleAutoSave(title, htmlContent); }}
+              onSeoDescriptionChange={(d) => { setSeoDescription(d); scheduleAutoSave(title, htmlContent); }}
+              onPublish={handlePublish}
+              publishing={publishing}
+              githubPrUrl={githubPrUrl}
+              title={title}
+              hasContent={Boolean(htmlContent)}
             />
+
+            {/* Tiptap WYSIWYG editor */}
+            <div className="flex min-h-0 flex-1 flex-col px-4">
+              <TiptapEditor
+                ref={editorRef}
+                initialContent={existing?.content ?? ""}
+                onChange={handleContentChange}
+                placeholder="Start writing your post..."
+                onImageInsert={() => fileInputRef.current?.click()}
+                onSelectionChange={handleSelectionChange}
+                onAskAI={handleAskAI}
+              />
+            </div>
           </div>
 
           <ImageTray

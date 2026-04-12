@@ -240,10 +240,17 @@ describe('FullScreenEditor', () => {
     expect(screen.getByTestId('tiptap-editor')).toBeInTheDocument()
   })
 
-  it('uses the main article pane as the scroll container', () => {
+  it('keeps the image tray outside the main pane scroll region', () => {
     render(<FullScreenEditor postId="new" />)
 
-    expect(screen.getByTestId('editor-main-pane')).toHaveClass('overflow-y-auto')
+    expect(screen.getByTestId('editor-main-pane')).toHaveClass('overflow-hidden')
+    expect(screen.getByTestId('tiptap-editor').parentElement?.parentElement).toHaveClass(
+      'flex',
+      'flex-col',
+      'min-h-0',
+      'flex-1'
+    )
+    expect(screen.getByRole('button', { name: /images \(0\)/i })).toBeInTheDocument()
   })
 
   it('renders a save status indicator', () => {
