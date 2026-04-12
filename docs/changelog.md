@@ -248,6 +248,65 @@ Append-only session log for repository-level updates. Each documentation refresh
 
 - feature/fullscreen-editor
 
+## 04/12/2026 00:12:04 PDT
+
+### Summary
+
+- Refreshed the living docs against branch `fix/pinned-image-tray-touch-hero` and the current editor/image-tray working set.
+- Kept `docs/spec.md` high-level while calling out that the image tray now stays outside the main editor scroll region and keeps hero/remove controls visible on touch devices.
+- Replaced the handoff doc with the latest pickup guidance for the dirty fullscreen-editor/image-tray worktree and recorded targeted test coverage status.
+
+### Staged Changes
+
+- M	components/FullScreenEditor/FullScreenEditor.tsx
+- M	components/FullScreenEditor/__tests__/FullScreenEditor.test.tsx
+- M	components/ImageTray/ImageTray.tsx
+- M	components/ImageTray/__tests__/ImageTray.test.tsx
+
+### Working Tree Snapshot
+
+- M  components/FullScreenEditor/FullScreenEditor.tsx
+- M  components/FullScreenEditor/__tests__/FullScreenEditor.test.tsx
+- M  components/ImageTray/ImageTray.tsx
+- M  components/ImageTray/__tests__/ImageTray.test.tsx
+- M  docs/changelog.md
+- M  docs/project-status.md
+- M  docs/spec.md
+
+### Branch
+
+- fix/pinned-image-tray-touch-hero
+
+## 04/11/2026 23:52:40 PDT
+
+### Summary
+
+- Refreshed the living docs against the current `fix/pinned-image-tray-touch-hero` working tree.
+- Kept `docs/spec.md` high-level while documenting the pinned image tray layout and the touch-device behavior that keeps hero/remove controls available without hover.
+- Replaced the project handoff with the current editor/image-tray pickup notes instead of the earlier fullscreen-editor launch snapshot.
+
+### Staged Changes
+
+- M	components/FullScreenEditor/FullScreenEditor.tsx
+- M	components/FullScreenEditor/__tests__/FullScreenEditor.test.tsx
+- M	components/ImageTray/ImageTray.tsx
+- M	components/ImageTray/__tests__/ImageTray.test.tsx
+- M	components/TiptapEditor/TiptapEditor.tsx
+- M	components/TiptapEditor/__tests__/TiptapEditor.test.tsx
+
+### Working Tree Snapshot
+
+- M  components/FullScreenEditor/FullScreenEditor.tsx
+- M  components/FullScreenEditor/__tests__/FullScreenEditor.test.tsx
+- M  components/ImageTray/ImageTray.tsx
+- M  components/ImageTray/__tests__/ImageTray.test.tsx
+- M  components/TiptapEditor/TiptapEditor.tsx
+- M  components/TiptapEditor/__tests__/TiptapEditor.test.tsx
+
+### Branch
+
+- fix/pinned-image-tray-touch-hero
+
 ## 04/09/2026 08:55:59 PDT
 
 ### Summary

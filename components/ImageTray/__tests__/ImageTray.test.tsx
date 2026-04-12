@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { ImageTray } from '@/components/ImageTray/ImageTray'
 
@@ -7,7 +7,31 @@ const mockImages = [
   { fileId: 'file-2', url: 'https://example.com/img2.jpg', altText: 'Alt text' },
 ]
 
+function mockMatchMedia(matches: boolean) {
+  const addEventListener = vi.fn()
+  const removeEventListener = vi.fn()
+
+  vi.stubGlobal('matchMedia', vi.fn().mockImplementation(() => ({
+    matches,
+    media: '(hover: none), (pointer: coarse)',
+    onchange: null,
+    addEventListener,
+    removeEventListener,
+    addListener: addEventListener,
+    removeListener: removeEventListener,
+    dispatchEvent: vi.fn(),
+  })))
+}
+
 describe('ImageTray', () => {
+  beforeEach(() => {
+    mockMatchMedia(false)
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
   // ── BEHAVIOR 1: collapsed by default ────────────────────────────────────
   it('shows a toggle button with image count', () => {
     render(
@@ -80,6 +104,7 @@ describe('ImageTray', () => {
       />
     )
     fireEvent.click(screen.getByRole('button', { name: /images \(2\)/i }))
+    expect(screen.getByTestId('image-controls-file-1')).toHaveClass('group-focus-within:opacity-100')
     fireEvent.click(screen.getByTestId('hero-btn-file-1'))
     expect(onHeroChange).toHaveBeenCalledWith('file-1')
   })
@@ -147,5 +172,24 @@ describe('ImageTray', () => {
     )
     fireEvent.click(screen.getByRole('button', { name: /images \(0\)/i }))
     expect(screen.getByText(/no images/i)).toBeInTheDocument()
+  })
+
+  it('keeps hero controls visible on touch devices', () => {
+    mockMatchMedia(true)
+
+    render(
+      <ImageTray
+        images={mockImages}
+        heroFileId={null}
+        onHeroChange={vi.fn()}
+        onRemove={vi.fn()}
+        onScrollToImage={vi.fn()}
+      />
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /images \(2\)/i }))
+
+    expect(screen.getByTestId('image-controls-file-1')).toHaveClass('opacity-100')
+    expect(screen.getByTestId('hero-btn-file-1')).toBeVisible()
   })
 })

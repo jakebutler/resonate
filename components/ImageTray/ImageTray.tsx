@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Star, Trash2, ChevronUp, ImageOff } from "lucide-react";
 
 export interface ImageEntry {
@@ -25,9 +25,35 @@ export function ImageTray({
   onScrollToImage,
 }: ImageTrayProps) {
   const [open, setOpen] = useState(false);
+  const [showPersistentControls, setShowPersistentControls] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+      return;
+    }
+
+    const mediaQuery = window.matchMedia("(hover: none), (pointer: coarse)");
+    const updateControls = (matches: boolean) => {
+      setShowPersistentControls(matches);
+    };
+
+    updateControls(mediaQuery.matches);
+
+    const handleChange = (event: MediaQueryListEvent) => {
+      updateControls(event.matches);
+    };
+
+    if (typeof mediaQuery.addEventListener === "function") {
+      mediaQuery.addEventListener("change", handleChange);
+      return () => mediaQuery.removeEventListener("change", handleChange);
+    }
+
+    mediaQuery.addListener(handleChange);
+    return () => mediaQuery.removeListener(handleChange);
+  }, []);
 
   return (
-    <div className="border-t border-gray-100 shrink-0">
+    <div className="border-t border-gray-100 bg-white shadow-[0_-8px_20px_rgba(0,21,36,0.04)] shrink-0">
       {/* Toggle button */}
       <button
         type="button"
@@ -74,7 +100,14 @@ export function ImageTray({
                     />
 
                     {/* Overlay controls (visible on hover) */}
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
+                    <div
+                      data-testid={`image-controls-${img.fileId}`}
+                      className={`absolute inset-0 bg-black/40 transition-opacity flex items-center justify-center gap-1 ${
+                        showPersistentControls
+                          ? "opacity-100"
+                          : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
+                      }`}
+                    >
                       {/* Hero / star button */}
                       <button
                         type="button"
@@ -87,7 +120,9 @@ export function ImageTray({
                         className={`p-1 rounded-full transition-colors ${
                           isHero
                             ? "bg-[#ff7d00] text-white"
-                            : "bg-white/20 text-white hover:bg-[#ff7d00]"
+                            : `text-white hover:bg-[#ff7d00] ${
+                                showPersistentControls ? "bg-black/45" : "bg-white/20"
+                              }`
                         }`}
                       >
                         <Star size={12} fill={isHero ? "currentColor" : "none"} />
@@ -102,7 +137,9 @@ export function ImageTray({
                           onRemove(img.fileId);
                         }}
                         aria-label="Remove image"
-                        className="p-1 rounded-full bg-white/20 text-white hover:bg-red-500 transition-colors"
+                        className={`p-1 rounded-full text-white hover:bg-red-500 transition-colors ${
+                          showPersistentControls ? "bg-black/45" : "bg-white/20"
+                        }`}
                       >
                         <Trash2 size={12} />
                       </button>
