@@ -1,53 +1,48 @@
 # Project Status
 
-Last updated: 04/12/2026 00:12:04 PDT
+Last updated: 04/12/2026 00:34:00 PDT
 
 ## State
 
-Resonate is running with the newer fullscreen blog editor layered on top of the older dashboard and workflow surfaces. The active branch is focused on editor image-tray usability rather than a broader product change.
+Resonate is running with the newer fullscreen blog editor layered on top of the older dashboard and workflow surfaces. This branch is focused on hardening the docs refresh workflow rather than changing product behavior.
 
 ## Current Task
 
-The living docs were refreshed to match branch `fix/pinned-image-tray-touch-hero` and the current dirty worktree.
+Bring the docs-hook follow-up branch current with `main` and close the remaining parser and lock-handling edge cases in `scripts/update-docs.mjs`.
 
 ## Last Completed Task
 
-- `493487c` `fix: pin image tray and expose hero control on touch`
+- `5f1cfd7` `fix: harden docs hook change parsing`
 
 ## Verified In This Session
 
-- `components/ImageTray/__tests__/ImageTray.test.tsx`
-- `components/FullScreenEditor/__tests__/FullScreenEditor.test.tsx`
-- Result: 31 tests passed via `npm test -- --run components/ImageTray/__tests__/ImageTray.test.tsx components/FullScreenEditor/__tests__/FullScreenEditor.test.tsx`
+- `scripts/__tests__/update-docs.test.ts`
+- Result: 5 tests passed via `npx vitest run scripts/__tests__/update-docs.test.ts`
 
 ## Local Working Tree
 
-- M `components/FullScreenEditor/FullScreenEditor.tsx`
-- M `components/FullScreenEditor/__tests__/FullScreenEditor.test.tsx`
-- M `components/ImageTray/ImageTray.tsx`
-- M `components/ImageTray/__tests__/ImageTray.test.tsx`
+- Working tree is clean.
 
 ## Non-Obvious Current Behavior
 
-- The image tray is rendered outside the main editor scroll container, so it stays reachable while long post content scrolls.
-- Hero-image selection still lives only in the image tray. There is no duplicate control in the metadata bar.
-- Tray controls are input-aware: hover devices reveal actions on hover, while touch or coarse-pointer devices keep them visible.
-- Removing an image updates both the stored `fileIds` metadata and the editor HTML. Clearing the active hero happens implicitly if that image is removed.
+- Changed-file detection now consumes NUL-delimited git output so paths with spaces and rename/copy records are handled correctly.
+- Docs refresh locks are ownership-aware: only the process that created the lock can release it.
+- Empty or malformed stale lock files are reclaimed based on file age, so they no longer block docs updates indefinitely.
 
 ## Next Agent Pickup
 
-- Start from the four dirty editor/image-tray files, not from commit `493487c` alone. The branch already has the pinned-tray and touch-control behavior in history, but the worktree still contains uncommitted edits in the same area.
-- If you change image handling again, keep the cross-file contract aligned: `FullScreenEditor` owns HTML and metadata updates, while `ImageTray` is only the tray UI plus input-mode behavior.
-- Re-run the two targeted Vitest files after any further tray/editor change.
+- If this branch moves again before merge, re-run `scripts/__tests__/update-docs.test.ts` after any change to `scripts/update-docs.mjs`.
+- If `main` advances again, prefer merging `origin/main` into this branch instead of rebasing so the PR history stays stable.
+- Keep the lock ownership check and stale-lock recovery coupled; relaxing one without the other will reintroduce either false unlocks or permanent stale locks.
 
 ## Recent Commits
 
+- `5f1cfd7` `fix: harden docs hook change parsing`
+- `ef739d8` `fix: scope docs lock cleanup to lock owner`
+- `dc0b836` `fix: harden docs hook path handling`
+- `c898b04` `chore: harden docs pre-commit workflow`
 - `493487c` `fix: pin image tray and expose hero control on touch`
-- `ea0f959` `feat: Full-screen blog post editor with Tiptap WYSIWYG (#32)`
-- `160be4a` `fix: harden prod auth wiring`
-- `0a744a3` `docs: add living documentation workflow`
-- `f93c209` `Fix brittle editor test dates`
 
 ## Branch
 
-- `fix/pinned-image-tray-touch-hero`
+- `chore/docs-hook-followup`
