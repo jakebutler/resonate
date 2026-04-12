@@ -1,6 +1,6 @@
 # Resonate Spec
 
-Last updated: 2026-04-09
+Last updated: 2026-04-11
 
 ## Purpose
 
@@ -139,12 +139,17 @@ These power the kanban workflow.
   - the editor inserts an immediate blob preview for responsiveness
   - later, a query-driven replacement pass swaps blob URLs for resolved storage URLs in the HTML
   - the image tray is derived from the current HTML plus stored `fileIds`, so removal must update both the document and metadata
+  - the image tray is pinned below the main editor scroll region, so thumbnails stay reachable while long posts scroll
 - Client-side image optimization happens before upload:
   - only common image MIME types are accepted
   - files over 10MB are rejected client-side
   - wide images are resized to 2000px max width before upload
   - JPEG stays JPEG, WebP stays WebP, and GIF uploads are re-encoded as PNG
 - The image tray is currently the hero-image picker. There is no separate metadata control for hero selection.
+- The tray thumbnail controls are input-aware:
+  - pointer/hover devices reveal hero and remove actions on hover
+  - touch/coarse-pointer devices keep those actions visible without hover
+- Clicking a tray thumbnail scrolls to the matching in-document image, while clicking the active star again clears the hero image.
 - The AI rewrite path is selection-based and optimistic:
   - Tiptap emits selection range plus text
   - the floating "Ask AI" button opens and focuses the sidebar

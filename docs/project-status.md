@@ -1,6 +1,6 @@
 # Project Status
 
-Last updated: 04/09/2026 18:50:46 PDT
+Last updated: 04/11/2026 23:54:31 PDT
 
 ## State
 
@@ -12,29 +12,31 @@ Maintain the living documentation and preserve a handoff-quality snapshot of the
 
 ## Session Focus
 
-- Adjusted commit-time automation for documentation refreshes.
+- Updated repository documentation and handoff records.
 
 ## Last Completed Task
 
-- c19151d fix: stabilize e2e auth bypass and startup
+- ea0f959 feat: Full-screen blog post editor with Tiptap WYSIWYG (#32)
 
 ## Recent Commits
 
-- c19151d fix: stabilize e2e auth bypass and startup
-- 32617d3 fix: flush pending saves before publish
-- 94d50a5 fix: use clerk-valid placeholder key in e2e
-- 2c9a6a9 fix: use placeholder envs for e2e build
-- 81844d0 fix: avoid double-saving tags on enter
+- ea0f959 feat: Full-screen blog post editor with Tiptap WYSIWYG (#32)
+- 160be4a fix: harden prod auth wiring
+- 0a744a3 docs: add living documentation workflow
+- f93c209 Fix brittle editor test dates
+- 1b0c676 Merge branch 'codex/inspiration-ideas'
 
 ## Local Working Tree
 
--  M .githooks/pre-commit
-- M  .github/workflows/test.yml
--  M package-lock.json
--  M package.json
--  M scripts/update-docs.mjs
-- ?? playwright-report/
-- ?? test-results/
+- M  components/FullScreenEditor/FullScreenEditor.tsx
+- M  components/FullScreenEditor/__tests__/FullScreenEditor.test.tsx
+- M  components/ImageTray/ImageTray.tsx
+- M  components/ImageTray/__tests__/ImageTray.test.tsx
+- M  components/TiptapEditor/TiptapEditor.tsx
+- M  components/TiptapEditor/__tests__/TiptapEditor.test.tsx
+-  M docs/changelog.md
+-  M docs/project-status.md
+-  M docs/spec.md
 
 ## Next Agent Pickup
 
@@ -43,4 +45,4 @@ Maintain the living documentation and preserve a handoff-quality snapshot of the
 
 ## Branch
 
-- feature/fullscreen-editor
+- fix/pinned-image-tray-touch-hero
