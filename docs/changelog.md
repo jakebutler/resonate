@@ -626,3 +626,23 @@ Append-only session log for repository-level updates. Each documentation refresh
 ### Branch
 
 - feature/fullscreen-editor
+
+## 04/12/2026 00:30:34 PDT
+
+### Summary
+
+- Adjusted commit-time automation for documentation refreshes.
+
+### Staged Changes
+
+- A	scripts/__tests__/update-docs.test.ts
+- M	scripts/update-docs.mjs
+
+### Working Tree Snapshot
+
+- A  scripts/__tests__/update-docs.test.ts
+- M  scripts/update-docs.mjs
+
+### Branch
+
+- chore/docs-hook-followup

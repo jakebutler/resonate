@@ -1,6 +1,6 @@
 # Project Status
 
-Last updated: 04/09/2026 18:50:46 PDT
+Last updated: 04/12/2026 00:30:34 PDT
 
 ## State
 
@@ -16,25 +16,20 @@ Maintain the living documentation and preserve a handoff-quality snapshot of the
 
 ## Last Completed Task
 
-- c19151d fix: stabilize e2e auth bypass and startup
+- ef739d8 fix: scope docs lock cleanup to lock owner
 
 ## Recent Commits
 
-- c19151d fix: stabilize e2e auth bypass and startup
-- 32617d3 fix: flush pending saves before publish
-- 94d50a5 fix: use clerk-valid placeholder key in e2e
-- 2c9a6a9 fix: use placeholder envs for e2e build
-- 81844d0 fix: avoid double-saving tags on enter
+- ef739d8 fix: scope docs lock cleanup to lock owner
+- dc0b836 fix: harden docs hook path handling
+- c898b04 chore: harden docs pre-commit workflow
+- ea0f959 feat: Full-screen blog post editor with Tiptap WYSIWYG (#32)
+- 160be4a fix: harden prod auth wiring
 
 ## Local Working Tree
 
--  M .githooks/pre-commit
-- M  .github/workflows/test.yml
--  M package-lock.json
--  M package.json
--  M scripts/update-docs.mjs
-- ?? playwright-report/
-- ?? test-results/
+- A  scripts/__tests__/update-docs.test.ts
+- M  scripts/update-docs.mjs
 
 ## Next Agent Pickup
 
@@ -43,4 +38,4 @@ Maintain the living documentation and preserve a handoff-quality snapshot of the
 
 ## Branch
 
-- feature/fullscreen-editor
+- chore/docs-hook-followup
