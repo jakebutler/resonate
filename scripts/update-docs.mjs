@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { execFileSync } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import {
   closeSync,
   existsSync,
@@ -465,10 +466,11 @@ function resolveGitDir() {
 }
 
 function acquireLock(targetPath, staleMs) {
+  const ownerId = createLockOwnerId();
+
   try {
-    const fd = openSync(targetPath, "wx");
-    closeSync(fd);
-    return () => safeUnlink(targetPath);
+    writeLockFile(targetPath, ownerId);
+    return () => releaseLock(targetPath, ownerId);
   } catch (error) {
     if (!isAlreadyExistsError(error)) {
       console.warn(`Unable to create docs refresh lock: ${formatError(error)}`);
@@ -477,12 +479,14 @@ function acquireLock(targetPath, staleMs) {
   }
 
   try {
-    const ageMs = Date.now() - statSync(targetPath).mtimeMs;
-    if (ageMs > staleMs) {
-      safeUnlink(targetPath);
-      const fd = openSync(targetPath, "wx");
-      closeSync(fd);
-      return () => safeUnlink(targetPath);
+    const existingLock = readLockFile(targetPath);
+    if (existingLock && Date.now() - existingLock.mtimeMs > staleMs) {
+      if (!releaseLock(targetPath, existingLock.ownerId)) {
+        return null;
+      }
+
+      writeLockFile(targetPath, ownerId);
+      return () => releaseLock(targetPath, ownerId);
     }
   } catch (error) {
     console.warn(`Unable to inspect docs refresh lock: ${formatError(error)}`);
@@ -491,11 +495,50 @@ function acquireLock(targetPath, staleMs) {
   return null;
 }
 
-function safeUnlink(targetPath) {
+function createLockOwnerId() {
+  return `${process.pid}:${randomUUID()}`;
+}
+
+function writeLockFile(targetPath, ownerId) {
+  const fd = openSync(targetPath, "wx");
   try {
+    writeFileSync(fd, `${ownerId}\n`, "utf8");
+  } catch (error) {
+    closeSync(fd);
+    throw error;
+  }
+
+  closeSync(fd);
+}
+
+function readLockFile(targetPath) {
+  if (!existsSync(targetPath)) {
+    return null;
+  }
+
+  const ownerId = readFileSync(targetPath, "utf8").trim();
+  if (!ownerId) {
+    return null;
+  }
+
+  return {
+    ownerId,
+    mtimeMs: statSync(targetPath).mtimeMs,
+  };
+}
+
+function releaseLock(targetPath, ownerId) {
+  try {
+    const existingLock = readLockFile(targetPath);
+    if (!existingLock || existingLock.ownerId !== ownerId) {
+      return false;
+    }
+
     unlinkSync(targetPath);
+    return true;
   } catch {
     // Ignore lock cleanup failures.
+    return false;
   }
 }
 
