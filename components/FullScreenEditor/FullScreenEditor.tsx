@@ -713,7 +713,7 @@ export function FullScreenEditor({ postId, initialDate }: FullScreenEditorProps)
             />
 
             {/* Tiptap WYSIWYG editor */}
-            <div className="min-h-0 flex-1 px-4">
+            <div className="flex min-h-0 flex-1 flex-col px-4">
               <TiptapEditor
                 ref={editorRef}
                 initialContent={existing?.content ?? ""}

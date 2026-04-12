@@ -1,48 +1,53 @@
 # Project Status
 
-Last updated: 04/11/2026 23:54:31 PDT
+Last updated: 04/12/2026 00:12:04 PDT
 
 ## State
 
-Resonate is a working content operations app with active surfaces for calendar planning, content editing, workflow review, and idea capture.
+Resonate is running with the newer fullscreen blog editor layered on top of the older dashboard and workflow surfaces. The active branch is focused on editor image-tray usability rather than a broader product change.
 
 ## Current Task
 
-Maintain the living documentation and preserve a handoff-quality snapshot of the repo state.
-
-## Session Focus
-
-- Updated repository documentation and handoff records.
+The living docs were refreshed to match branch `fix/pinned-image-tray-touch-hero` and the current dirty worktree.
 
 ## Last Completed Task
 
-- ea0f959 feat: Full-screen blog post editor with Tiptap WYSIWYG (#32)
+- `493487c` `fix: pin image tray and expose hero control on touch`
 
-## Recent Commits
+## Verified In This Session
 
-- ea0f959 feat: Full-screen blog post editor with Tiptap WYSIWYG (#32)
-- 160be4a fix: harden prod auth wiring
-- 0a744a3 docs: add living documentation workflow
-- f93c209 Fix brittle editor test dates
-- 1b0c676 Merge branch 'codex/inspiration-ideas'
+- `components/ImageTray/__tests__/ImageTray.test.tsx`
+- `components/FullScreenEditor/__tests__/FullScreenEditor.test.tsx`
+- Result: 31 tests passed via `npm test -- --run components/ImageTray/__tests__/ImageTray.test.tsx components/FullScreenEditor/__tests__/FullScreenEditor.test.tsx`
 
 ## Local Working Tree
 
-- M  components/FullScreenEditor/FullScreenEditor.tsx
-- M  components/FullScreenEditor/__tests__/FullScreenEditor.test.tsx
-- M  components/ImageTray/ImageTray.tsx
-- M  components/ImageTray/__tests__/ImageTray.test.tsx
-- M  components/TiptapEditor/TiptapEditor.tsx
-- M  components/TiptapEditor/__tests__/TiptapEditor.test.tsx
--  M docs/changelog.md
--  M docs/project-status.md
--  M docs/spec.md
+- M `components/FullScreenEditor/FullScreenEditor.tsx`
+- M `components/FullScreenEditor/__tests__/FullScreenEditor.test.tsx`
+- M `components/ImageTray/ImageTray.tsx`
+- M `components/ImageTray/__tests__/ImageTray.test.tsx`
+
+## Non-Obvious Current Behavior
+
+- The image tray is rendered outside the main editor scroll container, so it stays reachable while long post content scrolls.
+- Hero-image selection still lives only in the image tray. There is no duplicate control in the metadata bar.
+- Tray controls are input-aware: hover devices reveal actions on hover, while touch or coarse-pointer devices keep them visible.
+- Removing an image updates both the stored `fileIds` metadata and the editor HTML. Clearing the active hero happens implicitly if that image is removed.
 
 ## Next Agent Pickup
 
-- Start by checking the living docs against the current code before making assumptions.
-- If the working set includes product changes, keep `docs/spec.md`, `docs/changelog.md`, and `docs/project-status.md` aligned in the same session.
+- Start from the four dirty editor/image-tray files, not from commit `493487c` alone. The branch already has the pinned-tray and touch-control behavior in history, but the worktree still contains uncommitted edits in the same area.
+- If you change image handling again, keep the cross-file contract aligned: `FullScreenEditor` owns HTML and metadata updates, while `ImageTray` is only the tray UI plus input-mode behavior.
+- Re-run the two targeted Vitest files after any further tray/editor change.
+
+## Recent Commits
+
+- `493487c` `fix: pin image tray and expose hero control on touch`
+- `ea0f959` `feat: Full-screen blog post editor with Tiptap WYSIWYG (#32)`
+- `160be4a` `fix: harden prod auth wiring`
+- `0a744a3` `docs: add living documentation workflow`
+- `f93c209` `Fix brittle editor test dates`
 
 ## Branch
 
-- fix/pinned-image-tray-touch-hero
+- `fix/pinned-image-tray-touch-hero`

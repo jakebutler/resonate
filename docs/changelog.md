@@ -248,6 +248,35 @@ Append-only session log for repository-level updates. Each documentation refresh
 
 - feature/fullscreen-editor
 
+## 04/12/2026 00:12:04 PDT
+
+### Summary
+
+- Refreshed the living docs against branch `fix/pinned-image-tray-touch-hero` and the current editor/image-tray working set.
+- Kept `docs/spec.md` high-level while calling out that the image tray now stays outside the main editor scroll region and keeps hero/remove controls visible on touch devices.
+- Replaced the handoff doc with the latest pickup guidance for the dirty fullscreen-editor/image-tray worktree and recorded targeted test coverage status.
+
+### Staged Changes
+
+- M	components/FullScreenEditor/FullScreenEditor.tsx
+- M	components/FullScreenEditor/__tests__/FullScreenEditor.test.tsx
+- M	components/ImageTray/ImageTray.tsx
+- M	components/ImageTray/__tests__/ImageTray.test.tsx
+
+### Working Tree Snapshot
+
+- M  components/FullScreenEditor/FullScreenEditor.tsx
+- M  components/FullScreenEditor/__tests__/FullScreenEditor.test.tsx
+- M  components/ImageTray/ImageTray.tsx
+- M  components/ImageTray/__tests__/ImageTray.test.tsx
+- M  docs/changelog.md
+- M  docs/project-status.md
+- M  docs/spec.md
+
+### Branch
+
+- fix/pinned-image-tray-touch-hero
+
 ## 04/11/2026 23:52:40 PDT
 
 ### Summary
