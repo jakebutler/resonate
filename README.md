@@ -107,7 +107,8 @@ resonate/
 1. Push to GitHub
 2. Connect to Vercel or your preferred hosting
 3. Set environment variables in your deployment platform
-4. Deploy
+4. Add GitHub Actions secrets `CONVEX_DEPLOY_KEY` and `CLERK_JWT_ISSUER_DOMAIN` so Convex production deploys automatically on `main` when `convex/` changes
+5. Deploy
 
 ## License
 
