@@ -4,8 +4,6 @@ const REPO_NAME = process.env.BLOG_REPO_NAME!;
 const BLOG_APP_ROOT = process.env.BLOG_APP_ROOT || "corvo-labs-enhanced";
 const CONTENT_PATH =
   process.env.BLOG_CONTENT_PATH || `${BLOG_APP_ROOT}/content/blog`;
-const IMAGE_PATH =
-  process.env.BLOG_PUBLIC_IMAGE_PATH || `${BLOG_APP_ROOT}/public/images/blog`;
 const DEFAULT_AUTHOR = process.env.BLOG_POST_AUTHOR?.trim() || "Jake Butler";
 const DEFAULT_CATEGORY = process.env.BLOG_DEFAULT_CATEGORY?.trim() || "strategy";
 
@@ -15,14 +13,18 @@ export interface PublishImageAsset {
   isCover?: boolean;
 }
 
-interface PreparedImageAsset {
-  alt: string;
-  content: string;
-  fileName: string;
-  filePath: string;
-  isCover: boolean;
-  localUrl: string;
-  sourceUrl: string;
+export class BlogPostContractError extends Error {
+  readonly issues: string[];
+
+  constructor(issues: string[]) {
+    super(
+      `Blog post fails the corvo-labs-dot-com MDX contract:\n- ${issues.join(
+        "\n- "
+      )}`
+    );
+    this.name = "BlogPostContractError";
+    this.issues = issues;
+  }
 }
 
 function slugify(title: string): string {
@@ -36,6 +38,10 @@ function escapeYamlString(value: string): string {
   return value.replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/"/g, '\\"');
 }
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function clampText(value: string, maxLength: number): string {
   const normalized = value.replace(/\s+/g, " ").trim();
   if (normalized.length <= maxLength) return normalized;
@@ -47,7 +53,6 @@ function stripMarkdown(markdown: string): string {
     .replace(/```[\s\S]*?```/g, " ")
     .replace(/`[^`]*`/g, " ")
     .replace(/!\[[^\]]*]\([^)]*\)/g, " ")
-    .replace(/<BlogImage[\s\S]*?\/>/g, " ")
     .replace(/<[^>]+>/g, " ")
     .replace(/\[([^\]]+)]\([^)]*\)/g, "$1")
     .replace(/^[#>\-\*\d.\s]+/gm, " ")
@@ -62,9 +67,11 @@ function estimateReadTime(markdown: string): string {
   return `${minutes} min read`;
 }
 
-function buildExcerpt(markdown: string, explicitExcerpt?: string): string {
-  if (explicitExcerpt?.trim()) {
-    return clampText(explicitExcerpt, 180);
+// Corvo aliases `description` to `excerpt`, but <=160 chars keeps the value
+// viable as the <meta name="description"> too. Keep a small safety margin.
+function buildDescription(markdown: string, explicit?: string): string {
+  if (explicit?.trim()) {
+    return clampText(explicit, 160);
   }
 
   const firstParagraph = markdown
@@ -72,130 +79,216 @@ function buildExcerpt(markdown: string, explicitExcerpt?: string): string {
     .map((chunk) => stripMarkdown(chunk))
     .find(Boolean);
 
-  return clampText(firstParagraph || "Published via Resonate.", 180);
+  return clampText(firstParagraph || "Published via Resonate.", 160);
 }
 
-function inferImageExtension(contentType: string | null, sourceUrl: string): string {
-  const normalizedContentType = contentType?.split(";")[0].trim().toLowerCase();
-  if (normalizedContentType === "image/webp") return "webp";
-  if (normalizedContentType === "image/svg+xml") return "svg";
-  if (normalizedContentType === "image/png") return "png";
-  if (normalizedContentType === "image/jpeg") return "jpg";
-  if (normalizedContentType === "image/gif") return "gif";
+/** Image URL placeholder alt regex — slug-shaped like hero_image or asset12_. */
+const SLUG_ALT_PATTERN = /^!\[(hero_image|asset\d+[_-]?|image\d+|figure\d+)/i;
 
-  try {
-    const pathname = new URL(sourceUrl).pathname;
-    const match = pathname.match(/\.([a-z0-9]+)$/i);
-    if (match) {
-      return match[1].toLowerCase();
+/** Image glued to following non-whitespace content on the same line. */
+const IMAGE_GLUED_TO_NEXT_BLOCK_PATTERN = /^!\[[^\]]*]\([^)]+\)\S/;
+
+/** Well-formed markdown image occupying the entire line. */
+const STANDALONE_IMAGE_LINE_PATTERN = /^!\[[^\]]*]\([^)]+\)\s*$/;
+
+/** Any H1 markdown heading. Corvo renders the title from frontmatter. */
+const BODY_H1_PATTERN = /^# [^#]/;
+
+interface NormalizeBodyParams {
+  content: string;
+  heroImageUrl: string;
+  imagesBySourceUrl: Map<string, PublishImageAsset>;
+}
+
+/**
+ * Rewrite the raw editor content so it satisfies the corvo-labs-dot-com
+ * contract. This runs before validation so common issues (H1 that duplicates
+ * the title, hero image inlined in the body, images glued to the next block,
+ * slug-shaped alt text) are fixed rather than rejected when we can recover
+ * automatically.
+ */
+export function normalizeMdxBody(params: NormalizeBodyParams): string {
+  const { content, heroImageUrl, imagesBySourceUrl } = params;
+  let body = content.replace(/\r\n/g, "\n");
+
+  // 1. Drop any H1 headings in the body — the title comes from frontmatter.
+  body = body
+    .split("\n")
+    .filter((line) => !BODY_H1_PATTERN.test(line))
+    .join("\n");
+
+  // 2. Split image-glued-to-text ("![alt](url)Trailing" → two lines).
+  body = body.replace(
+    /^(!\[[^\]]*]\([^)]+\))(\S.*)$/gm,
+    "$1\n\n$2"
+  );
+
+  // 3. Rewrite alt text for every known asset so slug placeholders like
+  //    `![hero_image](url)` become the descriptive alt from the image payload.
+  body = body.replace(
+    /!\[([^\]]*)]\(([^)]+)\)/g,
+    (match, origAlt: string, rawUrl: string) => {
+      const url = rawUrl.trim().replace(/^<|>$/g, "");
+      const asset = imagesBySourceUrl.get(url);
+      if (!asset?.alt?.trim()) return match;
+      return `![${asset.alt.trim()}](${url})`;
     }
-  } catch {
-    // Ignore invalid URLs and fall back below.
+  );
+
+  // 4. Remove the first occurrence of the hero image inside the body's leading
+  //    region so it isn't duplicated with the frontmatter hero render.
+  if (heroImageUrl) {
+    const heroLinePattern = new RegExp(
+      `^!\\[[^\\]]*]\\(${escapeRegExp(heroImageUrl)}\\)\\s*$`
+    );
+    const lines = body.split("\n");
+    const scanLimit = Math.min(lines.length, 8);
+    for (let i = 0; i < scanLimit; i++) {
+      if (heroLinePattern.test(lines[i])) {
+        lines.splice(i, 1);
+        while (i < lines.length && lines[i].trim() === "") {
+          lines.splice(i, 1);
+        }
+        break;
+      }
+    }
+    body = lines.join("\n");
   }
 
-  return "webp";
+  // 5. Ensure a blank line follows every standalone image so the next block
+  //    (heading, paragraph, list) is parsed as block-level.
+  const lines = body.split("\n");
+  const normalized: string[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    normalized.push(lines[i]);
+    if (
+      STANDALONE_IMAGE_LINE_PATTERN.test(lines[i]) &&
+      i + 1 < lines.length &&
+      lines[i + 1].trim() !== ""
+    ) {
+      normalized.push("");
+    }
+  }
+
+  // 6. Collapse 3+ consecutive blank lines down to a single blank separator.
+  const collapsed: string[] = [];
+  let blankStreak = 0;
+  for (const line of normalized) {
+    if (line.trim() === "") {
+      blankStreak += 1;
+      if (blankStreak <= 1) collapsed.push("");
+    } else {
+      blankStreak = 0;
+      collapsed.push(line);
+    }
+  }
+
+  return collapsed.join("\n").replace(/^\n+/, "").trimEnd() + "\n";
 }
 
-function buildImageAlt(params: {
-  alt?: string;
-  isCover: boolean;
+interface ValidationFrontmatter {
   title: string;
-  index: number;
-}): string {
-  const explicitAlt = params.alt?.replace(/\s+/g, " ").trim();
-  if (explicitAlt) return explicitAlt;
-  if (params.isCover) return `Cover image for ${params.title}`;
-  return `Inline figure ${params.index + 1} for ${params.title}`;
+  date: string;
+  heroImage: string;
+  heroImageAlt: string;
+  description: string;
+  tags: string[];
 }
 
-function createImageFileName(params: {
-  alt: string;
-  extension: string;
-  isCover: boolean;
-  index: number;
-  usedNames: Set<string>;
-}): string {
-  const baseName = params.isCover
-    ? "hero"
-    : slugify(params.alt) || `figure-${params.index + 1}`;
-  let candidate = `${baseName}.${params.extension}`;
-  let suffix = 2;
+interface ValidateParams {
+  frontmatter: ValidationFrontmatter;
+  body: string;
+  heroImageUrl: string;
+}
 
-  while (params.usedNames.has(candidate)) {
-    candidate = `${baseName}-${suffix}.${params.extension}`;
-    suffix += 1;
+/**
+ * Enforce the corvo-labs-dot-com publishing contract before we touch GitHub.
+ * Throws a {@link BlogPostContractError} listing every violation so the
+ * publisher surfaces all issues in a single round-trip.
+ */
+export function validateMdxPost(params: ValidateParams): void {
+  const issues: string[] = [];
+  const { frontmatter, body, heroImageUrl } = params;
+
+  if (!frontmatter.title?.trim()) issues.push("Frontmatter `title` is required.");
+  if (!frontmatter.date?.trim()) issues.push("Frontmatter `date` is required.");
+  if (!frontmatter.heroImage?.trim()) {
+    issues.push("Frontmatter `heroImage` is required.");
+  }
+  if (!frontmatter.heroImageAlt?.trim()) {
+    issues.push(
+      "Frontmatter `heroImageAlt` is required for accessibility and SEO."
+    );
+  }
+  if (!frontmatter.description?.trim()) {
+    issues.push("Frontmatter `description` is required.");
+  }
+  if (!frontmatter.tags || frontmatter.tags.length === 0) {
+    issues.push("Frontmatter `tags` must contain at least one tag.");
   }
 
-  params.usedNames.add(candidate);
-  return candidate;
-}
-
-function replaceMarkdownImages(
-  markdown: string,
-  assetsBySourceUrl: Map<string, PreparedImageAsset>
-): string {
-  return markdown.replace(/!\[(.*?)\]\((.*?)\)/g, (match, altText, rawTarget) => {
-    const target = String(rawTarget).trim().replace(/^<|>$/g, "");
-    const asset = assetsBySourceUrl.get(target);
-    if (!asset) return match;
-
-    const nextAlt = asset.alt || String(altText).trim();
-    return [
-      "<BlogImage",
-      `  src="${asset.localUrl}"`,
-      `  alt="${escapeYamlString(nextAlt)}"`,
-      "/>",
-    ].join("\n");
-  });
-}
-
-function replaceHtmlImages(
-  markdown: string,
-  assetsBySourceUrl: Map<string, PreparedImageAsset>
-): string {
-  return markdown.replace(/<img\b[^>]*>/g, (tag) => {
-    const srcMatch = tag.match(/\ssrc=["']([^"']+)["']/i);
-    if (!srcMatch) return tag;
-    const asset = assetsBySourceUrl.get(srcMatch[1]);
-    if (!asset) return tag;
-
-    const altMatch = tag.match(/\salt=["']([^"']*)["']/i);
-    const nextAlt = asset.alt || altMatch?.[1]?.trim() || "";
-
-    return [
-      "<BlogImage",
-      `  src="${asset.localUrl}"`,
-      `  alt="${escapeYamlString(nextAlt)}"`,
-      "/>",
-    ].join("\n");
-  });
-}
-
-function buildMdxBody(
-  markdown: string,
-  assetsBySourceUrl: Map<string, PreparedImageAsset>
-): string {
-  const withMarkdownImages = replaceMarkdownImages(markdown, assetsBySourceUrl);
-  const withHtmlImages = replaceHtmlImages(withMarkdownImages, assetsBySourceUrl);
-  return withHtmlImages.trimEnd() + "\n";
-}
-
-function buildFrontmatter(
-  params: {
-    title: string;
-    date: string;
-    subtitle?: string;
-    excerpt: string;
-    author: string;
-    tags?: string[];
-    coverImage: string;
-    coverImageAlt: string;
-    readTime: string;
-    category: string;
-    featured: boolean;
-    published: boolean;
+  const lines = body.split("\n");
+  const nonBlankLines: Array<{ line: string; index: number }> = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].trim() !== "") {
+      nonBlankLines.push({ line: lines[i], index: i });
+    }
   }
-): string {
+
+  if (heroImageUrl) {
+    const heroLinePattern = new RegExp(
+      `!\\[[^\\]]*]\\(${escapeRegExp(heroImageUrl)}\\)`
+    );
+    const leading = nonBlankLines.slice(0, 5);
+    for (const { line, index } of leading) {
+      if (heroLinePattern.test(line)) {
+        issues.push(
+          `Line ${index + 1} duplicates the hero image URL in the body; remove the in-body copy.`
+        );
+        break;
+      }
+    }
+  }
+
+  for (let i = 0; i < lines.length; i++) {
+    if (IMAGE_GLUED_TO_NEXT_BLOCK_PATTERN.test(lines[i])) {
+      issues.push(
+        `Line ${i + 1} has text glued onto an image; insert a blank line after the image.`
+      );
+    }
+    if (SLUG_ALT_PATTERN.test(lines[i])) {
+      issues.push(
+        `Line ${i + 1} uses a slug as alt text; replace with a descriptive caption.`
+      );
+    }
+    if (BODY_H1_PATTERN.test(lines[i])) {
+      issues.push(
+        `Line ${i + 1} contains an H1 heading; the title already comes from frontmatter.`
+      );
+    }
+  }
+
+  if (issues.length > 0) {
+    throw new BlogPostContractError(issues);
+  }
+}
+
+interface BuildFrontmatterParams {
+  title: string;
+  date: string;
+  subtitle?: string;
+  description: string;
+  author: string;
+  tags: string[];
+  heroImage: string;
+  heroImageAlt: string;
+  readTime: string;
+  category: string;
+  featured: boolean;
+  status: string;
+}
+
+function buildFrontmatter(params: BuildFrontmatterParams): string {
   const lines = [
     `---`,
     `title: "${escapeYamlString(params.title)}"`,
@@ -204,21 +297,21 @@ function buildFrontmatter(
   if (params.subtitle?.trim()) {
     lines.push(`subtitle: "${escapeYamlString(params.subtitle.trim())}"`);
   }
-  lines.push(`excerpt: "${escapeYamlString(params.excerpt)}"`);
+  lines.push(`description: "${escapeYamlString(params.description)}"`);
   lines.push(`author: "${escapeYamlString(params.author)}"`);
-  if (params.tags?.length) {
+  if (params.tags.length > 0) {
     lines.push(
       `tags: [${params.tags.map((tag) => `"${escapeYamlString(tag)}"`).join(", ")}]`
     );
   } else {
     lines.push(`tags: []`);
   }
-  lines.push(`coverImage: "${escapeYamlString(params.coverImage)}"`);
-  lines.push(`coverImageAlt: "${escapeYamlString(params.coverImageAlt)}"`);
+  lines.push(`heroImage: "${escapeYamlString(params.heroImage)}"`);
+  lines.push(`heroImageAlt: "${escapeYamlString(params.heroImageAlt)}"`);
   lines.push(`readTime: "${escapeYamlString(params.readTime)}"`);
   lines.push(`category: "${escapeYamlString(params.category)}"`);
   lines.push(`featured: ${params.featured ? "true" : "false"}`);
-  lines.push(`published: ${params.published ? "true" : "false"}`);
+  lines.push(`status: "${escapeYamlString(params.status)}"`);
   lines.push(`---`, ``);
   return lines.join("\n") + "\n";
 }
@@ -238,12 +331,13 @@ export async function createBlogPostPR(params: {
   images?: PublishImageAsset[];
 }): Promise<{ prUrl: string; branchName: string }> {
   // Validate up front so we never create a remote branch that can't be
-  // completed — callers must supply at least one image for the cover asset.
+  // completed — callers must supply at least one image so we have a hero
+  // for the frontmatter and card thumbnail.
   const images = params.images ?? [];
-  const coverSource = images.find((asset) => asset.isCover) ?? images[0];
-  if (!coverSource) {
+  const hero = images.find((asset) => asset.isCover) ?? images[0];
+  if (!hero) {
     throw new Error(
-      "Publishing requires at least one image so the PR can commit a local cover image."
+      "Publishing requires at least one image so the PR can set heroImage in frontmatter."
     );
   }
 
@@ -253,6 +347,54 @@ export async function createBlogPostPR(params: {
   const filePath = `${CONTENT_PATH}/${fileName}`;
   const branchName = `resonate/blog-post-${slug}`;
 
+  const imagesBySourceUrl = new Map<string, PublishImageAsset>(
+    images.map((asset) => [asset.sourceUrl, asset] as const)
+  );
+
+  const body = normalizeMdxBody({
+    content: params.content,
+    heroImageUrl: hero.sourceUrl,
+    imagesBySourceUrl,
+  });
+
+  const heroImageAlt =
+    params.coverImageAlt?.trim() ||
+    hero.alt?.trim() ||
+    `Cover image for ${params.title}`;
+
+  const frontmatterInput: BuildFrontmatterParams = {
+    title: params.title,
+    date,
+    subtitle: params.subtitle,
+    description: buildDescription(params.content, params.excerpt),
+    author: params.author?.trim() || DEFAULT_AUTHOR,
+    tags: params.tags ?? [],
+    heroImage: hero.sourceUrl,
+    heroImageAlt,
+    readTime: estimateReadTime(params.content),
+    category: params.category?.trim() || DEFAULT_CATEGORY,
+    featured: params.featured ?? false,
+    status: params.status?.trim() || "scheduled",
+  };
+
+  // Contract check before we touch GitHub so a single round trip surfaces
+  // every violation to the caller.
+  validateMdxPost({
+    frontmatter: {
+      title: frontmatterInput.title,
+      date: frontmatterInput.date,
+      heroImage: frontmatterInput.heroImage,
+      heroImageAlt: frontmatterInput.heroImageAlt,
+      description: frontmatterInput.description,
+      tags: frontmatterInput.tags,
+    },
+    body,
+    heroImageUrl: hero.sourceUrl,
+  });
+
+  const frontmatter = buildFrontmatter(frontmatterInput);
+  const fileContent = Buffer.from(frontmatter + body).toString("base64");
+
   const headers = {
     Authorization: `Bearer ${GITHUB_TOKEN}`,
     "Content-Type": "application/json",
@@ -260,7 +402,6 @@ export async function createBlogPostPR(params: {
     "X-GitHub-Api-Version": "2022-11-28",
   };
 
-  // Get default branch SHA
   const repoRes = await fetch(
     `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}`,
     { headers }
@@ -277,7 +418,6 @@ export async function createBlogPostPR(params: {
   const branchData = await branchRes.json();
   const sha = branchData.object.sha;
 
-  // Create branch
   const createBranchRes = await fetch(
     `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/git/refs`,
     {
@@ -289,94 +429,6 @@ export async function createBlogPostPR(params: {
   if (!createBranchRes.ok) {
     const err = await createBranchRes.json();
     throw new Error(`GitHub create branch failed: ${JSON.stringify(err)}`);
-  }
-
-  const preparedAssets: PreparedImageAsset[] = [];
-  const usedFileNames = new Set<string>();
-
-  for (const [index, asset] of images.entries()) {
-    const response = await fetch(asset.sourceUrl);
-    if (!response.ok) {
-      throw new Error(`Failed to download image asset: ${response.status}`);
-    }
-
-    const extension = inferImageExtension(
-      response.headers.get("content-type"),
-      asset.sourceUrl
-    );
-    const alt = buildImageAlt({
-      alt: asset.alt,
-      isCover: coverSource.sourceUrl === asset.sourceUrl,
-      title: params.title,
-      index,
-    });
-    const fileName = createImageFileName({
-      alt,
-      extension,
-      isCover: coverSource.sourceUrl === asset.sourceUrl,
-      index,
-      usedNames: usedFileNames,
-    });
-    const localUrl = `/images/blog/${slug}/${fileName}`;
-    const repoPath = `${IMAGE_PATH}/${slug}/${fileName}`;
-    const arrayBuffer = await response.arrayBuffer();
-
-    preparedAssets.push({
-      alt,
-      content: Buffer.from(arrayBuffer).toString("base64"),
-      fileName,
-      filePath: repoPath,
-      isCover: coverSource.sourceUrl === asset.sourceUrl,
-      localUrl,
-      sourceUrl: asset.sourceUrl,
-    });
-  }
-
-  const assetsBySourceUrl = new Map(
-    preparedAssets.map((asset) => [asset.sourceUrl, asset] as const)
-  );
-  const coverImage = preparedAssets.find((asset) => asset.isCover);
-
-  if (!coverImage) {
-    throw new Error("Publishing requires a cover image asset.");
-  }
-
-  const frontmatter = buildFrontmatter({
-    title: params.title,
-    date,
-    subtitle: params.subtitle,
-    excerpt: buildExcerpt(params.content, params.excerpt),
-    author: params.author?.trim() || DEFAULT_AUTHOR,
-    tags: params.tags,
-    coverImage: coverImage.localUrl,
-    coverImageAlt:
-      params.coverImageAlt?.trim() || coverImage.alt || `Cover image for ${params.title}`,
-    readTime: estimateReadTime(params.content),
-    category: params.category?.trim() || DEFAULT_CATEGORY,
-    featured: params.featured ?? false,
-    published: true,
-  });
-  const mdxBody = buildMdxBody(params.content, assetsBySourceUrl);
-  const fileContent = Buffer.from(frontmatter + mdxBody).toString("base64");
-
-  for (const asset of preparedAssets) {
-    const createAssetRes = await fetch(
-      `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${asset.filePath}`,
-      {
-        method: "PUT",
-        headers,
-        body: JSON.stringify({
-          message: `feat: add blog image "${asset.fileName}"`,
-          content: asset.content,
-          branch: branchName,
-        }),
-      }
-    );
-
-    if (!createAssetRes.ok) {
-      const err = await createAssetRes.json();
-      throw new Error(`GitHub create asset failed: ${JSON.stringify(err)}`);
-    }
   }
 
   const createFileRes = await fetch(
@@ -396,7 +448,6 @@ export async function createBlogPostPR(params: {
     throw new Error(`GitHub create file failed: ${JSON.stringify(err)}`);
   }
 
-  // Open PR
   const prRes = await fetch(
     `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls`,
     {

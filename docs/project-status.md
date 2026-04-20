@@ -1,6 +1,6 @@
 # Project Status
 
-Last updated: 04/20/2026 11:40:10 PDT
+Last updated: 04/20/2026 16:27:46 PDT
 
 ## State
 
@@ -12,25 +12,24 @@ Maintain the living documentation and preserve a handoff-quality snapshot of the
 
 ## Session Focus
 
-- Adjusted commit-time automation for documentation refreshes.
+- Refreshed documentation for the current repository state.
 
 ## Last Completed Task
 
-- 52a6210 fix(image-tray): keep hero and remove controls visible on touch devices
+- 2e78e2d Merge main into feature/fullscreen-editor and fix editor scroll
 
 ## Recent Commits
 
-- 52a6210 fix(image-tray): keep hero and remove controls visible on touch devices
-- 0d8e7d2 ci: deploy convex to production on main when convex/ changes
-- 5e4d3b8 fix(editor): restore mouse-wheel scrolling in full-screen editor
-- d30775b fix(publish): preserve valid alt text and fail fast before branch creation
-- a18bff6 feat: align blog publish flow with corvo repo
+- 2e78e2d Merge main into feature/fullscreen-editor and fix editor scroll
+- c4defd0 Align blog publish flow with Corvo repo (#35)
+- 2835656 chore: harden docs pre-commit workflow (#33)
+- 296117e fix: keep image tray pinned and hero control visible on touch (#34)
+- 173a228 chore: harden docs pre-commit workflow
 
 ## Local Working Tree
 
--  M package-lock.json
-- A  scripts/__tests__/update-docs.test.ts
-- M  scripts/update-docs.mjs
+- M  lib/__tests__/github.test.ts
+- M  lib/github.ts
 
 ## Next Agent Pickup
 
@@ -39,4 +38,4 @@ Maintain the living documentation and preserve a handoff-quality snapshot of the
 
 ## Branch
 
-- resonate/zai-alt-text-blog-publish
+- feature/fullscreen-editor
