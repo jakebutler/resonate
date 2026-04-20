@@ -104,6 +104,7 @@ describe('ImageTray', () => {
       />
     )
     fireEvent.click(screen.getByRole('button', { name: /images \(2\)/i }))
+    expect(screen.getByTestId('image-controls-file-1')).toHaveClass('group-focus-within:opacity-100')
     fireEvent.click(screen.getByTestId('hero-btn-file-1'))
     expect(onHeroChange).toHaveBeenCalledWith('file-1')
   })
