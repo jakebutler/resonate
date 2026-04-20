@@ -1,6 +1,6 @@
 # Project Status
 
-Last updated: 04/20/2026 11:39:34 PDT
+Last updated: 04/20/2026 11:39:43 PDT
 
 ## State
 
@@ -16,22 +16,20 @@ Maintain the living documentation and preserve a handoff-quality snapshot of the
 
 ## Last Completed Task
 
-- 5e4d3b8 fix(editor): restore mouse-wheel scrolling in full-screen editor
+- 0d8e7d2 ci: deploy convex to production on main when convex/ changes
 
 ## Recent Commits
 
+- 0d8e7d2 ci: deploy convex to production on main when convex/ changes
 - 5e4d3b8 fix(editor): restore mouse-wheel scrolling in full-screen editor
 - d30775b fix(publish): preserve valid alt text and fail fast before branch creation
 - a18bff6 feat: align blog publish flow with corvo repo
 - 173a228 chore: harden docs pre-commit workflow
-- e20785e chore: bump github actions to v5
 
 ## Local Working Tree
 
-- M  .github/workflows/test.yml
-- M  README.md
--  M components/ImageTray/ImageTray.tsx
--  M components/ImageTray/__tests__/ImageTray.test.tsx
+- M  components/ImageTray/ImageTray.tsx
+- M  components/ImageTray/__tests__/ImageTray.test.tsx
 -  M package-lock.json
 -  M scripts/update-docs.mjs
 - ?? scripts/__tests__/
