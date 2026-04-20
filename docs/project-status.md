@@ -1,6 +1,6 @@
 # Project Status
 
-Last updated: 04/09/2026 19:02:21 PDT
+Last updated: 04/20/2026 11:40:10 PDT
 
 ## State
 
@@ -16,23 +16,20 @@ Maintain the living documentation and preserve a handoff-quality snapshot of the
 
 ## Last Completed Task
 
-- e20785e chore: bump github actions to v5
+- 52a6210 fix(image-tray): keep hero and remove controls visible on touch devices
 
 ## Recent Commits
 
-- e20785e chore: bump github actions to v5
-- c19151d fix: stabilize e2e auth bypass and startup
-- 32617d3 fix: flush pending saves before publish
-- 94d50a5 fix: use clerk-valid placeholder key in e2e
-- 2c9a6a9 fix: use placeholder envs for e2e build
+- 52a6210 fix(image-tray): keep hero and remove controls visible on touch devices
+- 0d8e7d2 ci: deploy convex to production on main when convex/ changes
+- 5e4d3b8 fix(editor): restore mouse-wheel scrolling in full-screen editor
+- d30775b fix(publish): preserve valid alt text and fail fast before branch creation
+- a18bff6 feat: align blog publish flow with corvo repo
 
 ## Local Working Tree
 
-- M  .githooks/pre-commit
-- A  .githooks/pre-commit.local.example
-- M  .gitignore
 -  M package-lock.json
-- M  package.json
+- A  scripts/__tests__/update-docs.test.ts
 - M  scripts/update-docs.mjs
 
 ## Next Agent Pickup
@@ -42,4 +39,4 @@ Maintain the living documentation and preserve a handoff-quality snapshot of the
 
 ## Branch
 
-- feature/fullscreen-editor
+- resonate/zai-alt-text-blog-publish

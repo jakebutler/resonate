@@ -1,146 +1,327 @@
 // @vitest-environment node
-import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from "vitest";
 
-// github.ts reads env vars as module-level constants, so we must set them
-// before the module is evaluated, then force re-evaluation via resetModules.
-let createBlogPostPR: (typeof import('@/lib/github'))['createBlogPostPR']
+let createBlogPostPR: (typeof import("@/lib/github"))["createBlogPostPR"];
 
 beforeAll(async () => {
-  process.env.GITHUB_TOKEN = 'test_token'
-  process.env.BLOG_REPO_OWNER = 'test-owner'
-  process.env.BLOG_REPO_NAME = 'test-repo'
-  process.env.BLOG_CONTENT_PATH = 'content/posts'
-  vi.resetModules()
-  const mod = await import('@/lib/github')
-  createBlogPostPR = mod.createBlogPostPR
-})
+  process.env.GITHUB_TOKEN = "test_token";
+  process.env.BLOG_REPO_OWNER = "test-owner";
+  process.env.BLOG_REPO_NAME = "test-repo";
+  delete process.env.BLOG_CONTENT_PATH;
+  delete process.env.BLOG_PUBLIC_IMAGE_PATH;
+  delete process.env.BLOG_APP_ROOT;
+  vi.resetModules();
+  const mod = await import("@/lib/github");
+  createBlogPostPR = mod.createBlogPostPR;
+});
 
-// Helper to build sequential fetch mocks for the 5 GitHub API calls
-function mockGitHubSuccess(prUrl = 'https://github.com/org/repo/pull/1') {
-  vi.mocked(fetch)
-    .mockResolvedValueOnce(new Response(JSON.stringify({ default_branch: 'main' }), { status: 200 }))
-    .mockResolvedValueOnce(new Response(JSON.stringify({ object: { sha: 'abc123' } }), { status: 200 }))
-    .mockResolvedValueOnce(new Response(JSON.stringify({}), { status: 200 }))
-    .mockResolvedValueOnce(new Response(JSON.stringify({}), { status: 200 }))
-    .mockResolvedValueOnce(new Response(JSON.stringify({ html_url: prUrl }), { status: 200 }))
+function mockImageDownload(url: string, contentType = "image/webp") {
+  return new Response(Uint8Array.from([1, 2, 3]), {
+    status: 200,
+    headers: {
+      "content-type": contentType,
+      "x-test-url": url,
+    },
+  });
 }
 
-describe('createBlogPostPR', () => {
+function mockGitHubSuccess(options?: {
+  imageResponses?: Response[];
+  prUrl?: string;
+}) {
+  const imageResponses = options?.imageResponses ?? [mockImageDownload("https://cdn.example.com/hero.webp")];
+
+  vi.mocked(fetch)
+    .mockResolvedValueOnce(
+      new Response(JSON.stringify({ default_branch: "main" }), { status: 200 })
+    )
+    .mockResolvedValueOnce(
+      new Response(JSON.stringify({ object: { sha: "abc123" } }), { status: 200 })
+    )
+    .mockResolvedValueOnce(new Response(JSON.stringify({}), { status: 200 }));
+
+  for (const imageResponse of imageResponses) {
+    vi.mocked(fetch).mockResolvedValueOnce(imageResponse);
+    vi.mocked(fetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({}), { status: 200 })
+    );
+  }
+
+  vi.mocked(fetch)
+    .mockResolvedValueOnce(new Response(JSON.stringify({}), { status: 200 }))
+    .mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          html_url: options?.prUrl ?? "https://github.com/org/repo/pull/1",
+        }),
+        { status: 200 }
+      )
+    );
+}
+
+describe("createBlogPostPR", () => {
   beforeEach(() => {
-    vi.stubGlobal('fetch', vi.fn())
-  })
-  afterEach(() => vi.unstubAllGlobals())
+    vi.stubGlobal("fetch", vi.fn());
+  });
 
-  it('returns prUrl and branchName on success', async () => {
-    mockGitHubSuccess('https://github.com/org/repo/pull/42')
-    const result = await createBlogPostPR({ title: 'Hello World', content: 'Body', scheduledDate: '2026-03-04', status: 'scheduled' })
-    expect(result.prUrl).toBe('https://github.com/org/repo/pull/42')
-    expect(result.branchName).toBe('resonate/blog-post-2026-03-04-hello-world')
-  })
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
 
-  it('slugifies special characters in title', async () => {
-    mockGitHubSuccess()
-    const result = await createBlogPostPR({ title: 'My AI & ML Post!', content: 'x', scheduledDate: '2026-03-04', status: 'draft' })
-    expect(result.branchName).toContain('my-ai-ml-post')
-  })
+  it("returns prUrl and branchName on success", async () => {
+    mockGitHubSuccess({ prUrl: "https://github.com/org/repo/pull/42" });
 
-  it('strips leading/trailing hyphens from slug', async () => {
-    mockGitHubSuccess()
-    const result = await createBlogPostPR({ title: '---edge---', content: 'x', scheduledDate: '2026-03-04', status: 'draft' })
-    expect(result.branchName).toContain('edge')
-    expect(result.branchName).not.toMatch(/--/)
-  })
+    const result = await createBlogPostPR({
+      title: "Hello World",
+      content: "Body",
+      scheduledDate: "2026-03-04",
+      status: "published",
+      images: [{ sourceUrl: "https://cdn.example.com/hero.webp", isCover: true }],
+    });
 
-  it('uses today\'s date when scheduledDate is empty', async () => {
-    mockGitHubSuccess()
-    const today = new Date().toISOString().split('T')[0]
-    const result = await createBlogPostPR({ title: 'Test', content: 'x', scheduledDate: '', status: 'draft' })
-    expect(result.branchName).toContain(today)
-  })
+    expect(result.prUrl).toBe("https://github.com/org/repo/pull/42");
+    expect(result.branchName).toBe("resonate/blog-post-2026-03-04-hello-world");
+  });
 
-  it('sends Authorization header on all requests', async () => {
-    mockGitHubSuccess()
-    await createBlogPostPR({ title: 'Test', content: 'x', scheduledDate: '2026-03-04', status: 'draft' })
-    const calls = vi.mocked(fetch).mock.calls
-    calls.forEach(([, opts]) => {
-      expect((opts as RequestInit).headers).toMatchObject({ Authorization: 'Bearer test_token' })
-    })
-  })
+  it("writes repo-compatible frontmatter and MDX image components", async () => {
+    mockGitHubSuccess();
 
-  it('encodes file content as base64 with frontmatter', async () => {
-    mockGitHubSuccess()
-    await createBlogPostPR({ title: 'Test Post', content: 'Body text here', scheduledDate: '2026-03-04', status: 'draft' })
-    // 4th fetch call is create-file (PUT)
-    const createFileCall = vi.mocked(fetch).mock.calls[3]
-    const body = JSON.parse((createFileCall[1] as RequestInit).body as string)
-    const decoded = Buffer.from(body.content, 'base64').toString('utf-8')
-    expect(decoded).toContain('title: "Test Post"')
-    expect(decoded).toContain('Body text here')
-  })
-
-  it('escapes frontmatter strings before writing YAML', async () => {
-    mockGitHubSuccess()
     await createBlogPostPR({
       title: 'He said "hello"',
-      content: 'Body',
-      scheduledDate: '2026-03-04',
-      status: 'draft',
-      heroImage: 'https://example.com/hero"image.jpg',
-      tags: ['ai', 'quote "heavy"'],
-      description: 'Line one\nLine "two"',
-    })
+      content:
+        'Intro paragraph.\n\n![System overview](https://cdn.example.com/hero.webp)\n',
+      scheduledDate: "2026-03-04",
+      status: "published",
+      subtitle: "A subtitle",
+      excerpt: 'Line one\nLine "two"',
+      author: "Jake Butler",
+      tags: ["ai", 'quote "heavy"'],
+      category: "strategy",
+      featured: true,
+      coverImageAlt: "A descriptive hero image.",
+      images: [
+        {
+          sourceUrl: "https://cdn.example.com/hero.webp",
+          alt: "System overview",
+          isCover: true,
+        },
+      ],
+    });
 
-    const createFileCall = vi.mocked(fetch).mock.calls[3]
-    const body = JSON.parse((createFileCall[1] as RequestInit).body as string)
-    const decoded = Buffer.from(body.content, 'base64').toString('utf-8')
+    const assetCall = vi.mocked(fetch).mock.calls[4];
+    expect(assetCall[0]).toContain(
+      "/contents/corvo-labs-enhanced/public/images/blog/2026-03-04-he-said-hello/hero.webp"
+    );
 
-    expect(decoded).toContain('title: "He said \\"hello\\""')
-    expect(decoded).toContain('heroImage: "https://example.com/hero\\"image.jpg"')
-    expect(decoded).toContain('tags: ["ai", "quote \\"heavy\\""]')
-    expect(decoded).toContain('description: "Line one\\nLine \\"two\\""')
-  })
+    const mdxCall = vi.mocked(fetch).mock.calls[5];
+    expect(mdxCall[0]).toContain(
+      "/contents/corvo-labs-enhanced/content/blog/2026-03-04-he-said-hello.mdx"
+    );
 
-  it('throws when repo fetch fails', async () => {
-    vi.mocked(fetch).mockResolvedValueOnce(new Response('', { status: 404 }))
-    await expect(createBlogPostPR({ title: 'T', content: 'x', scheduledDate: '2026-03-04', status: 'draft' }))
-      .rejects.toThrow('GitHub repo fetch failed')
-  })
+    const body = JSON.parse((mdxCall[1] as RequestInit).body as string);
+    const decoded = Buffer.from(body.content, "base64").toString("utf-8");
 
-  it('throws when branch ref fetch fails', async () => {
+    expect(decoded).toContain('title: "He said \\"hello\\""');
+    expect(decoded).toContain('date: "2026-03-04"');
+    expect(decoded).toContain('subtitle: "A subtitle"');
+    expect(decoded).toContain('excerpt: "Line one Line \\"two\\""');
+    expect(decoded).toContain('author: "Jake Butler"');
+    expect(decoded).toContain('tags: ["ai", "quote \\"heavy\\""]');
+    expect(decoded).toContain(
+      'coverImage: "/images/blog/2026-03-04-he-said-hello/hero.webp"'
+    );
+    expect(decoded).toContain('coverImageAlt: "A descriptive hero image."');
+    expect(decoded).toContain('readTime: "1 min read"');
+    expect(decoded).toContain('category: "strategy"');
+    expect(decoded).toContain("featured: true");
+    expect(decoded).toContain("published: true");
+    expect(decoded).toContain('<BlogImage\n  src="/images/blog/2026-03-04-he-said-hello/hero.webp"');
+    expect(decoded).toContain('  alt="System overview"');
+    expect(decoded).not.toContain("https://cdn.example.com/hero.webp");
+  });
+
+  it("includes publish intent and preview note in the PR description", async () => {
+    mockGitHubSuccess();
+
+    await createBlogPostPR({
+      title: "Hello World",
+      content: "Body",
+      scheduledDate: "2026-03-04",
+      status: "published",
+      images: [{ sourceUrl: "https://cdn.example.com/hero.webp", isCover: true }],
+    });
+
+    const prCall = vi.mocked(fetch).mock.calls[6];
+    const payload = JSON.parse((prCall[1] as RequestInit).body as string);
+
+    expect(payload.body).toContain(
+      "Publish intent: merge to publish on corvo-labs-dot-com."
+    );
+    expect(payload.body).toContain("Resonate run date: 2026-03-04.");
+    expect(payload.body).toContain(
+      "Vercel preview: pending manual review, if applicable."
+    );
+  });
+
+  it("throws before contacting GitHub when no image assets are provided", async () => {
+    await expect(
+      createBlogPostPR({
+        title: "Hello World",
+        content: "Body",
+        scheduledDate: "2026-03-04",
+        status: "published",
+      })
+    ).rejects.toThrow(/requires at least one image/i);
+
+    // Validation must happen up front so we never leave an orphaned remote
+    // branch behind when the caller hasn't supplied any image assets.
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("throws before contacting GitHub when images is an empty array", async () => {
+    await expect(
+      createBlogPostPR({
+        title: "Hello World",
+        content: "Body",
+        scheduledDate: "2026-03-04",
+        status: "published",
+        images: [],
+      })
+    ).rejects.toThrow(/requires at least one image/i);
+
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("throws when repo fetch fails", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response("", { status: 404 }));
+
+    await expect(
+      createBlogPostPR({
+        title: "T",
+        content: "x",
+        scheduledDate: "2026-03-04",
+        status: "published",
+        images: [{ sourceUrl: "https://cdn.example.com/hero.webp", isCover: true }],
+      })
+    ).rejects.toThrow("GitHub repo fetch failed");
+  });
+
+  it("throws when branch ref fetch fails", async () => {
     vi.mocked(fetch)
-      .mockResolvedValueOnce(new Response(JSON.stringify({ default_branch: 'main' }), { status: 200 }))
-      .mockResolvedValueOnce(new Response('', { status: 404 }))
-    await expect(createBlogPostPR({ title: 'T', content: 'x', scheduledDate: '2026-03-04', status: 'draft' }))
-      .rejects.toThrow('GitHub branch fetch failed')
-  })
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ default_branch: "main" }), { status: 200 })
+      )
+      .mockResolvedValueOnce(new Response("", { status: 404 }));
 
-  it('throws when create branch fails', async () => {
-    vi.mocked(fetch)
-      .mockResolvedValueOnce(new Response(JSON.stringify({ default_branch: 'main' }), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ object: { sha: 'abc' } }), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ message: 'already exists' }), { status: 422 }))
-    await expect(createBlogPostPR({ title: 'T', content: 'x', scheduledDate: '2026-03-04', status: 'draft' }))
-      .rejects.toThrow('GitHub create branch failed')
-  })
+    await expect(
+      createBlogPostPR({
+        title: "T",
+        content: "x",
+        scheduledDate: "2026-03-04",
+        status: "published",
+        images: [{ sourceUrl: "https://cdn.example.com/hero.webp", isCover: true }],
+      })
+    ).rejects.toThrow("GitHub branch fetch failed");
+  });
 
-  it('throws when create file fails', async () => {
+  it("throws when create branch fails", async () => {
     vi.mocked(fetch)
-      .mockResolvedValueOnce(new Response(JSON.stringify({ default_branch: 'main' }), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ object: { sha: 'abc' } }), { status: 200 }))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ default_branch: "main" }), { status: 200 })
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ object: { sha: "abc" } }), { status: 200 })
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ message: "already exists" }), { status: 422 })
+      );
+
+    await expect(
+      createBlogPostPR({
+        title: "T",
+        content: "x",
+        scheduledDate: "2026-03-04",
+        status: "published",
+        images: [{ sourceUrl: "https://cdn.example.com/hero.webp", isCover: true }],
+      })
+    ).rejects.toThrow("GitHub create branch failed");
+  });
+
+  it("throws when create asset fails", async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ default_branch: "main" }), { status: 200 })
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ object: { sha: "abc" } }), { status: 200 })
+      )
       .mockResolvedValueOnce(new Response(JSON.stringify({}), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ message: 'conflict' }), { status: 409 }))
-    await expect(createBlogPostPR({ title: 'T', content: 'x', scheduledDate: '2026-03-04', status: 'draft' }))
-      .rejects.toThrow('GitHub create file failed')
-  })
+      .mockResolvedValueOnce(mockImageDownload("https://cdn.example.com/hero.webp"))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ message: "conflict" }), { status: 409 })
+      );
 
-  it('throws when create PR fails', async () => {
+    await expect(
+      createBlogPostPR({
+        title: "T",
+        content: "x",
+        scheduledDate: "2026-03-04",
+        status: "published",
+        images: [{ sourceUrl: "https://cdn.example.com/hero.webp", isCover: true }],
+      })
+    ).rejects.toThrow("GitHub create asset failed");
+  });
+
+  it("throws when create file fails", async () => {
     vi.mocked(fetch)
-      .mockResolvedValueOnce(new Response(JSON.stringify({ default_branch: 'main' }), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ object: { sha: 'abc' } }), { status: 200 }))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ default_branch: "main" }), { status: 200 })
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ object: { sha: "abc" } }), { status: 200 })
+      )
+      .mockResolvedValueOnce(new Response(JSON.stringify({}), { status: 200 }))
+      .mockResolvedValueOnce(mockImageDownload("https://cdn.example.com/hero.webp"))
+      .mockResolvedValueOnce(new Response(JSON.stringify({}), { status: 200 }))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ message: "conflict" }), { status: 409 })
+      );
+
+    await expect(
+      createBlogPostPR({
+        title: "T",
+        content: "x",
+        scheduledDate: "2026-03-04",
+        status: "published",
+        images: [{ sourceUrl: "https://cdn.example.com/hero.webp", isCover: true }],
+      })
+    ).rejects.toThrow("GitHub create file failed");
+  });
+
+  it("throws when create PR fails", async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ default_branch: "main" }), { status: 200 })
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ object: { sha: "abc" } }), { status: 200 })
+      )
+      .mockResolvedValueOnce(new Response(JSON.stringify({}), { status: 200 }))
+      .mockResolvedValueOnce(mockImageDownload("https://cdn.example.com/hero.webp"))
       .mockResolvedValueOnce(new Response(JSON.stringify({}), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({}), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ message: 'error' }), { status: 500 }))
-    await expect(createBlogPostPR({ title: 'T', content: 'x', scheduledDate: '2026-03-04', status: 'draft' }))
-      .rejects.toThrow('GitHub create PR failed')
-  })
-})
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ message: "error" }), { status: 500 })
+      );
+
+    await expect(
+      createBlogPostPR({
+        title: "T",
+        content: "x",
+        scheduledDate: "2026-03-04",
+        status: "published",
+        images: [{ sourceUrl: "https://cdn.example.com/hero.webp", isCover: true }],
+      })
+    ).rejects.toThrow("GitHub create PR failed");
+  });
+});

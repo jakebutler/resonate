@@ -9,7 +9,7 @@ const mockCanvas = {
   })),
   toBlob: vi.fn((callback: (blob: Blob | null) => void, type: string, quality: number) => {
     void type; void quality
-    callback(new Blob(['compressed'], { type: 'image/jpeg' }))
+    callback(new Blob(['compressed'], { type: 'image/webp' }))
   }),
 }
 vi.stubGlobal('document', {
@@ -38,7 +38,7 @@ describe('optimizeImage', () => {
       close: vi.fn(),
     })
     mockCanvas.toBlob.mockImplementation((callback: (blob: Blob | null) => void) => {
-      callback(new Blob(['compressed'], { type: 'image/jpeg' }))
+      callback(new Blob(['compressed'], { type: 'image/webp' }))
     })
   })
 
@@ -92,31 +92,25 @@ describe('optimizeImage', () => {
     await expect(optimizeImage(file)).rejects.toThrow(/compress/i)
   })
 
-  it('preserves webp output for webp uploads', async () => {
+  it('re-encodes raster uploads as webp', async () => {
     mockCanvas.toBlob.mockImplementation(
       (callback: (blob: Blob | null) => void, type?: string) => {
         callback(new Blob(['compressed'], { type }))
       }
     )
 
-    const file = new File(['img'], 'photo.webp', { type: 'image/webp' })
+    const file = new File(['img'], 'photo.jpg', { type: 'image/jpeg' })
     const result = await optimizeImage(file)
 
-    expect(mockCanvas.toBlob).toHaveBeenCalledWith(expect.any(Function), 'image/webp', undefined)
+    expect(mockCanvas.toBlob).toHaveBeenCalledWith(expect.any(Function), 'image/webp', 0.82)
     expect(result.type).toBe('image/webp')
   })
 
-  it('exports gif uploads as png to preserve transparency', async () => {
-    mockCanvas.toBlob.mockImplementation(
-      (callback: (blob: Blob | null) => void, type?: string) => {
-        callback(new Blob(['compressed'], { type }))
-      }
-    )
-
-    const file = new File(['img'], 'photo.gif', { type: 'image/gif' })
+  it('passes svg uploads through unchanged', async () => {
+    const file = new File(['<svg />'], 'diagram.svg', { type: 'image/svg+xml' })
     const result = await optimizeImage(file)
 
-    expect(mockCanvas.toBlob).toHaveBeenCalledWith(expect.any(Function), 'image/png', undefined)
-    expect(result.type).toBe('image/png')
+    expect(createImageBitmap).not.toHaveBeenCalled()
+    expect(result).toBe(file)
   })
 })

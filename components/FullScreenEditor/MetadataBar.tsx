@@ -33,12 +33,22 @@ interface MetadataBarProps {
   scheduledDate: string;
   scheduledTime: string;
   tags: string[];
-  seoDescription: string;
+  subtitle: string;
+  excerpt: string;
+  author: string;
+  category: string;
+  featured: boolean;
+  coverImageAlt: string;
   onStatusChange: (status: Status) => void;
   onDateChange: (date: string) => void;
   onTimeChange: (time: string) => void;
   onTagsChange: (tags: string[]) => void;
-  onSeoDescriptionChange: (desc: string) => void;
+  onSubtitleChange: (value: string) => void;
+  onExcerptChange: (value: string) => void;
+  onAuthorChange: (value: string) => void;
+  onCategoryChange: (value: string) => void;
+  onFeaturedChange: (value: boolean) => void;
+  onCoverImageAltChange: (value: string) => void;
   onPublish: () => void;
   publishing: boolean;
   githubPrUrl: string;
@@ -51,12 +61,22 @@ export function MetadataBar({
   scheduledDate,
   scheduledTime,
   tags,
-  seoDescription,
+  subtitle,
+  excerpt,
+  author,
+  category,
+  featured,
+  coverImageAlt,
   onStatusChange,
   onDateChange,
   onTimeChange,
   onTagsChange,
-  onSeoDescriptionChange,
+  onSubtitleChange,
+  onExcerptChange,
+  onAuthorChange,
+  onCategoryChange,
+  onFeaturedChange,
+  onCoverImageAltChange,
   onPublish,
   publishing,
   githubPrUrl,
@@ -208,19 +228,85 @@ export function MetadataBar({
             />
           </div>
           <div>
-            <label htmlFor="meta-seo" className="block text-xs font-medium text-gray-500 mb-1">
-              SEO Description
+            <label htmlFor="meta-subtitle" className="block text-xs font-medium text-gray-500 mb-1">
+              Subtitle
+            </label>
+            <input
+              id="meta-subtitle"
+              value={subtitle}
+              onChange={(e) => onSubtitleChange(e.target.value)}
+              placeholder="Optional subtitle line"
+              aria-label="Subtitle"
+              className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#ff7d00]"
+            />
+          </div>
+          <div>
+            <label htmlFor="meta-excerpt" className="block text-xs font-medium text-gray-500 mb-1">
+              Excerpt
             </label>
             <textarea
-              id="meta-seo"
-              value={seoDescription}
-              onChange={(e) => onSeoDescriptionChange(e.target.value)}
-              placeholder="Brief description for search engines..."
+              id="meta-excerpt"
+              value={excerpt}
+              onChange={(e) => onExcerptChange(e.target.value)}
+              placeholder="Short summary used for SEO and social cards..."
               rows={2}
-              aria-label="SEO description"
+              aria-label="Excerpt"
               className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#ff7d00] resize-none"
             />
           </div>
+          <div>
+            <label htmlFor="meta-author" className="block text-xs font-medium text-gray-500 mb-1">
+              Author
+            </label>
+            <input
+              id="meta-author"
+              value={author}
+              onChange={(e) => onAuthorChange(e.target.value)}
+              placeholder="Jake Butler"
+              aria-label="Author"
+              className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#ff7d00]"
+            />
+          </div>
+          <div>
+            <label htmlFor="meta-category" className="block text-xs font-medium text-gray-500 mb-1">
+              Category
+            </label>
+            <input
+              id="meta-category"
+              value={category}
+              onChange={(e) => onCategoryChange(e.target.value)}
+              placeholder="strategy"
+              aria-label="Category"
+              className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#ff7d00]"
+            />
+          </div>
+          <div>
+            <label htmlFor="meta-cover-alt" className="block text-xs font-medium text-gray-500 mb-1">
+              Cover Image Alt
+            </label>
+            <input
+              id="meta-cover-alt"
+              value={coverImageAlt}
+              onChange={(e) => onCoverImageAltChange(e.target.value)}
+              placeholder="Describe the cover image"
+              aria-label="Cover image alt"
+              className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#ff7d00]"
+            />
+          </div>
+          <label
+            htmlFor="meta-featured"
+            className="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-xs text-gray-600"
+          >
+            <input
+              id="meta-featured"
+              type="checkbox"
+              checked={featured}
+              onChange={(e) => onFeaturedChange(e.target.checked)}
+              aria-label="Featured"
+              className="rounded border-gray-300 text-[#ff7d00] focus:ring-[#ff7d00]"
+            />
+            Featured post
+          </label>
         </div>
       )}
     </div>

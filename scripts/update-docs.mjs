@@ -12,6 +12,8 @@ import {
   writeFileSync,
 } from "node:fs";
 import path from "node:path";
+import { randomUUID } from "node:crypto";
+import { pathToFileURL } from "node:url";
 
 const repoRoot = execFileSync("git", ["rev-parse", "--show-toplevel"], {
   cwd: process.cwd(),
@@ -52,15 +54,20 @@ const branch = safeRun(["git", "rev-parse", "--abbrev-ref", "HEAD"]).trim() || "
 const recentCommits = splitLines(safeRun(["git", "log", "--oneline", "-5"]));
 const stagedChanges = splitLines(safeRun(["git", "diff", "--cached", "--name-status"]));
 const workingTreeChanges = splitLines(safeRun(["git", "status", "--short"]));
-const changedFiles = getChangedFiles(stagedChanges, workingTreeChanges);
+const stagedChangeEntries = safeRun(["git", "diff", "--cached", "--name-status", "-z"]);
+const workingTreeChangeEntries = safeRun(["git", "status", "--porcelain", "-z"]);
+const stagedFiles = getChangedFiles(stagedChangeEntries, "");
+const changedFiles = getChangedFiles(stagedChangeEntries, workingTreeChangeEntries);
 const skipReason = getSkipReason({
   runContext,
-  stagedChanges,
+  stagedFiles,
 });
 
-const exitCode = main();
-if (typeof exitCode === "number") {
-  process.exitCode = exitCode;
+if (isCliEntryPoint()) {
+  const exitCode = main();
+  if (typeof exitCode === "number") {
+    process.exitCode = exitCode;
+  }
 }
 
 function main() {
@@ -277,13 +284,8 @@ function buildPickupNotes(changedFiles, workingTreeChanges) {
 function getChangedFiles(stagedChanges, workingTreeChanges) {
   const files = new Set();
 
-  for (const line of [...stagedChanges, ...workingTreeChanges]) {
-    const normalized = line.trim();
-    if (!normalized) continue;
-    const parts = normalized.split(/\s+/);
-    const maybeFile = parts.at(-1);
-    if (maybeFile) files.add(maybeFile);
-  }
+  collectNameStatusPaths(stagedChanges, files);
+  collectStatusPaths(workingTreeChanges, files);
 
   return [...files];
 }
@@ -297,12 +299,11 @@ function getSkipReason(input) {
     return null;
   }
 
-  if (input.stagedChanges.length === 0 && docsExist()) {
+  if (input.stagedFiles.length === 0 && docsExist()) {
     return "Documentation refresh skipped: no staged changes detected.";
   }
 
-  const stagedFiles = getChangedFiles(input.stagedChanges, []);
-  if (stagedFiles.length > 0 && stagedFiles.every((file) => managedDocFiles.has(file)) && docsExist()) {
+  if (input.stagedFiles.length > 0 && input.stagedFiles.every((file) => managedDocFiles.has(file)) && docsExist()) {
     return "Documentation refresh skipped: staged changes only touch managed docs.";
   }
 
@@ -447,6 +448,56 @@ function splitLines(value) {
     .filter(Boolean);
 }
 
+function splitNullDelimited(value) {
+  return value.split("\0").filter(Boolean);
+}
+
+function collectNameStatusPaths(value, files) {
+  const entries = splitNullDelimited(value);
+
+  for (let index = 0; index < entries.length;) {
+    const status = entries[index++];
+    if (!status) continue;
+
+    if (status.startsWith("R") || status.startsWith("C")) {
+      index += 1;
+      const targetPath = entries[index++];
+      if (targetPath) {
+        files.add(normalizeRepoRelativePath(targetPath));
+      }
+      continue;
+    }
+
+    const filePath = entries[index++];
+    if (filePath) {
+      files.add(normalizeRepoRelativePath(filePath));
+    }
+  }
+}
+
+function collectStatusPaths(value, files) {
+  const entries = splitNullDelimited(value);
+
+  for (let index = 0; index < entries.length; index += 1) {
+    const entry = entries[index];
+    if (!entry || entry.length < 4) continue;
+
+    const status = entry.slice(0, 2);
+    const filePath = entry.slice(3);
+    if (filePath) {
+      files.add(normalizeRepoRelativePath(filePath));
+    }
+
+    if (status.includes("R") || status.includes("C")) {
+      index += 1;
+    }
+  }
+}
+
+function normalizeRepoRelativePath(filePath) {
+  return filePath.replace(/\\/g, "/");
+}
+
 function resolveGitDir() {
   const gitDirValue = safeRun(["git", "rev-parse", "--git-dir"]).trim();
   if (!gitDirValue) {
@@ -459,10 +510,11 @@ function resolveGitDir() {
 }
 
 function acquireLock(targetPath, staleMs) {
+  const ownerId = `${process.pid}:${randomUUID()}`;
+
   try {
-    const fd = openSync(targetPath, "wx");
-    closeSync(fd);
-    return () => safeUnlink(targetPath);
+    writeLockFile(targetPath, ownerId);
+    return createLockRelease(targetPath, ownerId);
   } catch (error) {
     if (!isAlreadyExistsError(error)) {
       console.warn(`Unable to create docs refresh lock: ${formatError(error)}`);
@@ -473,24 +525,62 @@ function acquireLock(targetPath, staleMs) {
   try {
     const ageMs = Date.now() - statSync(targetPath).mtimeMs;
     if (ageMs > staleMs) {
-      safeUnlink(targetPath);
-      const fd = openSync(targetPath, "wx");
-      closeSync(fd);
-      return () => safeUnlink(targetPath);
+      const existingOwner = readLockOwner(targetPath);
+      const released = releaseOwnedLock(targetPath, existingOwner);
+      if (!released && existsSync(targetPath)) {
+        return null;
+      }
+
+      writeLockFile(targetPath, ownerId);
+      return createLockRelease(targetPath, ownerId);
     }
   } catch (error) {
+    if (isAlreadyExistsError(error)) {
+      return null;
+    }
     console.warn(`Unable to inspect docs refresh lock: ${formatError(error)}`);
   }
 
   return null;
 }
 
-function safeUnlink(targetPath) {
+function writeLockFile(targetPath, ownerId) {
+  const fd = openSync(targetPath, "wx");
   try {
+    writeFileSync(fd, ownerId, "utf8");
+  } finally {
+    closeSync(fd);
+  }
+}
+
+function createLockRelease(targetPath, ownerId) {
+  return () => {
+    releaseOwnedLock(targetPath, ownerId);
+  };
+}
+
+function readLockOwner(targetPath) {
+  return readFileSync(targetPath, "utf8");
+}
+
+function releaseOwnedLock(targetPath, expectedOwnerId) {
+  try {
+    const currentOwnerId = readLockOwner(targetPath);
+    if (currentOwnerId !== expectedOwnerId) {
+      return false;
+    }
+
     unlinkSync(targetPath);
+    return true;
   } catch {
     // Ignore lock cleanup failures.
+    return false;
   }
+}
+
+function isCliEntryPoint() {
+  const entryPoint = process.argv[1];
+  return Boolean(entryPoint) && import.meta.url === pathToFileURL(entryPoint).href;
 }
 
 function isAlreadyExistsError(error) {
@@ -540,3 +630,5 @@ function failOrWarn(message, shouldFail) {
   console.warn(message);
   return 0;
 }
+
+export { acquireLock, getChangedFiles, normalizeRepoRelativePath };
