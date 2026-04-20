@@ -163,16 +163,7 @@ describe("createBlogPostPR", () => {
     );
   });
 
-  it("throws when no image assets are provided", async () => {
-    vi.mocked(fetch)
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify({ default_branch: "main" }), { status: 200 })
-      )
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify({ object: { sha: "abc123" } }), { status: 200 })
-      )
-      .mockResolvedValueOnce(new Response(JSON.stringify({}), { status: 200 }));
-
+  it("throws before contacting GitHub when no image assets are provided", async () => {
     await expect(
       createBlogPostPR({
         title: "Hello World",
@@ -181,6 +172,24 @@ describe("createBlogPostPR", () => {
         status: "published",
       })
     ).rejects.toThrow(/requires at least one image/i);
+
+    // Validation must happen up front so we never leave an orphaned remote
+    // branch behind when the caller hasn't supplied any image assets.
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("throws before contacting GitHub when images is an empty array", async () => {
+    await expect(
+      createBlogPostPR({
+        title: "Hello World",
+        content: "Body",
+        scheduledDate: "2026-03-04",
+        status: "published",
+        images: [],
+      })
+    ).rejects.toThrow(/requires at least one image/i);
+
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   it("throws when repo fetch fails", async () => {

@@ -237,6 +237,16 @@ export async function createBlogPostPR(params: {
   coverImageAlt?: string;
   images?: PublishImageAsset[];
 }): Promise<{ prUrl: string; branchName: string }> {
+  // Validate up front so we never create a remote branch that can't be
+  // completed — callers must supply at least one image for the cover asset.
+  const images = params.images ?? [];
+  const coverSource = images.find((asset) => asset.isCover) ?? images[0];
+  if (!coverSource) {
+    throw new Error(
+      "Publishing requires at least one image so the PR can commit a local cover image."
+    );
+  }
+
   const date = params.scheduledDate || new Date().toISOString().split("T")[0];
   const slug = `${date}-${slugify(params.title)}`;
   const fileName = `${slug}.mdx`;
@@ -283,16 +293,8 @@ export async function createBlogPostPR(params: {
 
   const preparedAssets: PreparedImageAsset[] = [];
   const usedFileNames = new Set<string>();
-  const coverSource =
-    params.images?.find((asset) => asset.isCover) ?? params.images?.[0];
 
-  if (!coverSource) {
-    throw new Error(
-      "Publishing requires at least one image so the PR can commit a local cover image."
-    );
-  }
-
-  for (const [index, asset] of (params.images ?? []).entries()) {
+  for (const [index, asset] of images.entries()) {
     const response = await fetch(asset.sourceUrl);
     if (!response.ok) {
       throw new Error(`Failed to download image asset: ${response.status}`);
