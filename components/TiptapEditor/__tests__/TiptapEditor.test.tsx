@@ -17,12 +17,6 @@ vi.mock("@tiptap/starter-kit", () => ({
   },
 }));
 
-vi.mock("@tiptap/extension-link", () => ({
-  default: {
-    configure: vi.fn(() => ({ name: "Link" })),
-  },
-}));
-
 vi.mock("@tiptap/extension-placeholder", () => ({
   default: {
     configure: vi.fn(() => ({ name: "Placeholder" })),
@@ -68,6 +62,6 @@ describe("TiptapEditor", () => {
     )
     expect(screen.getByTestId("toolbar")).toBeInTheDocument()
     expect(screen.getByTestId("editor-content")).toHaveTextContent("false")
-    expect(screen.getByTestId("editor-scroll-region")).toHaveClass("overflow-visible")
+    expect(screen.getByTestId("editor-scroll-region")).toHaveClass("overflow-y-auto")
   })
 })

@@ -3,7 +3,6 @@
 import { useEffect, useImperativeHandle, forwardRef, useState } from "react";
 import { useEditor, EditorContent, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import Link from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
 import Image from "@tiptap/extension-image";
 import { Sparkles } from "lucide-react";
@@ -69,10 +68,13 @@ export const TiptapEditor = forwardRef<TiptapEditorHandle, TiptapEditorProps>(
       extensions: [
         StarterKit.configure({
           heading: { levels: [2, 3] },
-        }),
-        Link.configure({
-          openOnClick: false,
-          autolink: true,
+          // Configure Link here — StarterKit v3 bundles Link, so we configure
+          // it in-place rather than adding a separate Link extension (which
+          // would produce a "Duplicate extension names: link" warning).
+          link: {
+            openOnClick: false,
+            autolink: true,
+          },
         }),
         Placeholder.configure({
           placeholder,
@@ -199,7 +201,7 @@ export const TiptapEditor = forwardRef<TiptapEditorHandle, TiptapEditorProps>(
         <Toolbar editor={editor} onImageInsert={onImageInsert} />
         <div
           data-testid="editor-scroll-region"
-          className="flex-1 overflow-visible px-8 py-2"
+          className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-8 py-2"
         >
           <EditorContent editor={editor} className="min-h-full" />
         </div>
