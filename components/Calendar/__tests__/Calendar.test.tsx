@@ -9,7 +9,7 @@ afterAll(() => vi.useRealTimers())
 
 const mockPosts = [
   { _id: "p1" as Id<"posts">, type: "blog" as const, title: "My Blog Post", content: "", status: "scheduled" as const, scheduledDate: "2026-03-04", createdAt: 0, updatedAt: 0 },
-  { _id: "p2" as Id<"posts">, type: "linkedin" as const, title: undefined, content: "LinkedIn text", status: "draft" as const, scheduledDate: "2026-03-04", createdAt: 0, updatedAt: 0 },
+  { _id: "p2" as Id<"posts">, type: "linkedin" as const, linkedinBrand: "corvo_labs" as const, title: undefined, content: "LinkedIn text", status: "draft" as const, scheduledDate: "2026-03-04", createdAt: 0, updatedAt: 0 },
 ]
 
 describe('Calendar', () => {
@@ -57,5 +57,24 @@ describe('Calendar', () => {
     render(<Calendar posts={mockPosts} filter="all" onCreatePost={vi.fn()} onEditPost={onEditPost} />)
     fireEvent.click(screen.getByText('My Blog Post'))
     expect(onEditPost).toHaveBeenCalledWith(mockPosts[0])
+  })
+
+  it('shows linkedin brand on linkedin chips', () => {
+    render(<Calendar posts={mockPosts} filter="all" onCreatePost={vi.fn()} onEditPost={vi.fn()} />)
+    expect(screen.getByText('Corvo')).toBeInTheDocument()
+  })
+
+  it('expands hidden posts when +more is clicked', () => {
+    const li = mockPosts[1]
+    const many = [
+      { ...li, _id: "l1" as Id<"posts">, content: "L1" },
+      { ...li, _id: "l2" as Id<"posts">, content: "L2" },
+      { ...li, _id: "l3" as Id<"posts">, content: "L3" },
+      { ...li, _id: "l4" as Id<"posts">, content: "L4" },
+    ]
+    render(<Calendar posts={many} filter="linkedin" onCreatePost={vi.fn()} onEditPost={vi.fn()} />)
+    expect(screen.queryByText('L4')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /\+1 more \(show all\)/i }))
+    expect(screen.getByText('L4')).toBeInTheDocument()
   })
 })

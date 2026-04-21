@@ -2,10 +2,13 @@
 
 import { FileText, Linkedin } from "lucide-react";
 import { Id } from "@/convex/_generated/dataModel";
+import type { LinkedinBrand } from "@/lib/linkedinBrand";
+import { formatLinkedinBrandShort, resolveLinkedinBrand } from "@/lib/linkedinBrand";
 
 interface Post {
   _id: Id<"posts">;
   type: "blog" | "linkedin";
+  linkedinBrand?: LinkedinBrand;
   title?: string;
   content: string;
   status: string;
@@ -16,11 +19,13 @@ interface Post {
 
 type Filter = "all" | "blog" | "linkedin";
 type TimePeriod = "all" | "this-month" | "last-3-months" | "this-year";
+export type LinkedinBrandFilter = "all" | LinkedinBrand;
 
 interface ContentLibraryProps {
   posts: Post[];
   filter: Filter;
   timePeriod: TimePeriod;
+  linkedinBrandFilter: LinkedinBrandFilter;
   onEditPost: (post: Post) => void;
 }
 
@@ -63,9 +68,25 @@ const STATUS_STYLES: Record<string, string> = {
   published: "bg-green-50 text-green-700",
 };
 
-export function ContentLibrary({ posts, filter, timePeriod, onEditPost }: ContentLibraryProps) {
+function matchesLinkedinBrand(
+  post: Post,
+  brandFilter: LinkedinBrandFilter
+): boolean {
+  if (brandFilter === "all") return true;
+  if (post.type !== "linkedin") return true;
+  return resolveLinkedinBrand(post.linkedinBrand) === brandFilter;
+}
+
+export function ContentLibrary({
+  posts,
+  filter,
+  timePeriod,
+  linkedinBrandFilter,
+  onEditPost,
+}: ContentLibraryProps) {
   const filtered = posts
     .filter((p) => filter === "all" || p.type === filter)
+    .filter((p) => matchesLinkedinBrand(p, linkedinBrandFilter))
     .filter((p) => matchesTimePeriod(p, timePeriod))
     .sort((a, b) => b.updatedAt - a.updatedAt);
 
@@ -116,7 +137,9 @@ export function ContentLibrary({ posts, filter, timePeriod, onEditPost }: Conten
                 ) : (
                   <Linkedin size={11} className="shrink-0" />
                 )}
-                {post.type === "blog" ? "Blog" : "LinkedIn"}
+                {post.type === "blog"
+                  ? "Blog"
+                  : `LinkedIn · ${formatLinkedinBrandShort(post.linkedinBrand)}`}
               </span>
 
               {/* Status badge */}

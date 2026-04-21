@@ -8,7 +8,10 @@ import { Id } from "@/convex/_generated/dataModel";
 import { Calendar } from "@/components/Calendar/Calendar";
 import { LinkedInPostEditor } from "@/components/LinkedInPostEditor/LinkedInPostEditor";
 import { CreatePostModal } from "@/components/CreatePostModal/CreatePostModal";
-import { ContentLibrary } from "@/components/ContentLibrary/ContentLibrary";
+import {
+  ContentLibrary,
+  type LinkedinBrandFilter,
+} from "@/components/ContentLibrary/ContentLibrary";
 import { WorkflowBoard } from "@/components/WorkflowBoard/WorkflowBoard";
 import { UserButton } from "@clerk/nextjs";
 import {
@@ -27,6 +30,12 @@ type Filter = "all" | "blog" | "linkedin";
 type View = "calendar" | "library" | "workflow";
 type TimePeriod = "all" | "this-month" | "last-3-months" | "this-year";
 
+const LINKEDIN_BRAND_FILTER_OPTIONS: { value: LinkedinBrandFilter; label: string }[] = [
+  { value: "all", label: "All pages" },
+  { value: "corvo_labs", label: "Corvo Labs" },
+  { value: "lower_db", label: "the lower dB" },
+];
+
 export default function Dashboard() {
   const router = useRouter();
   const allPosts = useQuery(api.posts.list, {});
@@ -34,6 +43,8 @@ export default function Dashboard() {
   const [filter, setFilter] = useState<Filter>("all");
   const [activeView, setActiveView] = useState<View>("calendar");
   const [timePeriod, setTimePeriod] = useState<TimePeriod>("all");
+  const [linkedinBrandFilter, setLinkedinBrandFilter] =
+    useState<LinkedinBrandFilter>("all");
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [createDate, setCreateDate] = useState<string | null>(null);
   const [linkedinEditorOpen, setLinkedinEditorOpen] = useState(false);
@@ -178,22 +189,50 @@ export default function Dashboard() {
             )}
 
             {activeView !== "workflow" && (
-              <div className="flex items-center gap-0.5 rounded-[18px] border border-gray-200 bg-white p-1 shadow-[0_12px_30px_rgba(0,21,36,0.05)]">
-                {(["all", "blog", "linkedin"] as Filter[]).map((f) => (
-                  <button
-                    key={f}
-                    onClick={() => setFilter(f)}
-                    className={`flex items-center gap-1.5 rounded-2xl px-3 py-1.5 text-sm font-medium capitalize transition-colors ${
-                      filter === f
-                        ? "bg-[#001524] text-white"
-                        : "text-gray-500 hover:bg-[#f5f7f8] hover:text-[#001524]"
-                    }`}
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-0.5 rounded-[18px] border border-gray-200 bg-white p-1 shadow-[0_12px_30px_rgba(0,21,36,0.05)]">
+                  {(["all", "blog", "linkedin"] as Filter[]).map((f) => (
+                    <button
+                      key={f}
+                      type="button"
+                      onClick={() => {
+                        setFilter(f);
+                        if (f === "blog") setLinkedinBrandFilter("all");
+                      }}
+                      className={`flex items-center gap-1.5 rounded-2xl px-3 py-1.5 text-sm font-medium capitalize transition-colors ${
+                        filter === f
+                          ? "bg-[#001524] text-white"
+                          : "text-gray-500 hover:bg-[#f5f7f8] hover:text-[#001524]"
+                      }`}
+                    >
+                      {f === "blog" && <FileText size={13} />}
+                      {f === "linkedin" && <Linkedin size={13} />}
+                      {f === "all" ? "All" : f === "blog" ? "Blog" : "LinkedIn"}
+                    </button>
+                  ))}
+                </div>
+                {activeView === "library" && (filter === "all" || filter === "linkedin") && (
+                  <div
+                    className="flex items-center gap-0.5 rounded-[18px] border border-gray-200 bg-white p-1 shadow-[0_12px_30px_rgba(0,21,36,0.05)]"
+                    role="group"
+                    aria-label="LinkedIn page"
                   >
-                    {f === "blog" && <FileText size={13} />}
-                    {f === "linkedin" && <Linkedin size={13} />}
-                    {f === "all" ? "All" : f === "blog" ? "Blog" : "LinkedIn"}
-                  </button>
-                ))}
+                    {LINKEDIN_BRAND_FILTER_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setLinkedinBrandFilter(opt.value)}
+                        className={`rounded-2xl px-3 py-1.5 text-sm font-medium transition-colors ${
+                          linkedinBrandFilter === opt.value
+                            ? "bg-[#15616d] text-white"
+                            : "text-gray-500 hover:bg-[#f5f7f8] hover:text-[#001524]"
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -212,6 +251,7 @@ export default function Dashboard() {
             posts={allPosts || []}
             filter={filter}
             timePeriod={timePeriod}
+            linkedinBrandFilter={linkedinBrandFilter}
             onEditPost={handleEditPost}
           />
         ) : (
