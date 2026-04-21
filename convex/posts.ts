@@ -1,5 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import type { Doc } from "./_generated/dataModel";
+import { linkedinBrandValidator } from "./schema";
 
 export const list = query({
   args: {
@@ -51,11 +53,16 @@ export const create = mutation({
     category: v.optional(v.string()),
     featured: v.optional(v.boolean()),
     coverImageAlt: v.optional(v.string()),
+    linkedinBrand: v.optional(linkedinBrandValidator),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
+    const { linkedinBrand, ...rest } = args;
     return await ctx.db.insert("posts", {
-      ...args,
+      ...rest,
+      ...(args.type === "linkedin"
+        ? { linkedinBrand: linkedinBrand ?? "corvo_labs" }
+        : {}),
       createdAt: now,
       updatedAt: now,
     });
@@ -92,9 +99,30 @@ export const update = mutation({
     category: v.optional(v.string()),
     featured: v.optional(v.boolean()),
     coverImageAlt: v.optional(v.string()),
+    linkedinBrand: v.optional(linkedinBrandValidator),
   },
   handler: async (ctx, args) => {
-    const { id, ...fields } = args;
+    const { id, ...raw } = args;
+    const existing = await ctx.db.get(id);
+    if (!existing) {
+      throw new Error("Post not found");
+    }
+
+    const fields: Partial<Doc<"posts">> = {};
+    for (const [key, value] of Object.entries(raw)) {
+      if (value !== undefined) {
+        (fields as Record<string, unknown>)[key] = value;
+      }
+    }
+
+    if (existing.type === "linkedin") {
+      const nextBrand =
+        fields.linkedinBrand ?? existing.linkedinBrand ?? "corvo_labs";
+      fields.linkedinBrand = nextBrand;
+    } else {
+      delete fields.linkedinBrand;
+    }
+
     await ctx.db.patch(id, { ...fields, updatedAt: Date.now() });
   },
 });
@@ -103,6 +131,29 @@ export const remove = mutation({
   args: { id: v.id("posts") },
   handler: async (ctx, args) => {
     await ctx.db.delete(args.id);
+  },
+});
+
+/** Idempotent: sets missing linkedinBrand to corvo_labs for all LinkedIn posts. Run once after deploy. */
+export const backfillLinkedinBrand = mutation({
+  args: {},
+  returns: v.object({ patched: v.number() }),
+  handler: async (ctx) => {
+    const linkedin = await ctx.db
+      .query("posts")
+      .withIndex("by_type", (q) => q.eq("type", "linkedin"))
+      .collect();
+    let patched = 0;
+    for (const p of linkedin) {
+      if (p.linkedinBrand === undefined) {
+        await ctx.db.patch(p._id, {
+          linkedinBrand: "corvo_labs",
+          updatedAt: Date.now(),
+        });
+        patched += 1;
+      }
+    }
+    return { patched };
   },
 });
 
@@ -152,6 +203,7 @@ export const createFromIdea = mutation({
 
     const postId = await ctx.db.insert("posts", {
       type: args.type,
+      ...(args.type === "linkedin" ? { linkedinBrand: "corvo_labs" as const } : {}),
       title: args.type === "blog" ? idea.sourceTitle || "Idea draft" : undefined,
       content:
         args.type === "blog"

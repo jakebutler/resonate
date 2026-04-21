@@ -1,3 +1,5 @@
+import type { LinkedinBrand } from "@/lib/linkedinBrand";
+
 export type ImportedPostType = "blog" | "linkedin";
 
 export type ImportedPostSeed = {
@@ -6,6 +8,7 @@ export type ImportedPostSeed = {
   content: string;
   externalUrl: string;
   publishedDate: string;
+  linkedinBrand?: LinkedinBrand;
 };
 
 export type NormalizedImportedPost = {
@@ -16,6 +19,7 @@ export type NormalizedImportedPost = {
   scheduledDate: string;
   externalUrl: string;
   publishedAt: number;
+  linkedinBrand?: LinkedinBrand;
 };
 
 export function canonicalizeExternalUrl(value: string): string {
@@ -43,6 +47,9 @@ export function normalizeImportedPost(seed: ImportedPostSeed): NormalizedImporte
     scheduledDate: publishedDate,
     externalUrl,
     publishedAt: Date.parse(`${publishedDate}T00:00:00.000Z`),
+    ...(seed.type === "linkedin"
+      ? { linkedinBrand: seed.linkedinBrand ?? "corvo_labs" }
+      : {}),
   };
 }
 

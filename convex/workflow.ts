@@ -594,6 +594,7 @@ export const createDraftFromIdea = mutation({
     const title = args.seedTitle?.trim() || idea.title;
     const postId = await ctx.db.insert("posts", {
       type: args.type,
+      ...(args.type === "linkedin" ? { linkedinBrand: "corvo_labs" as const } : {}),
       title,
       content: args.seedContent?.trim() || seedPostContent(args.type, idea),
       status: "draft",

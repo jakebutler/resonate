@@ -3,10 +3,13 @@
 import { useState } from "react";
 import { ChevronLeft, ChevronRight, Plus, FileText, Linkedin } from "lucide-react";
 import { Id } from "@/convex/_generated/dataModel";
+import type { LinkedinBrand } from "@/lib/linkedinBrand";
+import { formatLinkedinBrandShort, resolveLinkedinBrand } from "@/lib/linkedinBrand";
 
 interface Post {
   _id: Id<"posts">;
   type: "blog" | "linkedin";
+  linkedinBrand?: LinkedinBrand;
   title?: string;
   content: string;
   status: string;
@@ -21,6 +24,7 @@ interface CalendarProps {
 }
 
 const WEEKDAYS = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+const COLLAPSED_DAY_POST_LIMIT = 3;
 
 function formatYMD(d: Date): string {
   const y = d.getFullYear();
@@ -33,11 +37,21 @@ function todayYMD(): string {
   return formatYMD(new Date());
 }
 
+function postAriaLabel(p: Post): string {
+  if (p.type === "blog") {
+    return `Blog post: ${p.title || "Untitled"}`;
+  }
+  const brand = formatLinkedinBrandShort(p.linkedinBrand);
+  const snippet = (p.content || "").trim().slice(0, 80);
+  return `LinkedIn post for ${brand}: ${snippet || "No content"}`;
+}
+
 export function Calendar({ posts, filter, onCreatePost, onEditPost }: CalendarProps) {
   const today = new Date();
   const [currentMonth, setCurrentMonth] = useState(
     new Date(today.getFullYear(), today.getMonth(), 1)
   );
+  const [expandedDays, setExpandedDays] = useState<Record<string, boolean>>({});
 
   const prevMonth = () =>
     setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
@@ -76,6 +90,7 @@ export function Calendar({ posts, filter, onCreatePost, onEditPost }: CalendarPr
       {/* Month nav */}
       <div className="flex items-center gap-3 mb-4">
         <button
+          type="button"
           onClick={prevMonth}
           aria-label="Previous month"
           className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-600"
@@ -84,6 +99,7 @@ export function Calendar({ posts, filter, onCreatePost, onEditPost }: CalendarPr
         </button>
         <span className="font-semibold text-[#001524]">{monthLabel}</span>
         <button
+          type="button"
           onClick={nextMonth}
           aria-label="Next month"
           className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-600"
@@ -115,6 +131,12 @@ export function Calendar({ posts, filter, onCreatePost, onEditPost }: CalendarPr
             const dateStr = formatYMD(new Date(year, month, day));
             const isToday = dateStr === todayStr;
             const dayPosts = postsByDate[dateStr] || [];
+            const expanded = expandedDays[dateStr] ?? false;
+            const visiblePosts =
+              expanded || dayPosts.length <= COLLAPSED_DAY_POST_LIMIT
+                ? dayPosts
+                : dayPosts.slice(0, COLLAPSED_DAY_POST_LIMIT);
+            const hiddenCount = expanded ? 0 : Math.max(0, dayPosts.length - COLLAPSED_DAY_POST_LIMIT);
 
             // First cell of the month gets the "MAR 1, 2026" style label
             const isFirst = day === 1;
@@ -144,8 +166,10 @@ export function Calendar({ posts, filter, onCreatePost, onEditPost }: CalendarPr
                     </span>
                   )}
                   <button
+                    type="button"
                     onClick={() => onCreatePost(dateStr)}
                     className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-[#ff7d00] transition-all p-0.5 rounded"
+                    aria-label={`Create post on ${dateStr}`}
                   >
                     <Plus size={14} />
                   </button>
@@ -153,11 +177,13 @@ export function Calendar({ posts, filter, onCreatePost, onEditPost }: CalendarPr
 
                 {/* Posts */}
                 <div className="flex flex-col gap-0.5 flex-1">
-                  {dayPosts.slice(0, 3).map((p) => (
+                  {visiblePosts.map((p) => (
                     <button
+                      type="button"
                       key={p._id}
                       onClick={() => onEditPost(p)}
-                      className={`w-full text-left flex items-center gap-1 px-1.5 py-0.5 rounded text-xs truncate transition-colors ${
+                      aria-label={postAriaLabel(p)}
+                      className={`w-full text-left flex items-center gap-1 px-1.5 py-0.5 rounded text-xs transition-colors ${
                         p.type === "blog"
                           ? "bg-[#ffecd1]/60 text-[#78290f] hover:bg-[#ffecd1]"
                           : "bg-[#15616d]/10 text-[#15616d] hover:bg-[#15616d]/20"
@@ -168,13 +194,41 @@ export function Calendar({ posts, filter, onCreatePost, onEditPost }: CalendarPr
                       ) : (
                         <Linkedin size={10} className="shrink-0" />
                       )}
-                      <span className="truncate">
+                      {p.type === "linkedin" && (
+                        <span className="shrink-0 max-w-[3.25rem] truncate font-semibold text-[10px] uppercase tracking-tight">
+                          {formatLinkedinBrandShort(resolveLinkedinBrand(p.linkedinBrand))}
+                        </span>
+                      )}
+                      <span className="truncate min-w-0">
                         {p.type === "blog" ? p.title || "Untitled" : p.content}
                       </span>
                     </button>
                   ))}
-                  {dayPosts.length > 3 && (
-                    <span className="text-xs text-gray-400 px-1">+{dayPosts.length - 3} more</span>
+                  {hiddenCount > 0 && (
+                    <button
+                      type="button"
+                      className="text-left text-xs text-[#15616d] font-medium px-1 py-0.5 rounded hover:bg-[#15616d]/10 focus:outline-none focus:ring-2 focus:ring-[#15616d]/30"
+                      onClick={() =>
+                        setExpandedDays((prev) => ({ ...prev, [dateStr]: true }))
+                      }
+                    >
+                      +{hiddenCount} more (show all)
+                    </button>
+                  )}
+                  {expanded && dayPosts.length > COLLAPSED_DAY_POST_LIMIT && (
+                    <button
+                      type="button"
+                      className="text-left text-xs text-gray-500 px-1 py-0.5 rounded hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                      onClick={() =>
+                        setExpandedDays((prev) => {
+                          const next = { ...prev };
+                          delete next[dateStr];
+                          return next;
+                        })
+                      }
+                    >
+                      Show less
+                    </button>
                   )}
                 </div>
               </div>

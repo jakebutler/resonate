@@ -7,6 +7,11 @@ import { Id } from "@/convex/_generated/dataModel";
 import { SlideOver } from "@/components/ui/SlideOver";
 import { Button } from "@/components/ui/button";
 import { AIAssistant } from "@/components/AIAssistant/AIAssistant";
+import {
+  type LinkedinBrand,
+  formatLinkedinBrandLabel,
+  resolveLinkedinBrand,
+} from "@/lib/linkedinBrand";
 import { Linkedin, Trash2, Save, Edit3, Sparkles } from "lucide-react";
 
 const MAX_CHARS = 3000;
@@ -45,6 +50,7 @@ export function LinkedInPostEditor({ open, postId, initialDate, onClose, onSaved
   const [isRepost, setIsRepost] = useState(false);
   const [externalUrl, setExternalUrl] = useState("");
   const [linkedBlogPostId, setLinkedBlogPostId] = useState<string>("");
+  const [linkedinBrand, setLinkedinBrand] = useState<LinkedinBrand>("corvo_labs");
   const [saving, setSaving] = useState(false);
 
   // NOTE: This useEffect is intentionally duplicated in BlogPostEditor.tsx.
@@ -66,6 +72,7 @@ export function LinkedInPostEditor({ open, postId, initialDate, onClose, onSaved
       setIsRepost(existing.isRepost || false);
       setExternalUrl(existing.externalUrl || "");
       setLinkedBlogPostId(existing.linkedBlogPostId || "");
+      setLinkedinBrand(resolveLinkedinBrand(existing.linkedinBrand));
     } else if (!postId) {
       setContent("");
       setStatus("draft");
@@ -74,6 +81,7 @@ export function LinkedInPostEditor({ open, postId, initialDate, onClose, onSaved
       setIsRepost(false);
       setExternalUrl("");
       setLinkedBlogPostId("");
+      setLinkedinBrand("corvo_labs");
     }
   }, [existing, initialDate, postId]);
 
@@ -98,6 +106,7 @@ export function LinkedInPostEditor({ open, postId, initialDate, onClose, onSaved
         isRepost,
         externalUrl: externalUrl || undefined,
         linkedBlogPostId: linkedBlogPostId ? (linkedBlogPostId as Id<"posts">) : undefined,
+        linkedinBrand,
       };
       if (postId) {
         await updatePost({ id: postId, ...payload });
@@ -175,7 +184,7 @@ export function LinkedInPostEditor({ open, postId, initialDate, onClose, onSaved
         <p className="text-sm text-gray-500">Post not found.</p>
       ) : isPastPost ? (
         <div className="space-y-5">
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
             <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
               <p className="text-xs uppercase tracking-wide text-gray-400">Publish Date</p>
               <p className="mt-1 text-sm font-medium text-[#001524]">{scheduledDate || "Not set"}</p>
@@ -187,6 +196,12 @@ export function LinkedInPostEditor({ open, postId, initialDate, onClose, onSaved
             <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
               <p className="text-xs uppercase tracking-wide text-gray-400">Status</p>
               <p className="mt-1 text-sm font-medium capitalize text-[#001524]">{status}</p>
+            </div>
+            <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+              <p className="text-xs uppercase tracking-wide text-gray-400">LinkedIn page</p>
+              <p className="mt-1 text-sm font-medium text-[#001524]">
+                {formatLinkedinBrandLabel(resolveLinkedinBrand(existing?.linkedinBrand))}
+              </p>
             </div>
           </div>
 
@@ -282,6 +297,21 @@ export function LinkedInPostEditor({ open, postId, initialDate, onClose, onSaved
             <option value="scheduled">Scheduled</option>
           </select>
         </div>
+
+        <fieldset className="space-y-1.5 rounded-lg border border-gray-200 p-3">
+          <legend className="px-1 text-sm font-medium text-gray-700">LinkedIn page</legend>
+          <p className="text-xs text-gray-500 px-1 -mt-1 mb-1">Which company page this post is for</p>
+          <select
+            id="linkedin-post-brand"
+            aria-label="LinkedIn page"
+            value={linkedinBrand}
+            onChange={(e) => setLinkedinBrand(e.target.value as LinkedinBrand)}
+            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#ff7d00] focus:border-transparent"
+          >
+            <option value="corvo_labs">{formatLinkedinBrandLabel("corvo_labs")}</option>
+            <option value="lower_db">{formatLinkedinBrandLabel("lower_db")}</option>
+          </select>
+        </fieldset>
 
         {/* Tab toggle */}
         <div className="flex rounded-xl border border-gray-200 overflow-hidden">

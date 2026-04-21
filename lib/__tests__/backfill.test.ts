@@ -37,7 +37,20 @@ describe("normalizeImportedPost", () => {
       scheduledDate: "2026-02-10",
       externalUrl: "https://www.linkedin.com/posts/example-post",
       publishedAt: Date.parse("2026-02-10T00:00:00.000Z"),
+      linkedinBrand: "corvo_labs",
     });
+  });
+
+  it("preserves an explicit linkedin brand on linkedin seeds", () => {
+    expect(
+      normalizeImportedPost({
+        type: "linkedin",
+        content: "Hello",
+        externalUrl: "https://www.linkedin.com/posts/x",
+        publishedDate: "2026-02-10",
+        linkedinBrand: "lower_db",
+      }).linkedinBrand
+    ).toBe("lower_db");
   });
 });
 
