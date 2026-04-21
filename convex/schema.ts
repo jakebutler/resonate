@@ -1,6 +1,11 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
+export const linkedinBrandValidator = v.union(
+  v.literal("corvo_labs"),
+  v.literal("lower_db")
+);
+
 export default defineSchema({
   capturedIdeas: defineTable({
     userId: v.string(),
@@ -52,6 +57,7 @@ export default defineSchema({
 
   posts: defineTable({
     type: v.union(v.literal("blog"), v.literal("linkedin")),
+    linkedinBrand: v.optional(linkedinBrandValidator),
     title: v.optional(v.string()),
     content: v.string(),
     status: v.union(
