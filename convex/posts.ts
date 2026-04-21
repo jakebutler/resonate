@@ -45,6 +45,12 @@ export const create = mutation({
     heroImageId: v.optional(v.id("_storage")),
     tags: v.optional(v.array(v.string())),
     seoDescription: v.optional(v.string()),
+    subtitle: v.optional(v.string()),
+    excerpt: v.optional(v.string()),
+    author: v.optional(v.string()),
+    category: v.optional(v.string()),
+    featured: v.optional(v.boolean()),
+    coverImageAlt: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
@@ -80,6 +86,12 @@ export const update = mutation({
     heroImageId: v.optional(v.id("_storage")),
     tags: v.optional(v.array(v.string())),
     seoDescription: v.optional(v.string()),
+    subtitle: v.optional(v.string()),
+    excerpt: v.optional(v.string()),
+    author: v.optional(v.string()),
+    category: v.optional(v.string()),
+    featured: v.optional(v.boolean()),
+    coverImageAlt: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const { id, ...fields } = args;

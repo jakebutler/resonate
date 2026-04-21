@@ -1,48 +1,41 @@
 # Project Status
 
-Last updated: 04/12/2026 00:34:00 PDT
+Last updated: 04/20/2026 16:27:46 PDT
 
 ## State
 
-Resonate is running with the newer fullscreen blog editor layered on top of the older dashboard and workflow surfaces. This branch is focused on hardening the docs refresh workflow rather than changing product behavior.
+Resonate is a working content operations app with active surfaces for calendar planning, content editing, workflow review, and idea capture.
 
 ## Current Task
 
-Bring the docs-hook follow-up branch current with `main` and close the remaining parser and lock-handling edge cases in `scripts/update-docs.mjs`.
+Maintain the living documentation and preserve a handoff-quality snapshot of the repo state.
+
+## Session Focus
+
+- Refreshed documentation for the current repository state.
 
 ## Last Completed Task
 
-- `5f1cfd7` `fix: harden docs hook change parsing`
-
-## Verified In This Session
-
-- `scripts/__tests__/update-docs.test.ts`
-- Result: 5 tests passed via `npx vitest run scripts/__tests__/update-docs.test.ts`
-
-## Local Working Tree
-
-- Working tree is clean.
-
-## Non-Obvious Current Behavior
-
-- Changed-file detection now consumes NUL-delimited git output so paths with spaces and rename/copy records are handled correctly.
-- Docs refresh locks are ownership-aware: only the process that created the lock can release it.
-- Empty or malformed stale lock files are reclaimed based on file age, so they no longer block docs updates indefinitely.
-
-## Next Agent Pickup
-
-- If this branch moves again before merge, re-run `scripts/__tests__/update-docs.test.ts` after any change to `scripts/update-docs.mjs`.
-- If `main` advances again, prefer merging `origin/main` into this branch instead of rebasing so the PR history stays stable.
-- Keep the lock ownership check and stale-lock recovery coupled; relaxing one without the other will reintroduce either false unlocks or permanent stale locks.
+- 2e78e2d Merge main into feature/fullscreen-editor and fix editor scroll
 
 ## Recent Commits
 
-- `5f1cfd7` `fix: harden docs hook change parsing`
-- `ef739d8` `fix: scope docs lock cleanup to lock owner`
-- `dc0b836` `fix: harden docs hook path handling`
-- `c898b04` `chore: harden docs pre-commit workflow`
-- `493487c` `fix: pin image tray and expose hero control on touch`
+- 2e78e2d Merge main into feature/fullscreen-editor and fix editor scroll
+- c4defd0 Align blog publish flow with Corvo repo (#35)
+- 2835656 chore: harden docs pre-commit workflow (#33)
+- 296117e fix: keep image tray pinned and hero control visible on touch (#34)
+- 173a228 chore: harden docs pre-commit workflow
+
+## Local Working Tree
+
+- M  lib/__tests__/github.test.ts
+- M  lib/github.ts
+
+## Next Agent Pickup
+
+- Start by checking the living docs against the current code before making assumptions.
+- If the working set includes product changes, keep `docs/spec.md`, `docs/changelog.md`, and `docs/project-status.md` aligned in the same session.
 
 ## Branch
 
-- `chore/docs-hook-followup`
+- feature/fullscreen-editor

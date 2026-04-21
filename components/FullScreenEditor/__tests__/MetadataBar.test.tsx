@@ -8,12 +8,22 @@ describe('MetadataBar', () => {
     scheduledDate: '',
     scheduledTime: '10:00',
     tags: [] as string[],
-    seoDescription: '',
+    subtitle: '',
+    excerpt: '',
+    author: 'Jake Butler',
+    category: 'strategy',
+    featured: false,
+    coverImageAlt: '',
     onStatusChange: vi.fn(),
     onDateChange: vi.fn(),
     onTimeChange: vi.fn(),
     onTagsChange: vi.fn(),
-    onSeoDescriptionChange: vi.fn(),
+    onSubtitleChange: vi.fn(),
+    onExcerptChange: vi.fn(),
+    onAuthorChange: vi.fn(),
+    onCategoryChange: vi.fn(),
+    onFeaturedChange: vi.fn(),
+    onCoverImageAltChange: vi.fn(),
     onPublish: vi.fn(),
     publishing: false,
     githubPrUrl: '',
@@ -81,11 +91,16 @@ describe('MetadataBar', () => {
     expect(screen.queryByLabelText(/tags/i)).not.toBeInTheDocument()
   })
 
-  it('shows tags and SEO fields when gear icon is clicked', () => {
+  it('shows blog metadata fields when gear icon is clicked', () => {
     render(<MetadataBar {...defaultProps} />)
     fireEvent.click(screen.getByRole('button', { name: /settings/i }))
     expect(screen.getByLabelText(/tags/i)).toBeInTheDocument()
-    expect(screen.getByLabelText(/seo description/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/subtitle/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/excerpt/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/author/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/category/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/cover image alt/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/featured/i)).toBeInTheDocument()
   })
 
   it('preserves tag separators while typing and commits parsed tags on blur', () => {

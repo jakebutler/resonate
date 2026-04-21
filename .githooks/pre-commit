@@ -29,13 +29,4 @@ if ! RESONATE_DOCS_CONTEXT=hook node scripts/update-docs.mjs --mode=baseline; th
   exit 0
 fi
 
-docs_to_stage=()
-for doc_path in docs/spec.md docs/changelog.md docs/project-status.md; do
-  if [[ -f "$doc_path" ]]; then
-    docs_to_stage+=("$doc_path")
-  fi
-done
-
-if [[ "${#docs_to_stage[@]}" -gt 0 ]]; then
-  git add "${docs_to_stage[@]}"
-fi
+git add docs/spec.md docs/changelog.md docs/project-status.md

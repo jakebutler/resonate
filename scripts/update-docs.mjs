@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 
 import { execFileSync } from "node:child_process";
-import { randomUUID } from "node:crypto";
 import {
   closeSync,
   existsSync,
@@ -13,6 +12,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import path from "node:path";
+import { randomUUID } from "node:crypto";
 import { pathToFileURL } from "node:url";
 
 const repoRoot = execFileSync("git", ["rev-parse", "--show-toplevel"], {
@@ -27,9 +27,7 @@ const projectStatusPath = path.join(docsDir, "project-status.md");
 const promptPath = path.join(repoRoot, ".codex", "prompts", "documentation-subagent.md");
 const managedDocPaths = new Set([specPath, changelogPath, projectStatusPath]);
 const managedDocFiles = new Set(
-  [...managedDocPaths].map((filePath) =>
-    normalizeRepoRelativePath(path.relative(repoRoot, filePath))
-  )
+  [...managedDocPaths].map((filePath) => path.relative(repoRoot, filePath))
 );
 const lockPath = path.join(gitDir, "resonate-docs-update.lock");
 
@@ -292,10 +290,6 @@ function getChangedFiles(stagedChanges, workingTreeChanges) {
   return [...files];
 }
 
-function normalizeRepoRelativePath(filePath) {
-  return filePath.replace(/\\/g, "/");
-}
-
 function getSkipReason(input) {
   if (process.env.RESONATE_DOCS_HOOK_ACTIVE === "1") {
     return "Documentation refresh skipped: hook already active in this process tree.";
@@ -500,6 +494,10 @@ function collectStatusPaths(value, files) {
   }
 }
 
+function normalizeRepoRelativePath(filePath) {
+  return filePath.replace(/\\/g, "/");
+}
+
 function resolveGitDir() {
   const gitDirValue = safeRun(["git", "rev-parse", "--git-dir"]).trim();
   if (!gitDirValue) {
@@ -512,11 +510,11 @@ function resolveGitDir() {
 }
 
 function acquireLock(targetPath, staleMs) {
-  const ownerId = createLockOwnerId();
+  const ownerId = `${process.pid}:${randomUUID()}`;
 
   try {
     writeLockFile(targetPath, ownerId);
-    return () => releaseOwnedLock(targetPath, ownerId);
+    return createLockRelease(targetPath, ownerId);
   } catch (error) {
     if (!isAlreadyExistsError(error)) {
       console.warn(`Unable to create docs refresh lock: ${formatError(error)}`);
@@ -527,14 +525,14 @@ function acquireLock(targetPath, staleMs) {
   try {
     const ageMs = Date.now() - statSync(targetPath).mtimeMs;
     if (ageMs > staleMs) {
-      const existingOwnerId = readLockOwner(targetPath);
-      const released = releaseOwnedLock(targetPath, existingOwnerId);
+      const existingOwner = readLockOwner(targetPath);
+      const released = releaseOwnedLock(targetPath, existingOwner);
       if (!released && existsSync(targetPath)) {
         return null;
       }
 
       writeLockFile(targetPath, ownerId);
-      return () => releaseOwnedLock(targetPath, ownerId);
+      return createLockRelease(targetPath, ownerId);
     }
   } catch (error) {
     if (isAlreadyExistsError(error)) {
@@ -546,10 +544,6 @@ function acquireLock(targetPath, staleMs) {
   return null;
 }
 
-function createLockOwnerId() {
-  return `${process.pid}:${randomUUID()}`;
-}
-
 function writeLockFile(targetPath, ownerId) {
   const fd = openSync(targetPath, "wx");
   try {
@@ -559,14 +553,20 @@ function writeLockFile(targetPath, ownerId) {
   }
 }
 
+function createLockRelease(targetPath, ownerId) {
+  return () => {
+    releaseOwnedLock(targetPath, ownerId);
+  };
+}
+
 function readLockOwner(targetPath) {
   return readFileSync(targetPath, "utf8");
 }
 
-function releaseOwnedLock(targetPath, ownerId) {
+function releaseOwnedLock(targetPath, expectedOwnerId) {
   try {
-    const existingOwnerId = readLockOwner(targetPath);
-    if (existingOwnerId !== ownerId) {
+    const currentOwnerId = readLockOwner(targetPath);
+    if (currentOwnerId !== expectedOwnerId) {
       return false;
     }
 

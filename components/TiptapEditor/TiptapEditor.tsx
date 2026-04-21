@@ -197,7 +197,7 @@ export const TiptapEditor = forwardRef<TiptapEditorHandle, TiptapEditorProps>(
     }));
 
     return (
-      <div className="flex flex-1 flex-col">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <Toolbar editor={editor} onImageInsert={onImageInsert} />
         <div
           data-testid="editor-scroll-region"
