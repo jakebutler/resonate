@@ -95,14 +95,15 @@ function hasImportedPostChanged(
     linkedinBrand?: "corvo_labs" | "lower_db";
   }
 ): boolean {
-  const brandIncoming =
-    incoming.type === "linkedin"
-      ? incoming.linkedinBrand ?? "corvo_labs"
-      : undefined;
-  const brandExisting =
-    existing.type === "linkedin"
-      ? existing.linkedinBrand ?? "corvo_labs"
-      : undefined;
+  /** Same resolution as patch `linkedinBrand` when both rows are LinkedIn (omit ?? default on *existing* so legacy `undefined` still triggers one update). */
+  const patchLinkedinBrand =
+    existing.type === "linkedin" && incoming.type === "linkedin"
+      ? incoming.linkedinBrand ?? existing.linkedinBrand ?? "corvo_labs"
+      : null;
+  const linkedinBrandOutOfSync =
+    patchLinkedinBrand !== null &&
+    existing.linkedinBrand !== patchLinkedinBrand;
+
   return (
     existing.type !== incoming.type ||
     existing.title !== incoming.title ||
@@ -111,6 +112,6 @@ function hasImportedPostChanged(
     existing.scheduledDate !== incoming.scheduledDate ||
     existing.externalUrl !== incoming.externalUrl ||
     existing.publishedAt !== incoming.publishedAt ||
-    brandExisting !== brandIncoming
+    linkedinBrandOutOfSync
   );
 }
