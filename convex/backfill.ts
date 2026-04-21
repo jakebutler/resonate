@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
+import { linkedinBrandValidator } from "./schema";
 
 const importedPostValidator = v.object({
   type: v.union(v.literal("blog"), v.literal("linkedin")),
@@ -10,6 +11,7 @@ const importedPostValidator = v.object({
   scheduledDate: v.string(),
   externalUrl: v.string(),
   publishedAt: v.number(),
+  linkedinBrand: v.optional(linkedinBrandValidator),
 });
 
 export const upsertMany = mutation({
@@ -39,8 +41,12 @@ export const upsertMany = mutation({
 
       if (!existing) {
         const now = Date.now();
+        const { linkedinBrand: seedBrand, ...postRest } = post;
         await ctx.db.insert("posts", {
-          ...post,
+          ...postRest,
+          ...(post.type === "linkedin"
+            ? { linkedinBrand: seedBrand ?? "corvo_labs" }
+            : {}),
           createdAt: now,
           updatedAt: now,
         });
@@ -57,6 +63,12 @@ export const upsertMany = mutation({
           scheduledDate: post.scheduledDate,
           externalUrl: post.externalUrl,
           publishedAt: post.publishedAt,
+          ...(post.type === "linkedin"
+            ? {
+                linkedinBrand:
+                  post.linkedinBrand ?? existing.linkedinBrand ?? "corvo_labs",
+              }
+            : {}),
           updatedAt: Date.now(),
         });
         updated += 1;
@@ -80,8 +92,17 @@ function hasImportedPostChanged(
     scheduledDate: string;
     externalUrl: string;
     publishedAt: number;
+    linkedinBrand?: "corvo_labs" | "lower_db";
   }
 ): boolean {
+  const brandIncoming =
+    incoming.type === "linkedin"
+      ? incoming.linkedinBrand ?? "corvo_labs"
+      : undefined;
+  const brandExisting =
+    existing.type === "linkedin"
+      ? existing.linkedinBrand ?? "corvo_labs"
+      : undefined;
   return (
     existing.type !== incoming.type ||
     existing.title !== incoming.title ||
@@ -89,6 +110,7 @@ function hasImportedPostChanged(
     existing.status !== incoming.status ||
     existing.scheduledDate !== incoming.scheduledDate ||
     existing.externalUrl !== incoming.externalUrl ||
-    existing.publishedAt !== incoming.publishedAt
+    existing.publishedAt !== incoming.publishedAt ||
+    brandExisting !== brandIncoming
   );
 }
