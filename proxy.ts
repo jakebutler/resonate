@@ -1,7 +1,11 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 
-const isPublicRoute = createRouteMatcher(["/sign-in(.*)", "/sign-up(.*)"]);
+const isPublicRoute = createRouteMatcher([
+  "/sign-in(.*)",
+  "/sign-up(.*)",
+  "/api/v2/ops/validate-workflow",
+]);
 const bypassAuthForE2E = process.env.E2E_BYPASS_AUTH === "1";
 
 const authProxy = clerkMiddleware(async (auth, req) => {
