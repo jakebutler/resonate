@@ -7,8 +7,12 @@ import {
   buildFallbackDraft,
   buildIdeaSeedText,
   DEFAULT_V2_STATE,
+  EVIDENCE_LABEL_DESCRIPTIONS,
+  EVIDENCE_LABELS,
   filterPostsForView,
+  FRESHPROOF_SEED_BRIEF,
   makeId,
+  makeResearchBrief,
   normalizeIdeaSourceUrl,
   V2_BRANDS,
   V2_CHANNEL_LABELS,
@@ -17,6 +21,10 @@ import {
   type V2DraftVariant,
   type V2Idea,
   type V2Post,
+  type V2ResearchBrief,
+  type V2ResearchDepth,
+  type V2ResearchRiskLevel,
+  type V2SourceRecord,
   type V2WorkspaceState,
 } from "@/lib/v2";
 
@@ -77,6 +85,16 @@ export function V2ResonateApp() {
   const [scheduleDates, setScheduleDates] = useState<Record<string, string>>({});
   const [allBrandsDrafts, setAllBrandsDrafts] = useState(false);
   const [draftStatusFilter, setDraftStatusFilter] = useState<V2Post["status"] | "">("");
+
+  // Research pipeline state (#52)
+  const [researchBrief, setResearchBrief] = useState<V2ResearchBrief | null>(null);
+  const [researchTopic, setResearchTopic] = useState(FRESHPROOF_SEED_BRIEF.topic);
+  const [researchAudience, setResearchAudience] = useState(FRESHPROOF_SEED_BRIEF.audience);
+  const [researchThesis, setResearchThesis] = useState(FRESHPROOF_SEED_BRIEF.thesis);
+  const [researchDepth, setResearchDepth] = useState<V2ResearchDepth>("rigorous");
+  const [researchRisk, setResearchRisk] = useState<V2ResearchRiskLevel>("high");
+  const [researchBusy, setResearchBusy] = useState(false);
+  const [sourceReviewNotes, setSourceReviewNotes] = useState<Record<string, string>>({});
 
   useEffect(() => {
     setState(loadState());
@@ -403,12 +421,75 @@ export function V2ResonateApp() {
     setNotice(`Scheduled "${post.title}" for ${date}.`);
   }
 
+  async function runSourceDiscovery() {
+    if (!researchTopic.trim() || !researchAudience.trim()) return;
+    setResearchBusy(true);
+    setNotice(null);
+
+    const brief = makeResearchBrief({
+      brandId,
+      topic: researchTopic,
+      audience: researchAudience,
+      thesis: researchThesis,
+      depth: researchDepth,
+      riskLevel: researchRisk,
+      targetOutputs: FRESHPROOF_SEED_BRIEF.targetOutputs,
+    });
+
+    try {
+      const response = await fetch("/api/v2/research-brief", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          topic: brief.topic,
+          audience: brief.audience,
+          thesis: brief.thesis,
+          depth: brief.depth,
+          riskLevel: brief.riskLevel,
+          brandId: brief.brandId,
+          targetOutputs: brief.targetOutputs,
+        }),
+      });
+      const data = await response.json();
+      const sources: V2SourceRecord[] = Array.isArray(data.sources) ? data.sources : [];
+      setResearchBrief({ ...brief, sources, status: "source-review" });
+      setNotice(
+        data.warning ??
+          `Source discovery complete. ${sources.length} sources found. Review each before using in drafts.`
+      );
+    } finally {
+      setResearchBusy(false);
+    }
+  }
+
+  function vetSource(
+    sourceId: string,
+    newStatus: V2SourceRecord["status"],
+    notes?: string
+  ) {
+    setResearchBrief((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        sources: prev.sources.map((s) =>
+          s.id === sourceId
+            ? { ...s, status: newStatus, reviewerNotes: notes ?? s.reviewerNotes }
+            : s
+        ),
+      };
+    });
+    if (notes) {
+      setSourceReviewNotes((prev) => ({ ...prev, [sourceId]: notes }));
+    }
+  }
+
   function resetDemo() {
     setState(DEFAULT_V2_STATE);
     setBrandId("corvo");
     setSelectedIdeaId("idea-corvo-golden-sets");
     setVariants([]);
     setGeneratingChannels(new Set());
+    setResearchBrief(null);
     setNotice("Reset v2 demo data.");
   }
 
@@ -883,6 +964,233 @@ export function V2ResonateApp() {
                 );
               })}
             </div>
+          </section>
+
+          {/* Research / Editorial Pipeline (#52) */}
+          <section className="rounded-lg border border-black/10 bg-white p-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold">Research Editorial Pipeline</h2>
+                <p className="mt-1 text-sm text-gray-500">
+                  Prototype spike for rigorous, evidence-heavy content. Source discovery returns
+                  candidate sources — all require human review before use.
+                </p>
+              </div>
+              <span className="rounded-full bg-[#fff4e6] px-3 py-1 text-xs font-medium text-[#8a4b00]">
+                Spike / FreshProof
+              </span>
+            </div>
+
+            <div className="mt-5 grid gap-4 md:grid-cols-2">
+              <div className="space-y-3">
+                <label className="block text-sm font-medium">Topic</label>
+                <textarea
+                  className="w-full rounded-md border border-black/15 px-3 py-2 text-sm"
+                  onChange={(e) => setResearchTopic(e.target.value)}
+                  rows={2}
+                  value={researchTopic}
+                />
+                <label className="block text-sm font-medium">Audience</label>
+                <input
+                  className="w-full rounded-md border border-black/15 px-3 py-2 text-sm"
+                  onChange={(e) => setResearchAudience(e.target.value)}
+                  value={researchAudience}
+                />
+                <label className="block text-sm font-medium">Thesis / question</label>
+                <textarea
+                  className="w-full rounded-md border border-black/15 px-3 py-2 text-sm"
+                  onChange={(e) => setResearchThesis(e.target.value)}
+                  rows={3}
+                  value={researchThesis}
+                />
+                <div className="flex flex-wrap gap-3">
+                  <div className="flex-1">
+                    <label className="block text-xs font-medium text-gray-600">Depth</label>
+                    <select
+                      className="mt-1 w-full rounded-md border border-black/15 px-2 py-1.5 text-sm"
+                      onChange={(e) => setResearchDepth(e.target.value as V2ResearchDepth)}
+                      value={researchDepth}
+                    >
+                      <option value="light">Light</option>
+                      <option value="standard">Standard</option>
+                      <option value="rigorous">Rigorous</option>
+                    </select>
+                  </div>
+                  <div className="flex-1">
+                    <label className="block text-xs font-medium text-gray-600">Risk level</label>
+                    <select
+                      className="mt-1 w-full rounded-md border border-black/15 px-2 py-1.5 text-sm"
+                      onChange={(e) => setResearchRisk(e.target.value as V2ResearchRiskLevel)}
+                      value={researchRisk}
+                    >
+                      <option value="low">Low</option>
+                      <option value="medium">Medium</option>
+                      <option value="high">High (clinical/scientific)</option>
+                    </select>
+                  </div>
+                </div>
+                <button
+                  className="w-full rounded-md bg-[#15616d] px-4 py-2 text-sm font-semibold text-white hover:bg-[#104d56] disabled:opacity-60"
+                  disabled={researchBusy || !researchTopic.trim() || !researchAudience.trim()}
+                  onClick={runSourceDiscovery}
+                  type="button"
+                >
+                  {researchBusy ? "Discovering sources…" : "Run Source Discovery"}
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold">Evidence Labels Rubric</h3>
+                <div className="space-y-2">
+                  {EVIDENCE_LABELS.map((label) => (
+                    <div key={label} className="rounded-md border border-black/10 p-2">
+                      <p className="text-xs font-semibold">{label}</p>
+                      <p className="mt-0.5 text-xs text-gray-500">
+                        {EVIDENCE_LABEL_DESCRIPTIONS[label]}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {researchBrief && researchBrief.sources.length > 0 && (
+              <div className="mt-6">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="text-base font-semibold">
+                    Sources for Review
+                    <span className="ml-2 text-sm font-normal text-gray-500">
+                      ({researchBrief.sources.filter((s) => s.status === "accepted").length} accepted
+                      / {researchBrief.sources.filter((s) => s.status === "unvetted").length} unvetted)
+                    </span>
+                  </h3>
+                  <p className="rounded-full bg-red-50 px-3 py-1 text-xs text-red-700">
+                    Human review required — do not treat AI summaries as ground truth
+                  </p>
+                </div>
+                <div className="mt-3 space-y-3">
+                  {researchBrief.sources.map((source) => (
+                    <div
+                      key={source.id}
+                      className={`rounded-lg border p-4 ${
+                        source.status === "accepted"
+                          ? "border-[#15616d]/30 bg-[#f1fbfc]"
+                          : source.status === "rejected"
+                            ? "border-black/10 bg-black/[0.02] opacity-60"
+                            : source.status === "flagged"
+                              ? "border-yellow-300 bg-yellow-50"
+                              : "border-black/10"
+                      }`}
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <a
+                            className="text-sm font-medium text-[#15616d] underline"
+                            href={source.url}
+                            rel="noreferrer"
+                            target="_blank"
+                          >
+                            {source.title}
+                          </a>
+                          <p className="mt-0.5 text-xs text-gray-500">
+                            {source.domain}
+                            {source.publishedYear ? ` · ${source.publishedYear}` : ""}
+                            {" · "}
+                            <span className="font-medium">{source.evidenceLabel}</span>
+                            {" · "}
+                            <span
+                              className={
+                                source.qualityRating === "strong"
+                                  ? "text-[#15616d]"
+                                  : source.qualityRating === "moderate"
+                                    ? "text-[#8a4b00]"
+                                    : "text-gray-500"
+                              }
+                            >
+                              {source.qualityRating}
+                            </span>
+                          </p>
+                          <p className="mt-1 text-xs text-gray-600">{source.useCase}</p>
+                          {source.reviewerNotes && (
+                            <p className="mt-1 text-xs italic text-gray-500">
+                              Notes: {source.reviewerNotes}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex flex-shrink-0 flex-wrap gap-1.5">
+                          {source.status === "unvetted" || source.status === "flagged" ? (
+                            <>
+                              <button
+                                className="rounded-md bg-[#15616d] px-2.5 py-1 text-xs font-semibold text-white"
+                                onClick={() => vetSource(source.id, "accepted")}
+                                type="button"
+                              >
+                                Accept
+                              </button>
+                              <button
+                                className="rounded-md border border-yellow-400 bg-yellow-50 px-2.5 py-1 text-xs font-semibold text-yellow-800"
+                                onClick={() => vetSource(source.id, "flagged")}
+                                type="button"
+                              >
+                                Flag
+                              </button>
+                              <button
+                                className="rounded-md border border-black/15 px-2.5 py-1 text-xs font-medium"
+                                onClick={() => vetSource(source.id, "rejected")}
+                                type="button"
+                              >
+                                Reject
+                              </button>
+                            </>
+                          ) : (
+                            <span
+                              className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                                source.status === "accepted"
+                                  ? "bg-[#e8f3f4] text-[#15616d]"
+                                  : source.status === "rejected"
+                                    ? "bg-black/5 text-gray-500"
+                                    : "bg-yellow-100 text-yellow-800"
+                              }`}
+                            >
+                              {source.status}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      {(source.status === "unvetted" || source.status === "flagged") && (
+                        <div className="mt-2">
+                          <input
+                            className="w-full rounded-md border border-black/15 px-2 py-1 text-xs"
+                            onChange={(e) =>
+                              setSourceReviewNotes((prev) => ({
+                                ...prev,
+                                [source.id]: e.target.value,
+                              }))
+                            }
+                            placeholder="Reviewer notes (optional)"
+                            value={sourceReviewNotes[source.id] ?? ""}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {researchBrief.sources.filter((s) => s.status === "accepted").length > 0 && (
+                  <div className="mt-4 rounded-lg border border-[#15616d]/30 bg-[#f1fbfc] p-4">
+                    <p className="text-sm font-medium text-[#15616d]">
+                      {researchBrief.sources.filter((s) => s.status === "accepted").length} source
+                      {researchBrief.sources.filter((s) => s.status === "accepted").length > 1
+                        ? "s"
+                        : ""}{" "}
+                      accepted — ready to feed into a claim map (#53).
+                    </p>
+                    <p className="mt-1 text-xs text-[#0f4c55]">
+                      Rejected and flagged sources are excluded from draft generation by default.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
           </section>
         </div>
       </div>
