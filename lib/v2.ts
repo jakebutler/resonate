@@ -620,6 +620,57 @@ export function makeClaimMap(input: MakeClaimMapInput): V2ClaimMap {
   };
 }
 
+// ─── Editorial Outline + Long-Form Draft Types (issue #54) ──────────────────
+
+export type V2OutlineStatus = "draft" | "approved" | "generating-draft";
+
+export type V2OutlineSection = {
+  heading: string;
+  notes: string;
+  claimIds: string[];
+  evidenceLabels: V2EvidenceLabel[];
+};
+
+export type V2TakeawayRow = {
+  finding: string;
+  evidenceLabel: V2EvidenceLabel;
+  source: string;
+};
+
+export type V2EditorialOutline = {
+  id: string;
+  claimMapId: string;
+  brandId: V2BrandId;
+  thesis: string;
+  sections: V2OutlineSection[];
+  takeawayTable: V2TakeawayRow[];
+  citationPlan: string;
+  status: V2OutlineStatus;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export function makeOutlineSection(input: V2OutlineSection): V2OutlineSection {
+  return { ...input };
+}
+
+export function makeTakeawayRow(input: V2TakeawayRow): V2TakeawayRow {
+  return { ...input };
+}
+
+type MakeEditorialOutlineInput = Omit<V2EditorialOutline, "id" | "status" | "createdAt" | "updatedAt">;
+
+export function makeEditorialOutline(input: MakeEditorialOutlineInput): V2EditorialOutline {
+  const now = new Date().toISOString();
+  return {
+    id: makeId("outline"),
+    ...input,
+    status: "draft",
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
 // ─── Seed research brief for FreshProof spike (issue #52) ───────────────────
 
 export const FRESHPROOF_SEED_BRIEF: Omit<V2ResearchBrief, "id" | "createdAt" | "updatedAt"> = {

@@ -25,6 +25,7 @@ import {
   type V2ClaimMap,
   type V2ClaimStatus,
   type V2DraftVariant,
+  type V2EditorialOutline,
   type V2Idea,
   type V2Post,
   type V2ResearchBrief,
@@ -106,6 +107,12 @@ export function V2ResonateApp() {
   const [claimMap, setClaimMap] = useState<V2ClaimMap | null>(null);
   const [claimMapBusy, setClaimMapBusy] = useState(false);
   const [claimReviewNotes, setClaimReviewNotes] = useState<Record<string, string>>({});
+
+  // Editorial outline + long-form draft state (#54)
+  const [editorialOutline, setEditorialOutline] = useState<V2EditorialOutline | null>(null);
+  const [outlineBusy, setOutlineBusy] = useState(false);
+  const [longFormDraft, setLongFormDraft] = useState<string | null>(null);
+  const [draftBusy, setDraftBusy] = useState(false);
 
   useEffect(() => {
     setState(loadState());
@@ -484,6 +491,70 @@ export function V2ResonateApp() {
       };
     });
     if (notes) setClaimReviewNotes((prev) => ({ ...prev, [claimId]: notes }));
+  }
+
+  async function generateOutline() {
+    if (!claimMap || !researchBrief) return;
+    const accepted = claimMap.claims.filter((c) => c.status === "accepted");
+    if (accepted.length === 0) return;
+    setOutlineBusy(true);
+    setLongFormDraft(null);
+    setNotice(null);
+
+    try {
+      const response = await fetch("/api/v2/editorial-outline", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          thesis: researchBrief.thesis || claimMap.thesis,
+          claimMapId: claimMap.id,
+          brandId: claimMap.brandId,
+          topic: researchBrief.topic,
+          acceptedClaims: accepted,
+        }),
+      });
+      const data = await response.json();
+      if (data.outline) {
+        setEditorialOutline(data.outline);
+        setNotice(
+          data.warning ?? `Editorial outline generated — ${data.outline.sections.length} section${data.outline.sections.length !== 1 ? "s" : ""}. Review and approve before drafting.`
+        );
+      }
+    } finally {
+      setOutlineBusy(false);
+    }
+  }
+
+  async function generateLongFormDraft() {
+    if (!editorialOutline || !claimMap) return;
+    const accepted = claimMap.claims.filter((c) => c.status === "accepted");
+    if (accepted.length === 0) return;
+    const approvedOutline = { ...editorialOutline, status: "approved" as const };
+    setDraftBusy(true);
+    setNotice(null);
+
+    try {
+      const response = await fetch("/api/v2/long-form-draft", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          outline: approvedOutline,
+          acceptedClaims: accepted,
+          brandId: claimMap.brandId,
+        }),
+      });
+      const data = await response.json();
+      if (typeof data.draft === "string") {
+        setLongFormDraft(data.draft);
+        setEditorialOutline((prev) => prev ? { ...prev, status: "approved" } : prev);
+        setNotice(
+          data.warning ??
+            "Long-form draft generated. Review carefully before publishing — AI never auto-publishes."
+        );
+      }
+    } finally {
+      setDraftBusy(false);
+    }
   }
 
   async function runSourceDiscovery() {
@@ -1199,18 +1270,172 @@ export function V2ResonateApp() {
                         <p className="text-sm font-medium text-[#15616d]">
                           {claimMap.claims.filter((c) => c.status === "accepted").length} claim
                           {claimMap.claims.filter((c) => c.status === "accepted").length !== 1 ? "s" : ""}{" "}
-                          accepted — ready to generate an editorial outline (#54).
+                          accepted — ready to generate an editorial outline.
                         </p>
                         <p className="mt-1 text-xs text-[#0f4c55]">
                           Unsupported, too-risky, and out-of-scope claims are excluded from draft
                           generation by default.
                         </p>
+                        <button
+                          className="mt-3 rounded-md bg-[#15616d] px-4 py-2 text-sm font-semibold text-white hover:bg-[#104d56] disabled:opacity-60"
+                          disabled={
+                            outlineBusy ||
+                            claimMap.claims.filter((c) => c.status === "accepted").length === 0
+                          }
+                          onClick={generateOutline}
+                          type="button"
+                        >
+                          {outlineBusy ? "Generating outline…" : "Generate Editorial Outline"}
+                        </button>
                       </div>
                     )}
                   </div>
                 )}
               </section>
             )}
+
+          {/* Editorial Outline + Long-form Draft (#54) */}
+          {editorialOutline && (
+            <section className="rounded-lg border border-black/10 bg-white p-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-semibold">Editorial Outline</h2>
+                  <p className="mt-1 text-sm text-gray-500">
+                    Review the structure and approve before generating the long-form draft. AI never
+                    auto-publishes — human approval required.
+                  </p>
+                </div>
+                <span
+                  className={`rounded-full px-3 py-1 text-xs font-medium ${
+                    editorialOutline.status === "approved"
+                      ? "bg-[#e8f3f4] text-[#15616d]"
+                      : editorialOutline.status === "generating-draft"
+                        ? "bg-[#fff4e6] text-[#8a4b00]"
+                        : "bg-black/5 text-gray-600"
+                  }`}
+                >
+                  {editorialOutline.status}
+                </span>
+              </div>
+
+              <div className="mt-4 rounded-lg border border-black/10 bg-black/[0.02] p-4">
+                <p className="text-sm font-semibold">Thesis</p>
+                <p className="mt-1 text-sm text-gray-700">{editorialOutline.thesis}</p>
+              </div>
+
+              <div className="mt-4 space-y-3">
+                <h3 className="text-sm font-semibold">
+                  Sections ({editorialOutline.sections.length})
+                </h3>
+                {editorialOutline.sections.map((section, i) => (
+                  <div key={i} className="rounded-lg border border-black/10 p-4">
+                    <p className="text-sm font-medium">
+                      {i + 1}. {section.heading}
+                    </p>
+                    <p className="mt-1 text-xs text-gray-500">{section.notes}</p>
+                    {section.evidenceLabels.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {section.evidenceLabels.map((label) => (
+                          <span
+                            key={label}
+                            className="rounded-full bg-[#fff4e6] px-2 py-0.5 text-xs text-[#8a4b00]"
+                          >
+                            {label}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {editorialOutline.takeawayTable.length > 0 && (
+                <div className="mt-5">
+                  <h3 className="text-sm font-semibold">Key Takeaways</h3>
+                  <div className="mt-2 overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-black/10 text-left">
+                          <th className="pb-2 pr-4 font-medium">Finding</th>
+                          <th className="pb-2 pr-4 font-medium">Evidence</th>
+                          <th className="pb-2 font-medium">Source</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {editorialOutline.takeawayTable.map((row, i) => (
+                          <tr key={i} className="border-b border-black/5">
+                            <td className="py-2 pr-4 text-gray-700">{row.finding}</td>
+                            <td className="py-2 pr-4 text-[#8a4b00]">{row.evidenceLabel}</td>
+                            <td className="py-2 text-gray-500">{row.source}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {editorialOutline.citationPlan && (
+                <div className="mt-4 rounded-lg border border-black/10 bg-black/[0.02] p-3">
+                  <p className="text-xs font-semibold text-gray-500">Citation plan</p>
+                  <p className="mt-1 text-xs text-gray-600">{editorialOutline.citationPlan}</p>
+                </div>
+              )}
+
+              {editorialOutline.status !== "approved" && !longFormDraft && (
+                <div className="mt-5 flex flex-wrap gap-3">
+                  <button
+                    className="rounded-md bg-[#15616d] px-4 py-2 text-sm font-semibold text-white hover:bg-[#104d56] disabled:opacity-60"
+                    disabled={draftBusy || !claimMap}
+                    onClick={generateLongFormDraft}
+                    type="button"
+                  >
+                    {draftBusy ? "Generating draft…" : "Approve & Generate Long-form Draft"}
+                  </button>
+                </div>
+              )}
+
+              {longFormDraft && (
+                <div className="mt-6">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h3 className="text-base font-semibold">Long-form Draft</h3>
+                    <p className="rounded-full bg-red-50 px-3 py-1 text-xs text-red-700">
+                      AI never auto-publishes — human review required before scheduling
+                    </p>
+                  </div>
+                  <div className="mt-3 overflow-x-auto rounded-lg border border-black/10 bg-black/[0.02] p-4">
+                    <pre className="whitespace-pre-wrap font-mono text-xs leading-relaxed text-gray-800">
+                      {longFormDraft}
+                    </pre>
+                  </div>
+                  <p className="mt-2 text-xs text-gray-400">
+                    Copy this draft into your CMS or editor. Review all claims and citations before
+                    publishing.
+                  </p>
+                </div>
+              )}
+
+              {longFormDraft && !draftBusy && (
+                <div className="mt-4 rounded-lg border border-[#15616d]/30 bg-[#f1fbfc] p-4">
+                  <p className="text-sm font-medium text-[#15616d]">
+                    Long-form draft ready for human editorial review.
+                  </p>
+                  <p className="mt-1 text-xs text-[#0f4c55]">
+                    Next step: review, edit, and schedule via your standard editorial workflow.
+                    Regenerate if the draft needs major revision.
+                  </p>
+                  <button
+                    className="mt-2 rounded-md border border-[#15616d] px-3 py-1.5 text-xs font-medium text-[#15616d] hover:bg-[#e8f3f4] disabled:opacity-60"
+                    disabled={draftBusy}
+                    onClick={generateLongFormDraft}
+                    type="button"
+                  >
+                    {draftBusy ? "Regenerating…" : "Regenerate Draft"}
+                  </button>
+                </div>
+              )}
+            </section>
+          )}
 
           {/* Research / Editorial Pipeline (#52) */}
           <section className="rounded-lg border border-black/10 bg-white p-5">
