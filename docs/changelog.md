@@ -1039,3 +1039,27 @@ Append-only session log for repository-level updates. Each documentation refresh
 ### Branch
 
 - codex/postiz-foundation-runbook
+
+## 06/05/2026 02:49:00 PDT
+
+### Summary
+
+- Added #41 brand workspace validation notes.
+- Created separate local Postiz organizations for Personal, Corvo Labs, the lower dB, and FreshProof through the normal registration API.
+- Documented that connected-channel validation remains blocked by placeholder/missing provider credentials, with YouTube recommended as the first real unblocker.
+
+### Staged Changes
+
+- A	docs/plans/2026-06-05-postiz-brand-workspace-validation.md
+- M	docs/changelog.md
+- M	docs/project-status.md
+
+### Working Tree Snapshot
+
+- A  docs/plans/2026-06-05-postiz-brand-workspace-validation.md
+- M  docs/changelog.md
+- M  docs/project-status.md
+
+### Branch
+
+- codex/postiz-brand-workspace-validation
