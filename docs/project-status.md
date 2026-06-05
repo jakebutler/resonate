@@ -1,6 +1,6 @@
 # Project Status
 
-Last updated: 06/05/2026 14:20:10 PDT
+Last updated: 06/05/2026 14:22:36 PDT
 
 ## State
 
@@ -16,25 +16,20 @@ Maintain the living documentation and preserve a handoff-quality snapshot of the
 
 ## Last Completed Task
 
-- 1afa168 feat(v2): research claim map and citation review artifact (#53)
+- 402a2e8 feat(v2): editorial outline and long-form draft generation (#54)
 
 ## Recent Commits
 
+- 402a2e8 feat(v2): editorial outline and long-form draft generation (#54)
 - 1afa168 feat(v2): research claim map and citation review artifact (#53)
 - b57c416 feat(v2): research editorial pipeline spike and source-quality rubric (#52)
 - 7e29ea8 feat(v2): inbox and draft-management validation with cross-brand view (#51)
 - 0ee43ea feat(v2): multi-platform variant review and scheduling handoff (#49)
-- 473630d docs: refresh Postiz production validation status
 
 ## Local Working Tree
 
-- A  app/api/v2/editorial-outline/__tests__/route.test.ts
-- A  app/api/v2/editorial-outline/route.ts
-- A  app/api/v2/long-form-draft/__tests__/route.test.ts
-- A  app/api/v2/long-form-draft/route.ts
-- M  components/V2ResonateApp.tsx
-- A  lib/__tests__/v2Outline.test.ts
-- M  lib/v2.ts
+- A  docs/cutover-checklist.md
+- A  docs/ops-runbook.md
 - ?? CONTEXT.md
 - ?? docs/adr/
 
@@ -45,4 +40,4 @@ Maintain the living documentation and preserve a handoff-quality snapshot of the
 
 ## Branch
 
-- feat/54-outline-draft
+- feat/55-cutover-checklist
