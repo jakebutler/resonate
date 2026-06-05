@@ -12,7 +12,7 @@ Chosen shape:
 
 - Legacy Resonate remains deployed and functional on Vercel.
 - The current Resonate `/v2` tracer remains useful for production workflow validation until the real Postiz service is ready.
-- Customized Postiz should live in a sibling GitHub repository or fork, tentatively named `resonate-postiz` or `postiz-resonate`.
+- Customized Postiz lives in the sibling fork `jakebutler/resonate-postiz`.
 - The sibling Postiz service should eventually be routed under `resonate.corvolabs.com/v2/*`.
 - Do not vendor the full Postiz monorepo into this Next/Convex/Clerk application unless deployment constraints force that later.
 
@@ -35,6 +35,13 @@ Upstream Postiz checkout used for feasibility:
 
 ```text
 /Volumes/rexy/GitHub/postiz-app
+```
+
+Current local remotes:
+
+```text
+origin   https://github.com/jakebutler/resonate-postiz.git
+upstream https://github.com/gitroomhq/postiz-app.git
 ```
 
 Current local Postiz runtime facts:
@@ -179,7 +186,7 @@ git log --oneline --decorate --max-count=20 origin/main
 Recommended fork workflow:
 
 1. Keep `upstream` pointing at `gitroomhq/postiz-app`.
-2. Keep `origin` pointing at the custom fork once created.
+2. Keep `origin` pointing at `jakebutler/resonate-postiz`.
 3. Develop custom work on feature branches with `codex/` prefix.
 4. Regularly fetch upstream and compare:
 
@@ -256,13 +263,12 @@ Run this after local runtime changes, upstream updates, and deploy changes:
 Use names that make the transition explicit:
 
 - Issue tracker / legacy app: `resonate`
-- Postiz custom service/fork: `resonate-postiz` or `postiz-resonate`
+- Postiz custom service/fork: `resonate-postiz`
 - Local runtime directory: `/Volumes/rexy/GitHub/postiz-app`
 - Production route: `resonate.corvolabs.com/v2/*`
 
 ## Remaining Follow-Ups
 
-- Create or select the actual custom fork repository.
 - Choose the first hosted/container deployment target.
 - Decide whether `/v2/*` reverse proxying should happen at DNS/edge/proxy, in Vercel rewrites, or in a separate gateway.
 - Turn the smoke checklist into an executable script once the custom fork exists.

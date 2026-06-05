@@ -1063,3 +1063,27 @@ Append-only session log for repository-level updates. Each documentation refresh
 ### Branch
 
 - codex/postiz-brand-workspace-validation
+
+## 06/05/2026 02:54:00 PDT
+
+### Summary
+
+- Created the actual custom Postiz fork at `jakebutler/resonate-postiz`.
+- Rewired `/Volumes/rexy/GitHub/postiz-app` so `origin` points to the custom fork and `upstream` points to `gitroomhq/postiz-app`.
+- Updated the foundation runbook and project status with the concrete fork URL and remote strategy.
+
+### Staged Changes
+
+- M	docs/changelog.md
+- M	docs/plans/2026-06-05-postiz-foundation-runbook.md
+- M	docs/project-status.md
+
+### Working Tree Snapshot
+
+- M  docs/changelog.md
+- M  docs/plans/2026-06-05-postiz-foundation-runbook.md
+- M  docs/project-status.md
+
+### Branch
+
+- codex/postiz-fork-created
