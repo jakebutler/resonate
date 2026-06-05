@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   buildCorvoBlogDraft,
+  buildFallbackDraft,
   buildIdeaSeedText,
   DEFAULT_V2_STATE,
   makeId,
@@ -12,6 +13,7 @@ import {
   V2_CHANNEL_LABELS,
   type V2BrandId,
   type V2ChannelId,
+  type V2DraftVariant,
   type V2Idea,
   type V2Post,
   type V2WorkspaceState,
@@ -50,6 +52,12 @@ function saveState(state: V2WorkspaceState) {
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
+const STATUS_LABELS: Record<V2Post["status"], string> = {
+  draft: "Draft",
+  scheduled: "Scheduled",
+  "pr-created": "PR Created",
+};
+
 export function V2ResonateApp() {
   const [state, setState] = useState<V2WorkspaceState>(DEFAULT_V2_STATE);
   const [brandId, setBrandId] = useState<V2BrandId>("corvo");
@@ -58,9 +66,14 @@ export function V2ResonateApp() {
   const [ideaSourceUrl, setIdeaSourceUrl] = useState("");
   const [ideaTags, setIdeaTags] = useState("");
   const [selectedIdeaId, setSelectedIdeaId] = useState("idea-corvo-golden-sets");
-  const [targetChannel, setTargetChannel] = useState<V2ChannelId>("corvo-blog");
+  const [selectedChannels, setSelectedChannels] = useState<Set<V2ChannelId>>(
+    new Set(["corvo-blog"])
+  );
+  const [variants, setVariants] = useState<V2DraftVariant[]>([]);
+  const [generatingChannels, setGeneratingChannels] = useState<Set<V2ChannelId>>(new Set());
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [scheduleDates, setScheduleDates] = useState<Record<string, string>>({});
 
   useEffect(() => {
     setState(loadState());
@@ -88,8 +101,36 @@ export function V2ResonateApp() {
     return [...channels];
   }, [brand.targetChannels, brand.validatedChannels]);
 
+  // Clear variant state when the selected Idea changes
+  useEffect(() => {
+    setVariants([]);
+    setGeneratingChannels(new Set());
+  }, [selectedIdeaId]);
+
+  // Sync channel selection to available options when brand changes
+  useEffect(() => {
+    setSelectedChannels((prev) => {
+      const available = new Set(targetOptions);
+      const next = new Set([...prev].filter((c) => available.has(c)));
+      return next.size > 0 ? next : new Set(targetOptions.slice(0, 1));
+    });
+    setVariants([]);
+  }, [brandId, targetOptions]);
+
   function updateState(updater: (current: V2WorkspaceState) => V2WorkspaceState) {
     setState((current) => updater(current));
+  }
+
+  function toggleChannel(channelId: V2ChannelId) {
+    setSelectedChannels((prev) => {
+      const next = new Set(prev);
+      if (next.has(channelId)) {
+        next.delete(channelId);
+      } else {
+        next.add(channelId);
+      }
+      return next;
+    });
   }
 
   function createIdea() {
@@ -154,70 +195,107 @@ export function V2ResonateApp() {
     setIdeaTags("");
   }
 
-  async function generateDraft() {
-    if (!selectedIdea || !voicePack) return;
-    setBusy("Generating draft");
+  async function generateVariants() {
+    if (!selectedIdea || !voicePack || selectedChannels.size === 0) return;
     setNotice(null);
+    setVariants([]);
 
-    try {
-      const response = await fetch("/api/v2/generate-draft", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          idea: selectedIdea,
-          voicePackMarkdown: voicePack.markdown,
-          channel: targetChannel,
-        }),
-      });
-      const data = await response.json();
-      const draft =
-        typeof data.draft === "string"
-          ? data.draft
-          : buildCorvoBlogDraft({
+    const channels = [...selectedChannels];
+    setGeneratingChannels(new Set(channels));
+
+    await Promise.all(
+      channels.map(async (channelId) => {
+        try {
+          const response = await fetch("/api/v2/generate-draft", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
               idea: selectedIdea,
               voicePackMarkdown: voicePack.markdown,
-            });
-      const postId = makeId("post");
-      const createdAt = nowIso();
-      const post: V2Post = {
-        id: postId,
-        brandId,
-        channelId: targetChannel,
-        ideaId: selectedIdea.id,
-        title:
-          targetChannel === "youtube"
-            ? `${selectedIdea.title} - YouTube outline`
-            : selectedIdea.title,
-        content: draft,
-        status: "draft",
-        scheduledDate: today(),
-        createdAt,
-        updatedAt: createdAt,
-      };
+              channel: channelId,
+            }),
+          });
+          const data = await response.json();
+          const content =
+            typeof data.draft === "string"
+              ? data.draft
+              : buildFallbackDraft({
+                  idea: selectedIdea,
+                  channelId,
+                  voicePackMarkdown: voicePack.markdown,
+                });
 
-      updateState((current) => ({
-        ...current,
-        posts: [post, ...current.posts],
-        ideas: current.ideas.map((idea) =>
-          idea.id === selectedIdea.id
-            ? {
-                ...idea,
-                status: idea.status === "inbox" ? "reviewing" : idea.status,
-                linkedPostIds: [...new Set([...idea.linkedPostIds, postId])],
-                updatedAt: createdAt,
-              }
-            : idea
-        ),
-      }));
+          const variant: V2DraftVariant = {
+            id: makeId("variant"),
+            ideaId: selectedIdea.id,
+            channelId,
+            content,
+            provider: data.provider ?? "local-placeholder",
+            status: "pending",
+          };
 
-      setNotice(
-        data.provider === "pioneer"
-          ? `Generated ${V2_CHANNEL_LABELS[targetChannel]} draft with PioneerAI.`
-          : data.warning || `Generated ${V2_CHANNEL_LABELS[targetChannel]} draft.`
-      );
-    } finally {
-      setBusy(null);
-    }
+          setVariants((prev) => [...prev, variant]);
+        } finally {
+          setGeneratingChannels((prev) => {
+            const next = new Set(prev);
+            next.delete(channelId);
+            return next;
+          });
+        }
+      })
+    );
+
+    setNotice(
+      `Generated ${channels.length} variant${channels.length > 1 ? "s" : ""}. Review and accept or reject each one.`
+    );
+  }
+
+  function acceptVariant(variant: V2DraftVariant) {
+    if (!selectedIdea) return;
+    const postId = makeId("post");
+    const createdAt = nowIso();
+    const post: V2Post = {
+      id: postId,
+      brandId,
+      channelId: variant.channelId,
+      ideaId: selectedIdea.id,
+      title:
+        variant.channelId === "youtube"
+          ? `${selectedIdea.title} - YouTube outline`
+          : selectedIdea.title,
+      content: variant.content,
+      status: "draft",
+      scheduledDate: today(),
+      createdAt,
+      updatedAt: createdAt,
+    };
+
+    updateState((current) => ({
+      ...current,
+      posts: [post, ...current.posts],
+      ideas: current.ideas.map((idea) =>
+        idea.id === selectedIdea.id
+          ? {
+              ...idea,
+              status: idea.status === "inbox" ? "reviewing" : idea.status,
+              linkedPostIds: [...new Set([...idea.linkedPostIds, postId])],
+              updatedAt: createdAt,
+            }
+          : idea
+      ),
+    }));
+
+    setVariants((prev) =>
+      prev.map((v) =>
+        v.id === variant.id ? { ...v, status: "accepted", postId } : v
+      )
+    );
+  }
+
+  function rejectVariant(variantId: string) {
+    setVariants((prev) =>
+      prev.map((v) => (v.id === variantId ? { ...v, status: "rejected" } : v))
+    );
   }
 
   async function validateYouTube(post: V2Post) {
@@ -244,11 +322,7 @@ export function V2ResonateApp() {
           ),
         }));
       }
-      setNotice(
-        data.ok
-          ? data.message
-          : `${data.message} ${data.issues?.join(" ")}`
-      );
+      setNotice(data.ok ? data.message : `${data.message} ${data.issues?.join(" ")}`);
     } finally {
       setBusy(null);
     }
@@ -308,12 +382,31 @@ export function V2ResonateApp() {
     }
   }
 
+  function schedulePost(post: V2Post) {
+    const date = scheduleDates[post.id] ?? post.scheduledDate ?? today();
+    updateState((current) => ({
+      ...current,
+      posts: current.posts.map((item) =>
+        item.id === post.id
+          ? { ...item, status: "scheduled", scheduledDate: date, updatedAt: nowIso() }
+          : item
+      ),
+    }));
+    setNotice(`Scheduled "${post.title}" for ${date}.`);
+  }
+
   function resetDemo() {
     setState(DEFAULT_V2_STATE);
     setBrandId("corvo");
     setSelectedIdeaId("idea-corvo-golden-sets");
+    setVariants([]);
+    setGeneratingChannels(new Set());
     setNotice("Reset v2 demo data.");
   }
+
+  const pendingVariants = variants.filter((v) => v.status === "pending");
+  const reviewedVariants = variants.filter((v) => v.status !== "pending");
+  const isGenerating = generatingChannels.size > 0;
 
   return (
     <main className="min-h-screen bg-[#f7f7f4] text-[#111827]">
@@ -422,7 +515,7 @@ export function V2ResonateApp() {
             </div>
           )}
 
-          <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
             <div className="rounded-lg border border-black/10 bg-white p-5">
               <h2 className="text-lg font-semibold">Ideas</h2>
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -487,6 +580,12 @@ export function V2ResonateApp() {
                         </span>
                       ))}
                     </div>
+                    {idea.linkedPostIds.length > 0 && (
+                      <p className="mt-2 text-xs text-gray-400">
+                        {idea.linkedPostIds.length} linked post
+                        {idea.linkedPostIds.length > 1 ? "s" : ""}
+                      </p>
+                    )}
                   </button>
                 ))}
               </div>
@@ -497,35 +596,148 @@ export function V2ResonateApp() {
               {selectedIdea ? (
                 <>
                   <p className="mt-2 text-sm font-medium">{selectedIdea.title}</p>
-                  <pre className="mt-3 max-h-56 overflow-auto whitespace-pre-wrap rounded-md bg-black/5 p-3 text-xs">
+                  <pre className="mt-3 max-h-40 overflow-auto whitespace-pre-wrap rounded-md bg-black/5 p-3 text-xs">
                     {buildIdeaSeedText(selectedIdea)}
                   </pre>
-                  <label className="mt-4 block text-sm font-medium" htmlFor="v2-channel">
-                    Target channel
-                  </label>
-                  <select
-                    className="mt-2 w-full rounded-md border border-black/15 px-3 py-2 text-sm"
-                    id="v2-channel"
-                    onChange={(event) => setTargetChannel(event.target.value as V2ChannelId)}
-                    value={targetChannel}
-                  >
-                    {targetOptions.map((id) => (
-                      <option key={id} value={id}>
-                        {V2_CHANNEL_LABELS[id]}
-                      </option>
-                    ))}
-                  </select>
+
+                  <fieldset className="mt-4">
+                    <legend className="text-sm font-medium">Target channels</legend>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {targetOptions.map((id) => {
+                        const checked = selectedChannels.has(id);
+                        const isValidated = brand.validatedChannels.includes(id);
+                        return (
+                          <label
+                            key={id}
+                            className={`flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                              checked
+                                ? "border-[#15616d] bg-[#e8f3f4] text-[#15616d]"
+                                : "border-black/10 text-gray-600 hover:bg-black/5"
+                            }`}
+                          >
+                            <input
+                              checked={checked}
+                              className="sr-only"
+                              onChange={() => toggleChannel(id)}
+                              type="checkbox"
+                            />
+                            {V2_CHANNEL_LABELS[id]}
+                            {isValidated && (
+                              <span className="ml-1 rounded-full bg-[#15616d] px-1 text-[10px] text-white">
+                                ✓
+                              </span>
+                            )}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </fieldset>
+
                   <button
                     className="mt-4 w-full rounded-md bg-[#ff7d00] px-4 py-2 text-sm font-semibold text-white hover:bg-[#dd6d00] disabled:opacity-60"
-                    disabled={Boolean(busy)}
-                    onClick={generateDraft}
+                    disabled={isGenerating || selectedChannels.size === 0}
+                    onClick={generateVariants}
                     type="button"
                   >
-                    {busy === "Generating draft" ? "Generating..." : "Generate Draft"}
+                    {isGenerating
+                      ? `Generating ${generatingChannels.size} remaining…`
+                      : `Generate ${selectedChannels.size > 1 ? `${selectedChannels.size} Variants` : "Draft"}`}
                   </button>
+
+                  {selectedChannels.size === 0 && (
+                    <p className="mt-2 text-xs text-gray-500">
+                      Select at least one channel to generate variants.
+                    </p>
+                  )}
                 </>
               ) : (
                 <p className="mt-2 text-sm text-gray-600">Capture or select an Idea.</p>
+              )}
+
+              {/* Variant review panel */}
+              {variants.length > 0 && (
+                <div className="mt-5 space-y-4">
+                  <h3 className="text-sm font-semibold">
+                    Variants for Review
+                    {pendingVariants.length > 0 && (
+                      <span className="ml-2 rounded-full bg-[#fff4e6] px-2 py-0.5 text-xs text-[#8a4b00]">
+                        {pendingVariants.length} pending
+                      </span>
+                    )}
+                  </h3>
+
+                  {/* Still generating placeholders */}
+                  {[...generatingChannels].map((channelId) => (
+                    <div
+                      key={channelId}
+                      className="rounded-lg border border-black/10 bg-black/[0.02] p-4"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-gray-500">
+                          {V2_CHANNEL_LABELS[channelId]}
+                        </span>
+                        <span className="rounded-full bg-black/5 px-2 py-0.5 text-xs text-gray-500">
+                          generating…
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+
+                  {variants.map((variant) => (
+                    <div
+                      key={variant.id}
+                      className={`rounded-lg border p-4 ${
+                        variant.status === "accepted"
+                          ? "border-[#15616d]/30 bg-[#f1fbfc]"
+                          : variant.status === "rejected"
+                            ? "border-black/10 bg-black/[0.02] opacity-60"
+                            : "border-[#ff7d00]/30 bg-[#fff8f0]"
+                      }`}
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="text-sm font-semibold">
+                          {V2_CHANNEL_LABELS[variant.channelId]}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="rounded-full bg-black/5 px-2 py-0.5 text-xs">
+                            {variant.provider}
+                          </span>
+                          {variant.status === "pending" && (
+                            <>
+                              <button
+                                className="rounded-md bg-[#15616d] px-3 py-1 text-xs font-semibold text-white hover:bg-[#104d56]"
+                                onClick={() => acceptVariant(variant)}
+                                type="button"
+                              >
+                                Accept
+                              </button>
+                              <button
+                                className="rounded-md border border-black/15 px-3 py-1 text-xs font-medium hover:bg-black/5"
+                                onClick={() => rejectVariant(variant.id)}
+                                type="button"
+                              >
+                                Reject
+                              </button>
+                            </>
+                          )}
+                          {variant.status === "accepted" && (
+                            <span className="rounded-full bg-[#e8f3f4] px-2 py-0.5 text-xs font-medium text-[#15616d]">
+                              Accepted → Post
+                            </span>
+                          )}
+                          {variant.status === "rejected" && (
+                            <span className="rounded-full bg-black/5 px-2 py-0.5 text-xs text-gray-500">
+                              Rejected
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <pre className="mt-3 max-h-60 overflow-auto whitespace-pre-wrap rounded-md bg-black/5 p-3 text-xs">
+                        {variant.content}
+                      </pre>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           </section>
@@ -535,56 +747,102 @@ export function V2ResonateApp() {
             <div className="mt-4 grid gap-4">
               {posts.length === 0 && (
                 <p className="text-sm text-gray-600">
-                  No v2 drafts yet. Generate one from an Idea to validate the flow.
+                  No v2 drafts yet. Accept a variant from an Idea to create a draft.
                 </p>
               )}
-              {posts.map((post) => (
-                <article className="rounded-lg border border-black/10 p-4" key={post.id}>
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <h3 className="font-medium">{post.title}</h3>
-                      <p className="text-sm text-gray-500">
-                        {V2_CHANNEL_LABELS[post.channelId]} - {post.status}
-                      </p>
+              {posts.map((post) => {
+                const ideaTitle = state.ideas.find((i) => i.id === post.ideaId)?.title;
+                return (
+                  <article className="rounded-lg border border-black/10 p-4" key={post.id}>
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <h3 className="font-medium">{post.title}</h3>
+                        <p className="mt-0.5 text-sm text-gray-500">
+                          {V2_CHANNEL_LABELS[post.channelId]} ·{" "}
+                          <span
+                            className={
+                              post.status === "scheduled" || post.status === "pr-created"
+                                ? "text-[#15616d]"
+                                : ""
+                            }
+                          >
+                            {STATUS_LABELS[post.status]}
+                          </span>
+                        </p>
+                        {ideaTitle && (
+                          <p className="mt-0.5 text-xs text-gray-400">
+                            From idea: {ideaTitle}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        {/* Channel-specific actions */}
+                        {post.channelId === "youtube" && post.status === "draft" && (
+                          <button
+                            className="rounded-md border border-black/15 px-3 py-1.5 text-sm font-medium hover:bg-black/5 disabled:opacity-60"
+                            disabled={Boolean(busy)}
+                            onClick={() => validateYouTube(post)}
+                            type="button"
+                          >
+                            Validate YouTube Placeholder
+                          </button>
+                        )}
+                        {post.channelId === "corvo-blog" && post.status === "draft" && (
+                          <button
+                            className="rounded-md border border-black/15 px-3 py-1.5 text-sm font-medium hover:bg-black/5 disabled:opacity-60"
+                            disabled={Boolean(busy)}
+                            onClick={() => createCorvoBlogPr(post)}
+                            type="button"
+                          >
+                            Create Corvo Blog PR
+                          </button>
+                        )}
+
+                        {/* Generic scheduling handoff for other channels */}
+                        {post.status === "draft" &&
+                          post.channelId !== "youtube" &&
+                          post.channelId !== "corvo-blog" && (
+                            <div className="flex items-center gap-2">
+                              <input
+                                className="rounded-md border border-black/15 px-2 py-1.5 text-xs"
+                                onChange={(e) =>
+                                  setScheduleDates((prev) => ({
+                                    ...prev,
+                                    [post.id]: e.target.value,
+                                  }))
+                                }
+                                type="date"
+                                value={scheduleDates[post.id] ?? post.scheduledDate ?? today()}
+                              />
+                              <button
+                                className="rounded-md bg-[#15616d] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#104d56]"
+                                onClick={() => schedulePost(post)}
+                                type="button"
+                              >
+                                Schedule
+                              </button>
+                            </div>
+                          )}
+                      </div>
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                      {post.channelId === "youtube" && (
-                        <button
-                          className="rounded-md border border-black/15 px-3 py-2 text-sm font-medium hover:bg-black/5 disabled:opacity-60"
-                          disabled={Boolean(busy)}
-                          onClick={() => validateYouTube(post)}
-                          type="button"
-                        >
-                          Validate YouTube Placeholder
-                        </button>
-                      )}
-                      {post.channelId === "corvo-blog" && (
-                        <button
-                          className="rounded-md border border-black/15 px-3 py-2 text-sm font-medium hover:bg-black/5 disabled:opacity-60"
-                          disabled={Boolean(busy)}
-                          onClick={() => createCorvoBlogPr(post)}
-                          type="button"
-                        >
-                          Create Corvo Blog PR
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                  <pre className="mt-3 max-h-80 overflow-auto whitespace-pre-wrap rounded-md bg-black/5 p-3 text-sm">
-                    {post.content}
-                  </pre>
-                  {post.prUrl && (
-                    <a
-                      className="mt-3 inline-flex text-sm font-medium text-[#15616d] underline"
-                      href={post.prUrl}
-                      rel="noreferrer"
-                      target="_blank"
-                    >
-                      Open PR
-                    </a>
-                  )}
-                </article>
-              ))}
+
+                    <pre className="mt-3 max-h-80 overflow-auto whitespace-pre-wrap rounded-md bg-black/5 p-3 text-sm">
+                      {post.content}
+                    </pre>
+                    {post.prUrl && (
+                      <a
+                        className="mt-3 inline-flex text-sm font-medium text-[#15616d] underline"
+                        href={post.prUrl}
+                        rel="noreferrer"
+                        target="_blank"
+                      >
+                        Open PR
+                      </a>
+                    )}
+                  </article>
+                );
+              })}
             </div>
           </section>
         </div>

@@ -260,6 +260,90 @@ export function buildCorvoBlogDraft(params: {
   ].join("\n");
 }
 
+export type V2VariantStatus = "pending" | "accepted" | "rejected";
+
+export type V2DraftVariant = {
+  id: string;
+  ideaId: string;
+  channelId: V2ChannelId;
+  content: string;
+  provider: string;
+  status: V2VariantStatus;
+  /** Set when status transitions to "accepted" */
+  postId?: string;
+};
+
+export function buildLinkedInDraft(params: {
+  idea: V2Idea;
+  voicePackMarkdown: string;
+  generatedDraft?: string;
+}): string {
+  if (params.generatedDraft?.trim()) return params.generatedDraft.trim();
+
+  const entry = params.idea.entries.at(-1)?.content ?? "";
+  return [
+    `${params.idea.title}`,
+    "",
+    entry.slice(0, 280),
+    "",
+    "This is a placeholder LinkedIn draft. Configure PIONEER_API_KEY to generate with PioneerAI.",
+    "",
+    `Tags: ${params.idea.tags.join(" ")}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+export function buildGenericChannelDraft(params: {
+  idea: V2Idea;
+  channelId: V2ChannelId;
+  voicePackMarkdown: string;
+  generatedDraft?: string;
+}): string {
+  if (params.generatedDraft?.trim()) return params.generatedDraft.trim();
+
+  const label = V2_CHANNEL_LABELS[params.channelId];
+  const entry = params.idea.entries.at(-1)?.content ?? "";
+  return [
+    `[${label} draft] ${params.idea.title}`,
+    "",
+    entry.slice(0, 500),
+    "",
+    `This is a placeholder ${label} draft. Configure PIONEER_API_KEY to generate with PioneerAI.`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+export function buildFallbackDraft(params: {
+  idea: V2Idea;
+  channelId: V2ChannelId;
+  voicePackMarkdown: string;
+  generatedDraft?: string;
+}): string {
+  switch (params.channelId) {
+    case "corvo-blog":
+      return buildCorvoBlogDraft({
+        idea: params.idea,
+        voicePackMarkdown: params.voicePackMarkdown,
+        generatedDraft: params.generatedDraft,
+      });
+    case "linkedin":
+      return buildLinkedInDraft({
+        idea: params.idea,
+        voicePackMarkdown: params.voicePackMarkdown,
+        generatedDraft: params.generatedDraft,
+      });
+    default:
+      return buildGenericChannelDraft({
+        idea: params.idea,
+        channelId: params.channelId,
+        voicePackMarkdown: params.voicePackMarkdown,
+        generatedDraft: params.generatedDraft,
+      });
+  }
+}
+
 export function makeId(prefix: string): string {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
