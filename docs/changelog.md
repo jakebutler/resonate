@@ -1291,3 +1291,46 @@ Append-only session log for repository-level updates. Each documentation refresh
 ### Branch
 
 - feat/56-e2e-hardening
+
+## 06/05/2026 16:18:29 PDT
+
+### Summary
+
+- Updated repository documentation and handoff records.
+- Touched the captured ideas experience.
+
+### Staged Changes
+
+- M	app/api/v2/claim-map/route.ts
+- M	app/api/v2/editorial-outline/__tests__/route.test.ts
+- M	app/api/v2/editorial-outline/route.ts
+- M	app/api/v2/research-brief/route.ts
+- M	app/ideas/__tests__/page.test.tsx
+- M	components/IdeaDetail/__tests__/IdeaDetail.test.tsx
+- M	components/IdeasPage/__tests__/IdeasPage.test.tsx
+- M	components/SetupPage/__tests__/SetupPage.test.tsx
+- M	components/V2ResonateApp.tsx
+- A	components/__tests__/V2ResonateApp.test.tsx
+- M	lib/__tests__/v2Research.test.ts
+- M	vitest.config.ts
+
+### Working Tree Snapshot
+
+- M  app/api/v2/claim-map/route.ts
+- M  app/api/v2/editorial-outline/__tests__/route.test.ts
+- M  app/api/v2/editorial-outline/route.ts
+- M  app/api/v2/research-brief/route.ts
+- M  app/ideas/__tests__/page.test.tsx
+- M  components/IdeaDetail/__tests__/IdeaDetail.test.tsx
+- M  components/IdeasPage/__tests__/IdeasPage.test.tsx
+- M  components/SetupPage/__tests__/SetupPage.test.tsx
+- M  components/V2ResonateApp.tsx
+- A  components/__tests__/V2ResonateApp.test.tsx
+- M  lib/__tests__/v2Research.test.ts
+- M  vitest.config.ts
+- ?? CONTEXT.md
+- ?? docs/adr/
+
+### Branch
+
+- codex/fix-v2-validation-gates

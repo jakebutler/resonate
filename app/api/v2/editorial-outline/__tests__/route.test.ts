@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { POST } from "@/app/api/v2/editorial-outline/route";
-import { makeClaim, makeClaimMap } from "@/lib/v2";
+import { makeClaim } from "@/lib/v2";
 
 function makeRequest(body: object): NextRequest {
   return new Request("http://localhost/api/v2/editorial-outline", {

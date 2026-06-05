@@ -6,7 +6,6 @@ import {
   makeResearchBrief,
   makeSourceRecord,
   type V2EvidenceLabel,
-  type V2ResearchBrief,
   type V2SourceRecord,
 } from "@/lib/v2";
 
