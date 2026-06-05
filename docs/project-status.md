@@ -1,6 +1,6 @@
 # Project Status
 
-Last updated: 06/05/2026 14:22:36 PDT
+Last updated: 06/05/2026 14:25:10 PDT
 
 ## State
 
@@ -16,20 +16,19 @@ Maintain the living documentation and preserve a handoff-quality snapshot of the
 
 ## Last Completed Task
 
-- 402a2e8 feat(v2): editorial outline and long-form draft generation (#54)
+- d95a853 feat(v2): cutover checklist and ops runbook
 
 ## Recent Commits
 
+- d95a853 feat(v2): cutover checklist and ops runbook
 - 402a2e8 feat(v2): editorial outline and long-form draft generation (#54)
 - 1afa168 feat(v2): research claim map and citation review artifact (#53)
 - b57c416 feat(v2): research editorial pipeline spike and source-quality rubric (#52)
 - 7e29ea8 feat(v2): inbox and draft-management validation with cross-brand view (#51)
-- 0ee43ea feat(v2): multi-platform variant review and scheduling handoff (#49)
 
 ## Local Working Tree
 
-- A  docs/cutover-checklist.md
-- A  docs/ops-runbook.md
+- A  app/api/v2/__tests__/e2e-mvp-flow.test.ts
 - ?? CONTEXT.md
 - ?? docs/adr/
 
@@ -40,4 +39,4 @@ Maintain the living documentation and preserve a handoff-quality snapshot of the
 
 ## Branch
 
-- feat/55-cutover-checklist
+- feat/56-e2e-hardening
