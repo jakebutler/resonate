@@ -1,6 +1,6 @@
 # Project Status
 
-Last updated: 06/05/2026 13:08:33 PDT
+Last updated: 06/05/2026 14:25:10 PDT
 
 ## State
 
@@ -16,23 +16,19 @@ Maintain the living documentation and preserve a handoff-quality snapshot of the
 
 ## Last Completed Task
 
-- 473630d docs: refresh Postiz production validation status
+- d95a853 feat(v2): cutover checklist and ops runbook
 
 ## Recent Commits
 
-- 473630d docs: refresh Postiz production validation status
-- 84b6e9a fix: skip git hook install outside worktrees
-- 59ff50f docs: record Postiz fork creation
-- b5833e3 docs: add Postiz brand workspace validation notes
-- f2ff655 docs: add Postiz foundation runbook
+- d95a853 feat(v2): cutover checklist and ops runbook
+- 402a2e8 feat(v2): editorial outline and long-form draft generation (#54)
+- 1afa168 feat(v2): research claim map and citation review artifact (#53)
+- b57c416 feat(v2): research editorial pipeline spike and source-quality rubric (#52)
+- 7e29ea8 feat(v2): inbox and draft-management validation with cross-brand view (#51)
 
 ## Local Working Tree
 
-- M  app/api/v2/generate-draft/__tests__/route.test.ts
-- M  app/api/v2/generate-draft/route.ts
-- M  components/V2ResonateApp.tsx
-- M  lib/__tests__/v2.test.ts
-- M  lib/v2.ts
+- A  app/api/v2/__tests__/e2e-mvp-flow.test.ts
 - ?? CONTEXT.md
 - ?? docs/adr/
 
@@ -43,4 +39,4 @@ Maintain the living documentation and preserve a handoff-quality snapshot of the
 
 ## Branch
 
-- feat/49-multi-platform-variants
+- feat/56-e2e-hardening

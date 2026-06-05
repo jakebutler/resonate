@@ -344,6 +344,349 @@ export function buildFallbackDraft(params: {
   }
 }
 
+/** Severity classification for inbox/draft-management gap analysis (issue #51). */
+export type V2GapSeverity = "blocker" | "v1.1" | "later" | "acceptable";
+
+/**
+ * Filter the workspace post list for the drafts view.
+ * When allBrands is true, all brands are shown together (cross-brand view).
+ * An optional statusFilter narrows to one status.
+ */
+export function filterPostsForView(
+  posts: V2Post[],
+  activeBrandId: V2BrandId,
+  allBrands: boolean,
+  statusFilter?: V2Post["status"]
+): V2Post[] {
+  let result = allBrands ? posts : posts.filter((p) => p.brandId === activeBrandId);
+  if (statusFilter) result = result.filter((p) => p.status === statusFilter);
+  return result;
+}
+
+// ─── Research / Editorial Pipeline Types (issue #52) ────────────────────────
+
+export type V2EvidenceLabel =
+  | "rct-meta-analysis"   // Randomized controlled trial or meta-analysis
+  | "mechanism"           // Mechanistic or basic-science evidence
+  | "expert-practice"     // Expert opinion or established clinical/field practice
+  | "practice-principle"  // Documented field or clinical practice principle
+  | "primary-source"      // Direct primary source (trial data, regulatory filing, etc.)
+  | "weaker-support";     // Anecdote, opinion piece, or low-quality evidence
+
+export const EVIDENCE_LABELS: V2EvidenceLabel[] = [
+  "rct-meta-analysis",
+  "mechanism",
+  "expert-practice",
+  "practice-principle",
+  "primary-source",
+  "weaker-support",
+];
+
+export const EVIDENCE_LABEL_DESCRIPTIONS: Record<V2EvidenceLabel, string> = {
+  "rct-meta-analysis":
+    "Randomized controlled trial or published meta-analysis. Highest confidence for causal claims.",
+  mechanism:
+    "Mechanistic or basic-science evidence explaining biological/physiological pathways.",
+  "expert-practice":
+    "Expert opinion, consensus statement, or established professional practice.",
+  "practice-principle":
+    "Documented field or clinical practice principle derived from accumulated experience.",
+  "primary-source":
+    "Direct primary source: original trial data, regulatory filing, official dataset, or primary document.",
+  "weaker-support":
+    "Anecdote, single case report, opinion piece, or low-quality observational evidence. Use to illustrate, not to prove.",
+};
+
+export type V2SourceQualityRating = "strong" | "moderate" | "weak";
+
+/**
+ * Classify a source's overall quality rating from its evidence label and relevance score.
+ * This is a deterministic rubric — human review is still required before any source is accepted.
+ */
+export function classifySourceQuality(
+  evidenceLabel: V2EvidenceLabel,
+  relevanceScore: 1 | 2 | 3 | 4 | 5
+): V2SourceQualityRating {
+  if (relevanceScore <= 1 || evidenceLabel === "weaker-support") return "weak";
+  if (
+    evidenceLabel === "rct-meta-analysis" ||
+    (evidenceLabel === "primary-source" && relevanceScore >= 4)
+  )
+    return "strong";
+  if (
+    evidenceLabel === "mechanism" ||
+    evidenceLabel === "expert-practice" ||
+    evidenceLabel === "practice-principle" ||
+    evidenceLabel === "primary-source"
+  )
+    return "moderate";
+  return "weak";
+}
+
+export type V2SourceStatus = "unvetted" | "accepted" | "flagged" | "rejected";
+
+export type V2SourceRecord = {
+  id: string;
+  url: string;
+  title: string;
+  domain: string;
+  authors?: string[];
+  publishedYear?: number;
+  evidenceLabel: V2EvidenceLabel;
+  qualityRating: V2SourceQualityRating;
+  relevanceScore: 1 | 2 | 3 | 4 | 5;
+  conflicts?: string;
+  limitations?: string;
+  useCase: string;
+  addedBy: "user" | "agent";
+  status: V2SourceStatus;
+  reviewerNotes?: string;
+};
+
+type MakeSourceRecordInput = {
+  url: string;
+  title: string;
+  evidenceLabel: V2EvidenceLabel;
+  relevanceScore: 1 | 2 | 3 | 4 | 5;
+  useCase: string;
+  authors?: string[];
+  publishedYear?: number;
+  conflicts?: string;
+  limitations?: string;
+  addedBy?: "user" | "agent";
+  reviewerNotes?: string;
+  domain?: string;
+};
+
+export function makeSourceRecord(input: MakeSourceRecordInput): V2SourceRecord {
+  let domain = input.domain ?? "";
+  if (!domain) {
+    try {
+      domain = new URL(input.url).hostname;
+    } catch {
+      domain = input.url;
+    }
+  }
+  return {
+    id: makeId("src"),
+    url: input.url,
+    title: input.title,
+    domain,
+    authors: input.authors,
+    publishedYear: input.publishedYear,
+    evidenceLabel: input.evidenceLabel,
+    qualityRating: classifySourceQuality(input.evidenceLabel, input.relevanceScore),
+    relevanceScore: input.relevanceScore,
+    conflicts: input.conflicts,
+    limitations: input.limitations,
+    useCase: input.useCase,
+    addedBy: input.addedBy ?? "agent",
+    status: "unvetted",
+    reviewerNotes: input.reviewerNotes,
+  };
+}
+
+export type V2ResearchDepth = "light" | "standard" | "rigorous";
+export type V2ResearchRiskLevel = "low" | "medium" | "high";
+export type V2ResearchStatus =
+  | "drafting"
+  | "source-discovery"
+  | "source-review"
+  | "outline-ready";
+
+export type V2ResearchBrief = {
+  id: string;
+  brandId: V2BrandId;
+  topic: string;
+  audience: string;
+  thesis: string;
+  depth: V2ResearchDepth;
+  riskLevel: V2ResearchRiskLevel;
+  targetOutputs: string[];
+  sources: V2SourceRecord[];
+  status: V2ResearchStatus;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type MakeResearchBriefInput = Omit<V2ResearchBrief, "id" | "sources" | "status" | "createdAt" | "updatedAt">;
+
+export function makeResearchBrief(input: MakeResearchBriefInput): V2ResearchBrief {
+  const now = new Date().toISOString();
+  return {
+    id: makeId("brief"),
+    ...input,
+    sources: [],
+    status: "drafting",
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+// ─── Claim Map Types (issue #53) ────────────────────────────────────────────
+
+export type V2ClaimStatus =
+  | "unreviewed"
+  | "accepted"
+  | "needs-revision"
+  | "unsupported"
+  | "too-risky"
+  | "out-of-scope";
+
+export const CLAIM_STATUSES: V2ClaimStatus[] = [
+  "unreviewed",
+  "accepted",
+  "needs-revision",
+  "unsupported",
+  "too-risky",
+  "out-of-scope",
+];
+
+export const CLAIM_STATUS_LABELS: Record<V2ClaimStatus, string> = {
+  unreviewed: "Unreviewed",
+  accepted: "Accepted",
+  "needs-revision": "Needs Revision",
+  unsupported: "Unsupported",
+  "too-risky": "Too Risky",
+  "out-of-scope": "Out of Scope",
+};
+
+export type V2ClaimConfidence = "high" | "medium" | "low";
+
+export type V2Claim = {
+  id: string;
+  text: string;
+  sourceIds: string[];
+  evidenceLabel: V2EvidenceLabel;
+  confidence: V2ClaimConfidence;
+  caveats?: string;
+  reviewerNotes?: string;
+  status: V2ClaimStatus;
+};
+
+export type V2ClaimMapStatus = "building" | "review-ready" | "reviewed";
+
+export type V2ClaimMap = {
+  id: string;
+  brandId: V2BrandId;
+  topic: string;
+  thesis: string;
+  claims: V2Claim[];
+  status: V2ClaimMapStatus;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type MakeClaimInput = {
+  text: string;
+  sourceIds: string[];
+  evidenceLabel: V2EvidenceLabel;
+  confidence: V2ClaimConfidence;
+  caveats?: string;
+  reviewerNotes?: string;
+  status?: V2ClaimStatus;
+};
+
+export function makeClaim(input: MakeClaimInput): V2Claim {
+  return {
+    id: makeId("claim"),
+    status: input.status ?? "unreviewed",
+    text: input.text,
+    sourceIds: input.sourceIds,
+    evidenceLabel: input.evidenceLabel,
+    confidence: input.confidence,
+    caveats: input.caveats,
+    reviewerNotes: input.reviewerNotes,
+  };
+}
+
+type MakeClaimMapInput = {
+  brandId: V2BrandId;
+  topic: string;
+  thesis: string;
+};
+
+export function makeClaimMap(input: MakeClaimMapInput): V2ClaimMap {
+  const now = new Date().toISOString();
+  return {
+    id: makeId("cmap"),
+    brandId: input.brandId,
+    topic: input.topic,
+    thesis: input.thesis,
+    claims: [],
+    status: "building",
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+// ─── Editorial Outline + Long-Form Draft Types (issue #54) ──────────────────
+
+export type V2OutlineStatus = "draft" | "approved" | "generating-draft";
+
+export type V2OutlineSection = {
+  heading: string;
+  notes: string;
+  claimIds: string[];
+  evidenceLabels: V2EvidenceLabel[];
+};
+
+export type V2TakeawayRow = {
+  finding: string;
+  evidenceLabel: V2EvidenceLabel;
+  source: string;
+};
+
+export type V2EditorialOutline = {
+  id: string;
+  claimMapId: string;
+  brandId: V2BrandId;
+  thesis: string;
+  sections: V2OutlineSection[];
+  takeawayTable: V2TakeawayRow[];
+  citationPlan: string;
+  status: V2OutlineStatus;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export function makeOutlineSection(input: V2OutlineSection): V2OutlineSection {
+  return { ...input };
+}
+
+export function makeTakeawayRow(input: V2TakeawayRow): V2TakeawayRow {
+  return { ...input };
+}
+
+type MakeEditorialOutlineInput = Omit<V2EditorialOutline, "id" | "status" | "createdAt" | "updatedAt">;
+
+export function makeEditorialOutline(input: MakeEditorialOutlineInput): V2EditorialOutline {
+  const now = new Date().toISOString();
+  return {
+    id: makeId("outline"),
+    ...input,
+    status: "draft",
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+// ─── Seed research brief for FreshProof spike (issue #52) ───────────────────
+
+export const FRESHPROOF_SEED_BRIEF: Omit<V2ResearchBrief, "id" | "createdAt" | "updatedAt"> = {
+  brandId: "freshproof",
+  topic: "GLP-1 drug discontinuation and patient weight regain",
+  audience:
+    "Healthcare providers managing patients on GLP-1 receptor agonists and informed patients considering discontinuation",
+  thesis:
+    "Weight regain after GLP-1 discontinuation is predictable, substantial, and manageable — but only with structured tapering, lifestyle continuity, and realistic patient expectations.",
+  depth: "rigorous",
+  riskLevel: "high",
+  targetOutputs: ["long-form blog post", "linkedin post", "reddit post"],
+  sources: [],
+  status: "drafting",
+};
+
 export function makeId(prefix: string): string {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }

@@ -6,16 +6,32 @@ import {
   buildCorvoBlogDraft,
   buildFallbackDraft,
   buildIdeaSeedText,
+  CLAIM_STATUS_LABELS,
+  CLAIM_STATUSES,
   DEFAULT_V2_STATE,
+  EVIDENCE_LABEL_DESCRIPTIONS,
+  EVIDENCE_LABELS,
+  filterPostsForView,
+  FRESHPROOF_SEED_BRIEF,
+  makeClaimMap,
   makeId,
+  makeResearchBrief,
   normalizeIdeaSourceUrl,
   V2_BRANDS,
   V2_CHANNEL_LABELS,
   type V2BrandId,
   type V2ChannelId,
+  type V2Claim,
+  type V2ClaimMap,
+  type V2ClaimStatus,
   type V2DraftVariant,
+  type V2EditorialOutline,
   type V2Idea,
   type V2Post,
+  type V2ResearchBrief,
+  type V2ResearchDepth,
+  type V2ResearchRiskLevel,
+  type V2SourceRecord,
   type V2WorkspaceState,
 } from "@/lib/v2";
 
@@ -74,6 +90,29 @@ export function V2ResonateApp() {
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [scheduleDates, setScheduleDates] = useState<Record<string, string>>({});
+  const [allBrandsDrafts, setAllBrandsDrafts] = useState(false);
+  const [draftStatusFilter, setDraftStatusFilter] = useState<V2Post["status"] | "">("");
+
+  // Research pipeline state (#52)
+  const [researchBrief, setResearchBrief] = useState<V2ResearchBrief | null>(null);
+  const [researchTopic, setResearchTopic] = useState(FRESHPROOF_SEED_BRIEF.topic);
+  const [researchAudience, setResearchAudience] = useState(FRESHPROOF_SEED_BRIEF.audience);
+  const [researchThesis, setResearchThesis] = useState(FRESHPROOF_SEED_BRIEF.thesis);
+  const [researchDepth, setResearchDepth] = useState<V2ResearchDepth>("rigorous");
+  const [researchRisk, setResearchRisk] = useState<V2ResearchRiskLevel>("high");
+  const [researchBusy, setResearchBusy] = useState(false);
+  const [sourceReviewNotes, setSourceReviewNotes] = useState<Record<string, string>>({});
+
+  // Claim map state (#53)
+  const [claimMap, setClaimMap] = useState<V2ClaimMap | null>(null);
+  const [claimMapBusy, setClaimMapBusy] = useState(false);
+  const [claimReviewNotes, setClaimReviewNotes] = useState<Record<string, string>>({});
+
+  // Editorial outline + long-form draft state (#54)
+  const [editorialOutline, setEditorialOutline] = useState<V2EditorialOutline | null>(null);
+  const [outlineBusy, setOutlineBusy] = useState(false);
+  const [longFormDraft, setLongFormDraft] = useState<string | null>(null);
+  const [draftBusy, setDraftBusy] = useState(false);
 
   useEffect(() => {
     setState(loadState());
@@ -87,7 +126,12 @@ export function V2ResonateApp() {
   const ideas = state.ideas.filter((idea) => idea.brandId === brandId);
   const selectedIdea =
     ideas.find((idea) => idea.id === selectedIdeaId) ?? ideas[0] ?? null;
-  const posts = state.posts.filter((post) => post.brandId === brandId);
+  const visiblePosts = filterPostsForView(
+    state.posts,
+    brandId,
+    allBrandsDrafts,
+    draftStatusFilter || undefined
+  );
   const voicePack =
     state.voicePacks.find((pack) => pack.brandId === brandId && pack.isDefault) ??
     state.voicePacks.find((pack) => pack.brandId === brandId) ??
@@ -395,12 +439,194 @@ export function V2ResonateApp() {
     setNotice(`Scheduled "${post.title}" for ${date}.`);
   }
 
+  async function generateClaimMap() {
+    if (!researchBrief) return;
+    const accepted = researchBrief.sources.filter((s) => s.status === "accepted");
+    if (accepted.length === 0) return;
+    setClaimMapBusy(true);
+    setNotice(null);
+
+    try {
+      const response = await fetch("/api/v2/claim-map", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          topic: researchBrief.topic,
+          thesis: researchBrief.thesis,
+          brandId: researchBrief.brandId,
+          acceptedSources: accepted,
+        }),
+      });
+      const data = await response.json();
+      const claims: V2Claim[] = Array.isArray(data.claims) ? data.claims : [];
+      const map = makeClaimMap({
+        brandId: researchBrief.brandId,
+        topic: researchBrief.topic,
+        thesis: researchBrief.thesis,
+      });
+      setClaimMap({ ...map, claims, status: "review-ready" });
+      setNotice(
+        data.warning ??
+          `Generated ${claims.length} candidate claim${claims.length !== 1 ? "s" : ""}. Review each before drafting.`
+      );
+    } finally {
+      setClaimMapBusy(false);
+    }
+  }
+
+  function reviewClaim(claimId: string, status: V2ClaimStatus, notes?: string) {
+    setClaimMap((prev) => {
+      if (!prev) return prev;
+      const updatedClaims = prev.claims.map((c) =>
+        c.id === claimId
+          ? { ...c, status, reviewerNotes: notes ?? c.reviewerNotes }
+          : c
+      );
+      const allReviewed = updatedClaims.every((c) => c.status !== "unreviewed");
+      return {
+        ...prev,
+        claims: updatedClaims,
+        status: allReviewed ? "reviewed" : "review-ready",
+        updatedAt: new Date().toISOString(),
+      };
+    });
+    if (notes) setClaimReviewNotes((prev) => ({ ...prev, [claimId]: notes }));
+  }
+
+  async function generateOutline() {
+    if (!claimMap || !researchBrief) return;
+    const accepted = claimMap.claims.filter((c) => c.status === "accepted");
+    if (accepted.length === 0) return;
+    setOutlineBusy(true);
+    setLongFormDraft(null);
+    setNotice(null);
+
+    try {
+      const response = await fetch("/api/v2/editorial-outline", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          thesis: researchBrief.thesis || claimMap.thesis,
+          claimMapId: claimMap.id,
+          brandId: claimMap.brandId,
+          topic: researchBrief.topic,
+          acceptedClaims: accepted,
+        }),
+      });
+      const data = await response.json();
+      if (data.outline) {
+        setEditorialOutline(data.outline);
+        setNotice(
+          data.warning ?? `Editorial outline generated — ${data.outline.sections.length} section${data.outline.sections.length !== 1 ? "s" : ""}. Review and approve before drafting.`
+        );
+      }
+    } finally {
+      setOutlineBusy(false);
+    }
+  }
+
+  async function generateLongFormDraft() {
+    if (!editorialOutline || !claimMap) return;
+    const accepted = claimMap.claims.filter((c) => c.status === "accepted");
+    if (accepted.length === 0) return;
+    const approvedOutline = { ...editorialOutline, status: "approved" as const };
+    setDraftBusy(true);
+    setNotice(null);
+
+    try {
+      const response = await fetch("/api/v2/long-form-draft", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          outline: approvedOutline,
+          acceptedClaims: accepted,
+          brandId: claimMap.brandId,
+        }),
+      });
+      const data = await response.json();
+      if (typeof data.draft === "string") {
+        setLongFormDraft(data.draft);
+        setEditorialOutline((prev) => prev ? { ...prev, status: "approved" } : prev);
+        setNotice(
+          data.warning ??
+            "Long-form draft generated. Review carefully before publishing — AI never auto-publishes."
+        );
+      }
+    } finally {
+      setDraftBusy(false);
+    }
+  }
+
+  async function runSourceDiscovery() {
+    if (!researchTopic.trim() || !researchAudience.trim()) return;
+    setResearchBusy(true);
+    setNotice(null);
+
+    const brief = makeResearchBrief({
+      brandId,
+      topic: researchTopic,
+      audience: researchAudience,
+      thesis: researchThesis,
+      depth: researchDepth,
+      riskLevel: researchRisk,
+      targetOutputs: FRESHPROOF_SEED_BRIEF.targetOutputs,
+    });
+
+    try {
+      const response = await fetch("/api/v2/research-brief", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          topic: brief.topic,
+          audience: brief.audience,
+          thesis: brief.thesis,
+          depth: brief.depth,
+          riskLevel: brief.riskLevel,
+          brandId: brief.brandId,
+          targetOutputs: brief.targetOutputs,
+        }),
+      });
+      const data = await response.json();
+      const sources: V2SourceRecord[] = Array.isArray(data.sources) ? data.sources : [];
+      setResearchBrief({ ...brief, sources, status: "source-review" });
+      setNotice(
+        data.warning ??
+          `Source discovery complete. ${sources.length} sources found. Review each before using in drafts.`
+      );
+    } finally {
+      setResearchBusy(false);
+    }
+  }
+
+  function vetSource(
+    sourceId: string,
+    newStatus: V2SourceRecord["status"],
+    notes?: string
+  ) {
+    setResearchBrief((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        sources: prev.sources.map((s) =>
+          s.id === sourceId
+            ? { ...s, status: newStatus, reviewerNotes: notes ?? s.reviewerNotes }
+            : s
+        ),
+      };
+    });
+    if (notes) {
+      setSourceReviewNotes((prev) => ({ ...prev, [sourceId]: notes }));
+    }
+  }
+
   function resetDemo() {
     setState(DEFAULT_V2_STATE);
     setBrandId("corvo");
     setSelectedIdeaId("idea-corvo-golden-sets");
     setVariants([]);
     setGeneratingChannels(new Set());
+    setResearchBrief(null);
+    setClaimMap(null);
     setNotice("Reset v2 demo data.");
   }
 
@@ -743,15 +969,41 @@ export function V2ResonateApp() {
           </section>
 
           <section className="rounded-lg border border-black/10 bg-white p-5">
-            <h2 className="text-lg font-semibold">Drafts and Publishing Handoff</h2>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-lg font-semibold">Drafts and Publishing Handoff</h2>
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="flex cursor-pointer items-center gap-1.5 text-sm">
+                  <input
+                    checked={allBrandsDrafts}
+                    className="accent-[#15616d]"
+                    onChange={(e) => setAllBrandsDrafts(e.target.checked)}
+                    type="checkbox"
+                  />
+                  All brands
+                </label>
+                <select
+                  className="rounded-md border border-black/15 px-2 py-1 text-xs"
+                  onChange={(e) => setDraftStatusFilter(e.target.value as V2Post["status"] | "")}
+                  value={draftStatusFilter}
+                >
+                  <option value="">All statuses</option>
+                  <option value="draft">Draft</option>
+                  <option value="scheduled">Scheduled</option>
+                  <option value="pr-created">PR Created</option>
+                </select>
+              </div>
+            </div>
             <div className="mt-4 grid gap-4">
-              {posts.length === 0 && (
+              {visiblePosts.length === 0 && (
                 <p className="text-sm text-gray-600">
-                  No v2 drafts yet. Accept a variant from an Idea to create a draft.
+                  No drafts match the current filter. Accept a variant from an Idea to create a draft.
                 </p>
               )}
-              {posts.map((post) => {
+              {visiblePosts.map((post) => {
                 const ideaTitle = state.ideas.find((i) => i.id === post.ideaId)?.title;
+                const postBrand = allBrandsDrafts
+                  ? V2_BRANDS.find((b) => b.id === post.brandId)?.name
+                  : null;
                 return (
                   <article className="rounded-lg border border-black/10 p-4" key={post.id}>
                     <div className="flex flex-wrap items-start justify-between gap-3">
@@ -769,6 +1021,11 @@ export function V2ResonateApp() {
                             {STATUS_LABELS[post.status]}
                           </span>
                         </p>
+                        {postBrand && (
+                          <p className="mt-0.5 text-xs font-medium text-[#15616d]">
+                            {postBrand}
+                          </p>
+                        )}
                         {ideaTitle && (
                           <p className="mt-0.5 text-xs text-gray-400">
                             From idea: {ideaTitle}
@@ -844,6 +1101,567 @@ export function V2ResonateApp() {
                 );
               })}
             </div>
+          </section>
+
+          {/* Claim Map (#53) — visible once research brief has accepted sources */}
+          {researchBrief &&
+            researchBrief.sources.filter((s) => s.status === "accepted").length > 0 && (
+              <section className="rounded-lg border border-black/10 bg-white p-5">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-lg font-semibold">Claim Map</h2>
+                    <p className="mt-1 text-sm text-gray-500">
+                      Candidate claims derived from accepted sources. Review each before drafting.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {claimMap && (
+                      <span
+                        className={`rounded-full px-3 py-1 text-xs font-medium ${
+                          claimMap.status === "reviewed"
+                            ? "bg-[#e8f3f4] text-[#15616d]"
+                            : "bg-[#fff4e6] text-[#8a4b00]"
+                        }`}
+                      >
+                        {claimMap.status}
+                      </span>
+                    )}
+                    <button
+                      className="rounded-md bg-[#15616d] px-4 py-2 text-sm font-semibold text-white hover:bg-[#104d56] disabled:opacity-60"
+                      disabled={claimMapBusy}
+                      onClick={generateClaimMap}
+                      type="button"
+                    >
+                      {claimMapBusy
+                        ? "Generating…"
+                        : claimMap
+                          ? "Regenerate Claim Map"
+                          : "Generate Claim Map"}
+                    </button>
+                  </div>
+                </div>
+
+                {claimMap && claimMap.claims.length > 0 && (
+                  <div className="mt-5 space-y-3">
+                    <div className="flex flex-wrap gap-3 text-xs text-gray-500">
+                      {CLAIM_STATUSES.filter((s) => s !== "unreviewed").map((s) => {
+                        const count = claimMap.claims.filter((c) => c.status === s).length;
+                        return count > 0 ? (
+                          <span key={s}>
+                            {CLAIM_STATUS_LABELS[s]}: {count}
+                          </span>
+                        ) : null;
+                      })}
+                      <span>Unreviewed: {claimMap.claims.filter((c) => c.status === "unreviewed").length}</span>
+                    </div>
+
+                    {claimMap.claims.map((claim) => (
+                      <div
+                        key={claim.id}
+                        className={`rounded-lg border p-4 ${
+                          claim.status === "accepted"
+                            ? "border-[#15616d]/30 bg-[#f1fbfc]"
+                            : claim.status === "unsupported" ||
+                                claim.status === "too-risky" ||
+                                claim.status === "out-of-scope"
+                              ? "border-black/10 bg-black/[0.02] opacity-60"
+                              : claim.status === "needs-revision"
+                                ? "border-yellow-300 bg-yellow-50"
+                                : "border-black/10"
+                        }`}
+                      >
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium">{claim.text}</p>
+                            <div className="mt-1 flex flex-wrap gap-2 text-xs text-gray-500">
+                              <span className="font-medium">{claim.evidenceLabel}</span>
+                              <span>confidence: {claim.confidence}</span>
+                              {claim.sourceIds.length > 0 && (
+                                <span>{claim.sourceIds.length} source{claim.sourceIds.length > 1 ? "s" : ""}</span>
+                              )}
+                            </div>
+                            {claim.caveats && (
+                              <p className="mt-1 text-xs italic text-gray-500">
+                                Caveat: {claim.caveats}
+                              </p>
+                            )}
+                            {claim.reviewerNotes && (
+                              <p className="mt-1 text-xs text-gray-500">
+                                Notes: {claim.reviewerNotes}
+                              </p>
+                            )}
+                          </div>
+
+                          <div className="flex flex-shrink-0 flex-col gap-1.5">
+                            {claim.status === "unreviewed" || claim.status === "needs-revision" ? (
+                              <div className="flex flex-wrap gap-1.5">
+                                <button
+                                  className="rounded-md bg-[#15616d] px-2.5 py-1 text-xs font-semibold text-white"
+                                  onClick={() => reviewClaim(claim.id, "accepted", claimReviewNotes[claim.id])}
+                                  type="button"
+                                >
+                                  Accept
+                                </button>
+                                <button
+                                  className="rounded-md border border-yellow-400 bg-yellow-50 px-2.5 py-1 text-xs font-semibold text-yellow-800"
+                                  onClick={() => reviewClaim(claim.id, "needs-revision")}
+                                  type="button"
+                                >
+                                  Needs Revision
+                                </button>
+                                <button
+                                  className="rounded-md border border-red-300 bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700"
+                                  onClick={() => reviewClaim(claim.id, "too-risky")}
+                                  type="button"
+                                >
+                                  Too Risky
+                                </button>
+                                <button
+                                  className="rounded-md border border-black/15 px-2.5 py-1 text-xs font-medium"
+                                  onClick={() => reviewClaim(claim.id, "unsupported")}
+                                  type="button"
+                                >
+                                  Unsupported
+                                </button>
+                                <button
+                                  className="rounded-md border border-black/15 px-2.5 py-1 text-xs font-medium"
+                                  onClick={() => reviewClaim(claim.id, "out-of-scope")}
+                                  type="button"
+                                >
+                                  Out of Scope
+                                </button>
+                              </div>
+                            ) : (
+                              <span
+                                className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                                  claim.status === "accepted"
+                                    ? "bg-[#e8f3f4] text-[#15616d]"
+                                    : claim.status === "needs-revision"
+                                      ? "bg-yellow-100 text-yellow-800"
+                                      : "bg-black/5 text-gray-500"
+                                }`}
+                              >
+                                {CLAIM_STATUS_LABELS[claim.status]}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {(claim.status === "unreviewed" || claim.status === "needs-revision") && (
+                          <div className="mt-2">
+                            <input
+                              className="w-full rounded-md border border-black/15 px-2 py-1 text-xs"
+                              onChange={(e) =>
+                                setClaimReviewNotes((prev) => ({
+                                  ...prev,
+                                  [claim.id]: e.target.value,
+                                }))
+                              }
+                              placeholder="Reviewer notes (optional — included when accepting)"
+                              value={claimReviewNotes[claim.id] ?? ""}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    ))}
+
+                    {claimMap.status === "reviewed" && (
+                      <div className="rounded-lg border border-[#15616d]/30 bg-[#f1fbfc] p-4">
+                        <p className="text-sm font-medium text-[#15616d]">
+                          {claimMap.claims.filter((c) => c.status === "accepted").length} claim
+                          {claimMap.claims.filter((c) => c.status === "accepted").length !== 1 ? "s" : ""}{" "}
+                          accepted — ready to generate an editorial outline.
+                        </p>
+                        <p className="mt-1 text-xs text-[#0f4c55]">
+                          Unsupported, too-risky, and out-of-scope claims are excluded from draft
+                          generation by default.
+                        </p>
+                        <button
+                          className="mt-3 rounded-md bg-[#15616d] px-4 py-2 text-sm font-semibold text-white hover:bg-[#104d56] disabled:opacity-60"
+                          disabled={
+                            outlineBusy ||
+                            claimMap.claims.filter((c) => c.status === "accepted").length === 0
+                          }
+                          onClick={generateOutline}
+                          type="button"
+                        >
+                          {outlineBusy ? "Generating outline…" : "Generate Editorial Outline"}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </section>
+            )}
+
+          {/* Editorial Outline + Long-form Draft (#54) */}
+          {editorialOutline && (
+            <section className="rounded-lg border border-black/10 bg-white p-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-semibold">Editorial Outline</h2>
+                  <p className="mt-1 text-sm text-gray-500">
+                    Review the structure and approve before generating the long-form draft. AI never
+                    auto-publishes — human approval required.
+                  </p>
+                </div>
+                <span
+                  className={`rounded-full px-3 py-1 text-xs font-medium ${
+                    editorialOutline.status === "approved"
+                      ? "bg-[#e8f3f4] text-[#15616d]"
+                      : editorialOutline.status === "generating-draft"
+                        ? "bg-[#fff4e6] text-[#8a4b00]"
+                        : "bg-black/5 text-gray-600"
+                  }`}
+                >
+                  {editorialOutline.status}
+                </span>
+              </div>
+
+              <div className="mt-4 rounded-lg border border-black/10 bg-black/[0.02] p-4">
+                <p className="text-sm font-semibold">Thesis</p>
+                <p className="mt-1 text-sm text-gray-700">{editorialOutline.thesis}</p>
+              </div>
+
+              <div className="mt-4 space-y-3">
+                <h3 className="text-sm font-semibold">
+                  Sections ({editorialOutline.sections.length})
+                </h3>
+                {editorialOutline.sections.map((section, i) => (
+                  <div key={i} className="rounded-lg border border-black/10 p-4">
+                    <p className="text-sm font-medium">
+                      {i + 1}. {section.heading}
+                    </p>
+                    <p className="mt-1 text-xs text-gray-500">{section.notes}</p>
+                    {section.evidenceLabels.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {section.evidenceLabels.map((label) => (
+                          <span
+                            key={label}
+                            className="rounded-full bg-[#fff4e6] px-2 py-0.5 text-xs text-[#8a4b00]"
+                          >
+                            {label}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {editorialOutline.takeawayTable.length > 0 && (
+                <div className="mt-5">
+                  <h3 className="text-sm font-semibold">Key Takeaways</h3>
+                  <div className="mt-2 overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-black/10 text-left">
+                          <th className="pb-2 pr-4 font-medium">Finding</th>
+                          <th className="pb-2 pr-4 font-medium">Evidence</th>
+                          <th className="pb-2 font-medium">Source</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {editorialOutline.takeawayTable.map((row, i) => (
+                          <tr key={i} className="border-b border-black/5">
+                            <td className="py-2 pr-4 text-gray-700">{row.finding}</td>
+                            <td className="py-2 pr-4 text-[#8a4b00]">{row.evidenceLabel}</td>
+                            <td className="py-2 text-gray-500">{row.source}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {editorialOutline.citationPlan && (
+                <div className="mt-4 rounded-lg border border-black/10 bg-black/[0.02] p-3">
+                  <p className="text-xs font-semibold text-gray-500">Citation plan</p>
+                  <p className="mt-1 text-xs text-gray-600">{editorialOutline.citationPlan}</p>
+                </div>
+              )}
+
+              {editorialOutline.status !== "approved" && !longFormDraft && (
+                <div className="mt-5 flex flex-wrap gap-3">
+                  <button
+                    className="rounded-md bg-[#15616d] px-4 py-2 text-sm font-semibold text-white hover:bg-[#104d56] disabled:opacity-60"
+                    disabled={draftBusy || !claimMap}
+                    onClick={generateLongFormDraft}
+                    type="button"
+                  >
+                    {draftBusy ? "Generating draft…" : "Approve & Generate Long-form Draft"}
+                  </button>
+                </div>
+              )}
+
+              {longFormDraft && (
+                <div className="mt-6">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h3 className="text-base font-semibold">Long-form Draft</h3>
+                    <p className="rounded-full bg-red-50 px-3 py-1 text-xs text-red-700">
+                      AI never auto-publishes — human review required before scheduling
+                    </p>
+                  </div>
+                  <div className="mt-3 overflow-x-auto rounded-lg border border-black/10 bg-black/[0.02] p-4">
+                    <pre className="whitespace-pre-wrap font-mono text-xs leading-relaxed text-gray-800">
+                      {longFormDraft}
+                    </pre>
+                  </div>
+                  <p className="mt-2 text-xs text-gray-400">
+                    Copy this draft into your CMS or editor. Review all claims and citations before
+                    publishing.
+                  </p>
+                </div>
+              )}
+
+              {longFormDraft && !draftBusy && (
+                <div className="mt-4 rounded-lg border border-[#15616d]/30 bg-[#f1fbfc] p-4">
+                  <p className="text-sm font-medium text-[#15616d]">
+                    Long-form draft ready for human editorial review.
+                  </p>
+                  <p className="mt-1 text-xs text-[#0f4c55]">
+                    Next step: review, edit, and schedule via your standard editorial workflow.
+                    Regenerate if the draft needs major revision.
+                  </p>
+                  <button
+                    className="mt-2 rounded-md border border-[#15616d] px-3 py-1.5 text-xs font-medium text-[#15616d] hover:bg-[#e8f3f4] disabled:opacity-60"
+                    disabled={draftBusy}
+                    onClick={generateLongFormDraft}
+                    type="button"
+                  >
+                    {draftBusy ? "Regenerating…" : "Regenerate Draft"}
+                  </button>
+                </div>
+              )}
+            </section>
+          )}
+
+          {/* Research / Editorial Pipeline (#52) */}
+          <section className="rounded-lg border border-black/10 bg-white p-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold">Research Editorial Pipeline</h2>
+                <p className="mt-1 text-sm text-gray-500">
+                  Prototype spike for rigorous, evidence-heavy content. Source discovery returns
+                  candidate sources — all require human review before use.
+                </p>
+              </div>
+              <span className="rounded-full bg-[#fff4e6] px-3 py-1 text-xs font-medium text-[#8a4b00]">
+                Spike / FreshProof
+              </span>
+            </div>
+
+            <div className="mt-5 grid gap-4 md:grid-cols-2">
+              <div className="space-y-3">
+                <label className="block text-sm font-medium">Topic</label>
+                <textarea
+                  className="w-full rounded-md border border-black/15 px-3 py-2 text-sm"
+                  onChange={(e) => setResearchTopic(e.target.value)}
+                  rows={2}
+                  value={researchTopic}
+                />
+                <label className="block text-sm font-medium">Audience</label>
+                <input
+                  className="w-full rounded-md border border-black/15 px-3 py-2 text-sm"
+                  onChange={(e) => setResearchAudience(e.target.value)}
+                  value={researchAudience}
+                />
+                <label className="block text-sm font-medium">Thesis / question</label>
+                <textarea
+                  className="w-full rounded-md border border-black/15 px-3 py-2 text-sm"
+                  onChange={(e) => setResearchThesis(e.target.value)}
+                  rows={3}
+                  value={researchThesis}
+                />
+                <div className="flex flex-wrap gap-3">
+                  <div className="flex-1">
+                    <label className="block text-xs font-medium text-gray-600">Depth</label>
+                    <select
+                      className="mt-1 w-full rounded-md border border-black/15 px-2 py-1.5 text-sm"
+                      onChange={(e) => setResearchDepth(e.target.value as V2ResearchDepth)}
+                      value={researchDepth}
+                    >
+                      <option value="light">Light</option>
+                      <option value="standard">Standard</option>
+                      <option value="rigorous">Rigorous</option>
+                    </select>
+                  </div>
+                  <div className="flex-1">
+                    <label className="block text-xs font-medium text-gray-600">Risk level</label>
+                    <select
+                      className="mt-1 w-full rounded-md border border-black/15 px-2 py-1.5 text-sm"
+                      onChange={(e) => setResearchRisk(e.target.value as V2ResearchRiskLevel)}
+                      value={researchRisk}
+                    >
+                      <option value="low">Low</option>
+                      <option value="medium">Medium</option>
+                      <option value="high">High (clinical/scientific)</option>
+                    </select>
+                  </div>
+                </div>
+                <button
+                  className="w-full rounded-md bg-[#15616d] px-4 py-2 text-sm font-semibold text-white hover:bg-[#104d56] disabled:opacity-60"
+                  disabled={researchBusy || !researchTopic.trim() || !researchAudience.trim()}
+                  onClick={runSourceDiscovery}
+                  type="button"
+                >
+                  {researchBusy ? "Discovering sources…" : "Run Source Discovery"}
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold">Evidence Labels Rubric</h3>
+                <div className="space-y-2">
+                  {EVIDENCE_LABELS.map((label) => (
+                    <div key={label} className="rounded-md border border-black/10 p-2">
+                      <p className="text-xs font-semibold">{label}</p>
+                      <p className="mt-0.5 text-xs text-gray-500">
+                        {EVIDENCE_LABEL_DESCRIPTIONS[label]}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {researchBrief && researchBrief.sources.length > 0 && (
+              <div className="mt-6">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="text-base font-semibold">
+                    Sources for Review
+                    <span className="ml-2 text-sm font-normal text-gray-500">
+                      ({researchBrief.sources.filter((s) => s.status === "accepted").length} accepted
+                      / {researchBrief.sources.filter((s) => s.status === "unvetted").length} unvetted)
+                    </span>
+                  </h3>
+                  <p className="rounded-full bg-red-50 px-3 py-1 text-xs text-red-700">
+                    Human review required — do not treat AI summaries as ground truth
+                  </p>
+                </div>
+                <div className="mt-3 space-y-3">
+                  {researchBrief.sources.map((source) => (
+                    <div
+                      key={source.id}
+                      className={`rounded-lg border p-4 ${
+                        source.status === "accepted"
+                          ? "border-[#15616d]/30 bg-[#f1fbfc]"
+                          : source.status === "rejected"
+                            ? "border-black/10 bg-black/[0.02] opacity-60"
+                            : source.status === "flagged"
+                              ? "border-yellow-300 bg-yellow-50"
+                              : "border-black/10"
+                      }`}
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <a
+                            className="text-sm font-medium text-[#15616d] underline"
+                            href={source.url}
+                            rel="noreferrer"
+                            target="_blank"
+                          >
+                            {source.title}
+                          </a>
+                          <p className="mt-0.5 text-xs text-gray-500">
+                            {source.domain}
+                            {source.publishedYear ? ` · ${source.publishedYear}` : ""}
+                            {" · "}
+                            <span className="font-medium">{source.evidenceLabel}</span>
+                            {" · "}
+                            <span
+                              className={
+                                source.qualityRating === "strong"
+                                  ? "text-[#15616d]"
+                                  : source.qualityRating === "moderate"
+                                    ? "text-[#8a4b00]"
+                                    : "text-gray-500"
+                              }
+                            >
+                              {source.qualityRating}
+                            </span>
+                          </p>
+                          <p className="mt-1 text-xs text-gray-600">{source.useCase}</p>
+                          {source.reviewerNotes && (
+                            <p className="mt-1 text-xs italic text-gray-500">
+                              Notes: {source.reviewerNotes}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex flex-shrink-0 flex-wrap gap-1.5">
+                          {source.status === "unvetted" || source.status === "flagged" ? (
+                            <>
+                              <button
+                                className="rounded-md bg-[#15616d] px-2.5 py-1 text-xs font-semibold text-white"
+                                onClick={() => vetSource(source.id, "accepted")}
+                                type="button"
+                              >
+                                Accept
+                              </button>
+                              <button
+                                className="rounded-md border border-yellow-400 bg-yellow-50 px-2.5 py-1 text-xs font-semibold text-yellow-800"
+                                onClick={() => vetSource(source.id, "flagged")}
+                                type="button"
+                              >
+                                Flag
+                              </button>
+                              <button
+                                className="rounded-md border border-black/15 px-2.5 py-1 text-xs font-medium"
+                                onClick={() => vetSource(source.id, "rejected")}
+                                type="button"
+                              >
+                                Reject
+                              </button>
+                            </>
+                          ) : (
+                            <span
+                              className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                                source.status === "accepted"
+                                  ? "bg-[#e8f3f4] text-[#15616d]"
+                                  : source.status === "rejected"
+                                    ? "bg-black/5 text-gray-500"
+                                    : "bg-yellow-100 text-yellow-800"
+                              }`}
+                            >
+                              {source.status}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      {(source.status === "unvetted" || source.status === "flagged") && (
+                        <div className="mt-2">
+                          <input
+                            className="w-full rounded-md border border-black/15 px-2 py-1 text-xs"
+                            onChange={(e) =>
+                              setSourceReviewNotes((prev) => ({
+                                ...prev,
+                                [source.id]: e.target.value,
+                              }))
+                            }
+                            placeholder="Reviewer notes (optional)"
+                            value={sourceReviewNotes[source.id] ?? ""}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {researchBrief.sources.filter((s) => s.status === "accepted").length > 0 && (
+                  <div className="mt-4 rounded-lg border border-[#15616d]/30 bg-[#f1fbfc] p-4">
+                    <p className="text-sm font-medium text-[#15616d]">
+                      {researchBrief.sources.filter((s) => s.status === "accepted").length} source
+                      {researchBrief.sources.filter((s) => s.status === "accepted").length > 1
+                        ? "s"
+                        : ""}{" "}
+                      accepted — ready to feed into a claim map (#53).
+                    </p>
+                    <p className="mt-1 text-xs text-[#0f4c55]">
+                      Rejected and flagged sources are excluded from draft generation by default.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
           </section>
         </div>
       </div>
