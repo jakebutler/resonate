@@ -1,6 +1,6 @@
 # Project Status
 
-Last updated: 06/05/2026 02:45:00 PDT
+Last updated: 06/05/2026 02:49:00 PDT
 
 ## State
 
@@ -14,13 +14,15 @@ Track the Postiz rebuild against issue #38 and its related implementation issues
 
 - Completed the vanilla Postiz feasibility spike with local Docker runtime proof under Colima/QEMU.
 - Added the #40 foundation runbook for custom fork strategy, side-by-side deployment, local runtime commands, upstream sync, customization boundaries, secrets, and smoke testing.
+- Partially validated #41 by creating hard-separated local Postiz organizations for Personal, Corvo Labs, the lower dB, and FreshProof; real channel validation remains blocked on provider credentials.
 
 ## Last Completed Task
 
-- docs: add Postiz foundation runbook
+- docs: add Postiz brand workspace validation notes
 
 ## Recent Commits
 
+- docs: add Postiz brand workspace validation notes
 - docs: add Postiz foundation runbook
 - docs: complete Postiz runtime feasibility proof
 - docs: add Postiz feasibility spike
@@ -36,8 +38,8 @@ Track the Postiz rebuild against issue #38 and its related implementation issues
 
 ## Next Agent Pickup
 
-- Update and close issue #40 with the foundation runbook evidence once pushed.
-- Next likely implementation blockers are #41 brand/workspace setup and #42 Corvo Labs Blog custom channel, depending on whether the custom fork repository is created first.
+- Continue #41 only after real provider credentials are available, with YouTube as the recommended first connection.
+- Next non-provider-dependent implementation blocker is #42 Corvo Labs Blog custom channel planning/prototype.
 - Keep issue #38 open until real Postiz is functional alongside legacy Resonate.
 
 ## Branch
