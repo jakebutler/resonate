@@ -87,7 +87,17 @@ describe("POST /api/v2/generate-draft", () => {
     expect(res.status).toBe(200);
     expect(data.provider).toBe("pioneer");
     expect(data.model).toBe("claude-opus-4-7");
+    expect(data.channel).toBe("corvo-blog");
     expect(data.draft).toBe("Pioneer generated draft.");
+  });
+
+  it("returns a linkedin placeholder draft when Pioneer is not configured", async () => {
+    const res = await POST(makeRequest({ ...validBody, channel: "linkedin" }));
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(data.provider).toBe("local-placeholder");
+    expect(data.draft).toContain("Golden sets and evals");
   });
 
   it("falls back when Pioneer returns an error", async () => {

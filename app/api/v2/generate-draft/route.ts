@@ -1,20 +1,60 @@
 import { NextRequest, NextResponse } from "next/server";
-import { buildCorvoBlogDraft } from "@/lib/v2";
+import { buildFallbackDraft, type V2ChannelId } from "@/lib/v2";
 
 export const runtime = "nodejs";
 
 type RequestBody = {
-  idea: Parameters<typeof buildCorvoBlogDraft>[0]["idea"];
+  idea: Parameters<typeof buildFallbackDraft>[0]["idea"];
   voicePackMarkdown: string;
-  channel: "corvo-blog" | "linkedin" | "youtube";
+  channel: V2ChannelId;
 };
 
 function fallbackDraft(body: RequestBody) {
-  return buildCorvoBlogDraft({
+  return buildFallbackDraft({
     idea: body.idea,
+    channelId: body.channel,
     voicePackMarkdown: body.voicePackMarkdown,
   });
 }
+
+const CHANNEL_INSTRUCTIONS: Record<V2ChannelId, string> = {
+  "corvo-blog": [
+    "Write a high-signal Corvo Labs blog post in markdown body only (no frontmatter).",
+    "Structure: practical problem → architecture/workflow split → why the naive approach breaks → review or measurement loop → reader takeaway.",
+    "Avoid hype. Be precise and candid about constraints.",
+  ].join(" "),
+  linkedin: [
+    "Write a short LinkedIn post (200–300 words).",
+    "Open with one concrete hook or observation, not a question or a list header.",
+    "One central lesson per post. Conversational but substantive.",
+    "No hashtags unless they directly add context. No line breaks every sentence.",
+  ].join(" "),
+  youtube: [
+    "Write a YouTube video script outline and description draft.",
+    "Include: title, 3–5 sentence description for the video listing, and a brief script outline with timestamps.",
+    "Make the setup explicit, include visual beat cues, and end with one concrete takeaway.",
+  ].join(" "),
+  x: [
+    "Write a thread or single post for X (formerly Twitter).",
+    "If a thread, use numbered tweets (1/, 2/, etc.). If single, keep under 280 characters.",
+    "Lead with the sharpest claim. Cut everything soft.",
+  ].join(" "),
+  instagram: [
+    "Write an Instagram caption (150–300 words).",
+    "Open with a strong first line (visible before 'more'). Conversational and visual.",
+    "End with a question or prompt that invites comments.",
+  ].join(" "),
+  tiktok: [
+    "Write a TikTok video script (30–90 seconds).",
+    "Hook in the first 3 seconds. Pacing is fast. End with a clear takeaway or CTA.",
+    "Write it as spoken words, not prose.",
+  ].join(" "),
+  reddit: [
+    "Write a Reddit post: title and body text.",
+    "Body should be substantive and direct. No marketing language.",
+    "Identify the subreddit context if relevant to tone.",
+  ].join(" "),
+};
 
 export async function POST(req: NextRequest) {
   const body = (await req.json()) as Partial<RequestBody>;
@@ -37,14 +77,15 @@ export async function POST(req: NextRequest) {
     });
   }
 
+  const channelInstruction =
+    CHANNEL_INSTRUCTIONS[body.channel] ??
+    `Write a draft for the ${body.channel} channel. Follow the voice pack.`;
+
   const prompt = [
-    "Draft a high-signal Corvo Labs post from this Idea.",
-    "Follow the voice pack. Do not invent facts, citations, metrics, or case studies.",
-    "If the target channel is Corvo Labs Blog, write markdown body only, without frontmatter.",
-    "If the target channel is YouTube, write a concise script/description draft.",
-    "If the target channel is LinkedIn, write a short LinkedIn post.",
+    `Draft a high-signal post from this Idea for the target channel below.`,
+    "Follow the voice pack exactly. Do not invent facts, citations, metrics, or case studies.",
     "",
-    `Target channel: ${body.channel}`,
+    `Channel instructions: ${channelInstruction}`,
     "",
     "Voice pack:",
     body.voicePackMarkdown,
@@ -94,7 +135,7 @@ export async function POST(req: NextRequest) {
       data?.output_text ||
       fallbackDraft(body as RequestBody);
 
-    return NextResponse.json({ draft, provider: "pioneer", model });
+    return NextResponse.json({ draft, provider: "pioneer", model, channel: body.channel });
   } catch (error) {
     console.error(
       "Pioneer draft request failed:",
