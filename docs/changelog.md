@@ -862,3 +862,48 @@ Append-only session log for repository-level updates. Each documentation refresh
 ### Branch
 
 - feature/fullscreen-editor
+
+## 06/05/2026 01:09:21 PDT
+
+### Summary
+
+- Touched the captured ideas experience.
+- Touched auth or environment wiring.
+- Touched the main dashboard surfaces.
+
+### Staged Changes
+
+- M	.env.local.example
+- M	app/api/publish/route.ts
+- A	app/api/v2/generate-draft/route.ts
+- A	app/api/v2/validate-youtube/route.ts
+- M	app/ideas/page.tsx
+- M	app/layout.tsx
+- M	app/page.tsx
+- A	app/v2/page.tsx
+- M	components/ConvexClientProvider.tsx
+- A	components/V2ResonateApp.tsx
+- A	lib/__tests__/v2.test.ts
+- M	lib/github.ts
+- A	lib/v2.ts
+
+### Working Tree Snapshot
+
+- M  .env.local.example
+- M  app/api/publish/route.ts
+- A  app/api/v2/generate-draft/route.ts
+- A  app/api/v2/validate-youtube/route.ts
+- M  app/ideas/page.tsx
+- M  app/layout.tsx
+- M  app/page.tsx
+- A  app/v2/page.tsx
+- M  components/ConvexClientProvider.tsx
+- A  components/V2ResonateApp.tsx
+- A  lib/__tests__/v2.test.ts
+- M  lib/github.ts
+- A  lib/v2.ts
+-  M package-lock.json
+
+### Branch
+
+- codex/postiz-v2-mvp

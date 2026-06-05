@@ -19,19 +19,30 @@ export const metadata: Metadata = {
 
 const clerkPublishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.trim();
 const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL?.trim();
+const bypassAuthForE2E = process.env.E2E_BYPASS_AUTH === "1";
 
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const app = (
+    <html lang="en" className={cn("font-sans", geist.variable)}>
+      <body className={`${inter.variable} antialiased`}>
+        <ConvexClientProvider url={convexUrl} bypassAuth={bypassAuthForE2E}>
+          {children}
+        </ConvexClientProvider>
+      </body>
+    </html>
+  );
+
+  if (bypassAuthForE2E && !clerkPublishableKey) {
+    return app;
+  }
+
   return (
     <ClerkProvider publishableKey={clerkPublishableKey}>
-      <html lang="en" className={cn("font-sans", geist.variable)}>
-        <body className={`${inter.variable} antialiased`}>
-          <ConvexClientProvider url={convexUrl}>{children}</ConvexClientProvider>
-        </body>
-      </html>
+      {app}
     </ClerkProvider>
   );
 }
