@@ -945,3 +945,25 @@ Append-only session log for repository-level updates. Each documentation refresh
 ### Branch
 
 - codex/postiz-v2-mvp
+
+## 06/05/2026 01:32:03 PDT
+
+### Summary
+
+- Refreshed documentation for the current repository state.
+
+### Staged Changes
+
+- A	app/api/v2/ops/validate-workflow/__tests__/route.test.ts
+- A	app/api/v2/ops/validate-workflow/route.ts
+- M	proxy.ts
+
+### Working Tree Snapshot
+
+- A  app/api/v2/ops/validate-workflow/__tests__/route.test.ts
+- A  app/api/v2/ops/validate-workflow/route.ts
+- M  proxy.ts
+
+### Branch
+
+- codex/prod-v2-workflow-validation
