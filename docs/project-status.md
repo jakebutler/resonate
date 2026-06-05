@@ -1,6 +1,6 @@
 # Project Status
 
-Last updated: 06/05/2026 14:13:16 PDT
+Last updated: 06/05/2026 14:20:10 PDT
 
 ## State
 
@@ -16,22 +16,24 @@ Maintain the living documentation and preserve a handoff-quality snapshot of the
 
 ## Last Completed Task
 
-- b57c416 feat(v2): research editorial pipeline spike and source-quality rubric (#52)
+- 1afa168 feat(v2): research claim map and citation review artifact (#53)
 
 ## Recent Commits
 
+- 1afa168 feat(v2): research claim map and citation review artifact (#53)
 - b57c416 feat(v2): research editorial pipeline spike and source-quality rubric (#52)
 - 7e29ea8 feat(v2): inbox and draft-management validation with cross-brand view (#51)
 - 0ee43ea feat(v2): multi-platform variant review and scheduling handoff (#49)
 - 473630d docs: refresh Postiz production validation status
-- 84b6e9a fix: skip git hook install outside worktrees
 
 ## Local Working Tree
 
-- A  app/api/v2/claim-map/__tests__/route.test.ts
-- A  app/api/v2/claim-map/route.ts
+- A  app/api/v2/editorial-outline/__tests__/route.test.ts
+- A  app/api/v2/editorial-outline/route.ts
+- A  app/api/v2/long-form-draft/__tests__/route.test.ts
+- A  app/api/v2/long-form-draft/route.ts
 - M  components/V2ResonateApp.tsx
-- A  lib/__tests__/v2ClaimMap.test.ts
+- A  lib/__tests__/v2Outline.test.ts
 - M  lib/v2.ts
 - ?? CONTEXT.md
 - ?? docs/adr/
@@ -43,4 +45,4 @@ Maintain the living documentation and preserve a handoff-quality snapshot of the
 
 ## Branch
 
-- feat/53-claim-map
+- feat/54-outline-draft
