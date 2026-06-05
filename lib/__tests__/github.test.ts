@@ -35,6 +35,7 @@ function mockGitHubSuccess(options?: { prUrl?: string }) {
       new Response(JSON.stringify({ object: { sha: "abc123" } }), { status: 200 })
     )
     .mockResolvedValueOnce(new Response(JSON.stringify({}), { status: 200 }))
+    .mockResolvedValueOnce(new Response(JSON.stringify({ message: "not found" }), { status: 404 }))
     .mockResolvedValueOnce(new Response(JSON.stringify({}), { status: 200 }))
     .mockResolvedValueOnce(
       new Response(
@@ -285,11 +286,11 @@ describe("createBlogPostPR", () => {
       ],
     });
 
-    // Five fetches: repo → branch ref → create branch → create file → open PR.
+    // Six fetches: repo → branch ref → create branch → existing file lookup → create file → open PR.
     // No image downloads and no asset commits — Convex URLs stay absolute.
-    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(5);
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(6);
 
-    const mdxCall = vi.mocked(fetch).mock.calls[3];
+    const mdxCall = vi.mocked(fetch).mock.calls[4];
     expect(mdxCall[0]).toContain(
       "/contents/corvo-labs-enhanced/content/blog/2026-03-04-he-said-hello.mdx"
     );
@@ -343,7 +344,7 @@ describe("createBlogPostPR", () => {
       images: [{ sourceUrl: HERO_URL, alt: "Hero", isCover: true }],
     });
 
-    const prCall = vi.mocked(fetch).mock.calls[4];
+    const prCall = vi.mocked(fetch).mock.calls[5];
     const payload = JSON.parse((prCall[1] as RequestInit).body as string);
 
     expect(payload.body).toContain(
@@ -467,6 +468,9 @@ describe("createBlogPostPR", () => {
       )
       .mockResolvedValueOnce(new Response(JSON.stringify({}), { status: 200 }))
       .mockResolvedValueOnce(
+        new Response(JSON.stringify({ message: "not found" }), { status: 404 })
+      )
+      .mockResolvedValueOnce(
         new Response(JSON.stringify({ message: "conflict" }), { status: 409 })
       );
 
@@ -491,6 +495,9 @@ describe("createBlogPostPR", () => {
         new Response(JSON.stringify({ object: { sha: "abc" } }), { status: 200 })
       )
       .mockResolvedValueOnce(new Response(JSON.stringify({}), { status: 200 }))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ message: "not found" }), { status: 404 })
+      )
       .mockResolvedValueOnce(new Response(JSON.stringify({}), { status: 200 }))
       .mockResolvedValueOnce(
         new Response(JSON.stringify({ message: "error" }), { status: 500 })
@@ -506,5 +513,43 @@ describe("createBlogPostPR", () => {
         images: [{ sourceUrl: HERO_URL, alt: "Hero", isCover: true }],
       })
     ).rejects.toThrow("GitHub create PR failed");
+  });
+
+  it("updates the MDX file when the retry branch already contains it", async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ default_branch: "main" }), { status: 200 })
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ object: { sha: "abc" } }), { status: 200 })
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ message: "Reference already exists" }), {
+          status: 422,
+        })
+      )
+      .mockResolvedValueOnce(new Response(JSON.stringify({ sha: "existing-file-sha" }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({}), { status: 200 }))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ html_url: "https://github.com/org/repo/pull/9" }), {
+          status: 200,
+        })
+      );
+
+    const result = await createBlogPostPR({
+      title: "Retry Me",
+      content: "Body.",
+      scheduledDate: "2026-03-04",
+      status: "scheduled",
+      tags: ["ai"],
+      coverImageAlt: "Hero",
+      images: [{ sourceUrl: HERO_URL, alt: "Hero", isCover: true }],
+    });
+
+    const fileCall = vi.mocked(fetch).mock.calls[4];
+    const payload = JSON.parse((fileCall[1] as RequestInit).body as string);
+
+    expect(result.prUrl).toBe("https://github.com/org/repo/pull/9");
+    expect(payload.sha).toBe("existing-file-sha");
   });
 });

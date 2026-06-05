@@ -1,6 +1,6 @@
 # Project Status
 
-Last updated: 06/05/2026 01:13:48 PDT
+Last updated: 06/05/2026 01:16:39 PDT
 
 ## State
 
@@ -16,19 +16,19 @@ Maintain the living documentation and preserve a handoff-quality snapshot of the
 
 ## Last Completed Task
 
-- 1410da4 feat: add postiz v2 workspace tracer
+- e7bfced test: cover v2 pioneer draft route
 
 ## Recent Commits
 
+- e7bfced test: cover v2 pioneer draft route
 - 1410da4 feat: add postiz v2 workspace tracer
 - 5bc37c7 Enforce Corvo Labs MDX contract; fix editor scroll; ship publish flow to main (#36)
 - 2835656 chore: harden docs pre-commit workflow (#33)
 - 296117e fix: keep image tray pinned and hero control visible on touch (#34)
-- ea0f959 feat: Full-screen blog post editor with Tiptap WYSIWYG (#32)
 
 ## Local Working Tree
 
-- A  app/api/v2/generate-draft/__tests__/route.test.ts
+- M  lib/__tests__/github.test.ts
 -  M package-lock.json
 
 ## Next Agent Pickup
