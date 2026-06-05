@@ -6,11 +6,14 @@ import {
   buildCorvoBlogDraft,
   buildFallbackDraft,
   buildIdeaSeedText,
+  CLAIM_STATUS_LABELS,
+  CLAIM_STATUSES,
   DEFAULT_V2_STATE,
   EVIDENCE_LABEL_DESCRIPTIONS,
   EVIDENCE_LABELS,
   filterPostsForView,
   FRESHPROOF_SEED_BRIEF,
+  makeClaimMap,
   makeId,
   makeResearchBrief,
   normalizeIdeaSourceUrl,
@@ -18,6 +21,9 @@ import {
   V2_CHANNEL_LABELS,
   type V2BrandId,
   type V2ChannelId,
+  type V2Claim,
+  type V2ClaimMap,
+  type V2ClaimStatus,
   type V2DraftVariant,
   type V2Idea,
   type V2Post,
@@ -95,6 +101,11 @@ export function V2ResonateApp() {
   const [researchRisk, setResearchRisk] = useState<V2ResearchRiskLevel>("high");
   const [researchBusy, setResearchBusy] = useState(false);
   const [sourceReviewNotes, setSourceReviewNotes] = useState<Record<string, string>>({});
+
+  // Claim map state (#53)
+  const [claimMap, setClaimMap] = useState<V2ClaimMap | null>(null);
+  const [claimMapBusy, setClaimMapBusy] = useState(false);
+  const [claimReviewNotes, setClaimReviewNotes] = useState<Record<string, string>>({});
 
   useEffect(() => {
     setState(loadState());
@@ -421,6 +432,60 @@ export function V2ResonateApp() {
     setNotice(`Scheduled "${post.title}" for ${date}.`);
   }
 
+  async function generateClaimMap() {
+    if (!researchBrief) return;
+    const accepted = researchBrief.sources.filter((s) => s.status === "accepted");
+    if (accepted.length === 0) return;
+    setClaimMapBusy(true);
+    setNotice(null);
+
+    try {
+      const response = await fetch("/api/v2/claim-map", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          topic: researchBrief.topic,
+          thesis: researchBrief.thesis,
+          brandId: researchBrief.brandId,
+          acceptedSources: accepted,
+        }),
+      });
+      const data = await response.json();
+      const claims: V2Claim[] = Array.isArray(data.claims) ? data.claims : [];
+      const map = makeClaimMap({
+        brandId: researchBrief.brandId,
+        topic: researchBrief.topic,
+        thesis: researchBrief.thesis,
+      });
+      setClaimMap({ ...map, claims, status: "review-ready" });
+      setNotice(
+        data.warning ??
+          `Generated ${claims.length} candidate claim${claims.length !== 1 ? "s" : ""}. Review each before drafting.`
+      );
+    } finally {
+      setClaimMapBusy(false);
+    }
+  }
+
+  function reviewClaim(claimId: string, status: V2ClaimStatus, notes?: string) {
+    setClaimMap((prev) => {
+      if (!prev) return prev;
+      const updatedClaims = prev.claims.map((c) =>
+        c.id === claimId
+          ? { ...c, status, reviewerNotes: notes ?? c.reviewerNotes }
+          : c
+      );
+      const allReviewed = updatedClaims.every((c) => c.status !== "unreviewed");
+      return {
+        ...prev,
+        claims: updatedClaims,
+        status: allReviewed ? "reviewed" : "review-ready",
+        updatedAt: new Date().toISOString(),
+      };
+    });
+    if (notes) setClaimReviewNotes((prev) => ({ ...prev, [claimId]: notes }));
+  }
+
   async function runSourceDiscovery() {
     if (!researchTopic.trim() || !researchAudience.trim()) return;
     setResearchBusy(true);
@@ -490,6 +555,7 @@ export function V2ResonateApp() {
     setVariants([]);
     setGeneratingChannels(new Set());
     setResearchBrief(null);
+    setClaimMap(null);
     setNotice("Reset v2 demo data.");
   }
 
@@ -965,6 +1031,186 @@ export function V2ResonateApp() {
               })}
             </div>
           </section>
+
+          {/* Claim Map (#53) — visible once research brief has accepted sources */}
+          {researchBrief &&
+            researchBrief.sources.filter((s) => s.status === "accepted").length > 0 && (
+              <section className="rounded-lg border border-black/10 bg-white p-5">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-lg font-semibold">Claim Map</h2>
+                    <p className="mt-1 text-sm text-gray-500">
+                      Candidate claims derived from accepted sources. Review each before drafting.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {claimMap && (
+                      <span
+                        className={`rounded-full px-3 py-1 text-xs font-medium ${
+                          claimMap.status === "reviewed"
+                            ? "bg-[#e8f3f4] text-[#15616d]"
+                            : "bg-[#fff4e6] text-[#8a4b00]"
+                        }`}
+                      >
+                        {claimMap.status}
+                      </span>
+                    )}
+                    <button
+                      className="rounded-md bg-[#15616d] px-4 py-2 text-sm font-semibold text-white hover:bg-[#104d56] disabled:opacity-60"
+                      disabled={claimMapBusy}
+                      onClick={generateClaimMap}
+                      type="button"
+                    >
+                      {claimMapBusy
+                        ? "Generating…"
+                        : claimMap
+                          ? "Regenerate Claim Map"
+                          : "Generate Claim Map"}
+                    </button>
+                  </div>
+                </div>
+
+                {claimMap && claimMap.claims.length > 0 && (
+                  <div className="mt-5 space-y-3">
+                    <div className="flex flex-wrap gap-3 text-xs text-gray-500">
+                      {CLAIM_STATUSES.filter((s) => s !== "unreviewed").map((s) => {
+                        const count = claimMap.claims.filter((c) => c.status === s).length;
+                        return count > 0 ? (
+                          <span key={s}>
+                            {CLAIM_STATUS_LABELS[s]}: {count}
+                          </span>
+                        ) : null;
+                      })}
+                      <span>Unreviewed: {claimMap.claims.filter((c) => c.status === "unreviewed").length}</span>
+                    </div>
+
+                    {claimMap.claims.map((claim) => (
+                      <div
+                        key={claim.id}
+                        className={`rounded-lg border p-4 ${
+                          claim.status === "accepted"
+                            ? "border-[#15616d]/30 bg-[#f1fbfc]"
+                            : claim.status === "unsupported" ||
+                                claim.status === "too-risky" ||
+                                claim.status === "out-of-scope"
+                              ? "border-black/10 bg-black/[0.02] opacity-60"
+                              : claim.status === "needs-revision"
+                                ? "border-yellow-300 bg-yellow-50"
+                                : "border-black/10"
+                        }`}
+                      >
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium">{claim.text}</p>
+                            <div className="mt-1 flex flex-wrap gap-2 text-xs text-gray-500">
+                              <span className="font-medium">{claim.evidenceLabel}</span>
+                              <span>confidence: {claim.confidence}</span>
+                              {claim.sourceIds.length > 0 && (
+                                <span>{claim.sourceIds.length} source{claim.sourceIds.length > 1 ? "s" : ""}</span>
+                              )}
+                            </div>
+                            {claim.caveats && (
+                              <p className="mt-1 text-xs italic text-gray-500">
+                                Caveat: {claim.caveats}
+                              </p>
+                            )}
+                            {claim.reviewerNotes && (
+                              <p className="mt-1 text-xs text-gray-500">
+                                Notes: {claim.reviewerNotes}
+                              </p>
+                            )}
+                          </div>
+
+                          <div className="flex flex-shrink-0 flex-col gap-1.5">
+                            {claim.status === "unreviewed" || claim.status === "needs-revision" ? (
+                              <div className="flex flex-wrap gap-1.5">
+                                <button
+                                  className="rounded-md bg-[#15616d] px-2.5 py-1 text-xs font-semibold text-white"
+                                  onClick={() => reviewClaim(claim.id, "accepted", claimReviewNotes[claim.id])}
+                                  type="button"
+                                >
+                                  Accept
+                                </button>
+                                <button
+                                  className="rounded-md border border-yellow-400 bg-yellow-50 px-2.5 py-1 text-xs font-semibold text-yellow-800"
+                                  onClick={() => reviewClaim(claim.id, "needs-revision")}
+                                  type="button"
+                                >
+                                  Needs Revision
+                                </button>
+                                <button
+                                  className="rounded-md border border-red-300 bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700"
+                                  onClick={() => reviewClaim(claim.id, "too-risky")}
+                                  type="button"
+                                >
+                                  Too Risky
+                                </button>
+                                <button
+                                  className="rounded-md border border-black/15 px-2.5 py-1 text-xs font-medium"
+                                  onClick={() => reviewClaim(claim.id, "unsupported")}
+                                  type="button"
+                                >
+                                  Unsupported
+                                </button>
+                                <button
+                                  className="rounded-md border border-black/15 px-2.5 py-1 text-xs font-medium"
+                                  onClick={() => reviewClaim(claim.id, "out-of-scope")}
+                                  type="button"
+                                >
+                                  Out of Scope
+                                </button>
+                              </div>
+                            ) : (
+                              <span
+                                className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                                  claim.status === "accepted"
+                                    ? "bg-[#e8f3f4] text-[#15616d]"
+                                    : claim.status === "needs-revision"
+                                      ? "bg-yellow-100 text-yellow-800"
+                                      : "bg-black/5 text-gray-500"
+                                }`}
+                              >
+                                {CLAIM_STATUS_LABELS[claim.status]}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {(claim.status === "unreviewed" || claim.status === "needs-revision") && (
+                          <div className="mt-2">
+                            <input
+                              className="w-full rounded-md border border-black/15 px-2 py-1 text-xs"
+                              onChange={(e) =>
+                                setClaimReviewNotes((prev) => ({
+                                  ...prev,
+                                  [claim.id]: e.target.value,
+                                }))
+                              }
+                              placeholder="Reviewer notes (optional — included when accepting)"
+                              value={claimReviewNotes[claim.id] ?? ""}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    ))}
+
+                    {claimMap.status === "reviewed" && (
+                      <div className="rounded-lg border border-[#15616d]/30 bg-[#f1fbfc] p-4">
+                        <p className="text-sm font-medium text-[#15616d]">
+                          {claimMap.claims.filter((c) => c.status === "accepted").length} claim
+                          {claimMap.claims.filter((c) => c.status === "accepted").length !== 1 ? "s" : ""}{" "}
+                          accepted — ready to generate an editorial outline (#54).
+                        </p>
+                        <p className="mt-1 text-xs text-[#0f4c55]">
+                          Unsupported, too-risky, and out-of-scope claims are excluded from draft
+                          generation by default.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </section>
+            )}
 
           {/* Research / Editorial Pipeline (#52) */}
           <section className="rounded-lg border border-black/10 bg-white p-5">
