@@ -1,49 +1,40 @@
 # Project Status
 
-Last updated: 06/05/2026 02:54:00 PDT
+Last updated: 06/05/2026 08:39:11 PDT
 
 ## State
 
-Resonate is a working content operations app with active surfaces for calendar planning, content editing, workflow review, idea capture, and a `/v2` Postiz-style tracer for the rebuild workflow.
+Resonate is a working content operations app with active surfaces for calendar planning, content editing, workflow review, and idea capture.
 
 ## Current Task
 
-Track the Postiz rebuild against issue #38 and its related implementation issues while keeping legacy Resonate functional.
+Maintain the living documentation and preserve a handoff-quality snapshot of the repo state.
 
 ## Session Focus
 
-- Completed the vanilla Postiz feasibility spike with local Docker runtime proof under Colima/QEMU.
-- Added the #40 foundation runbook for custom fork strategy, side-by-side deployment, local runtime commands, upstream sync, customization boundaries, secrets, and smoke testing.
-- Partially validated #41 by creating hard-separated local Postiz organizations for Personal, Corvo Labs, the lower dB, and FreshProof; real channel validation remains blocked on provider credentials.
-- Created the actual Postiz custom fork at `jakebutler/resonate-postiz` and wired `/Volumes/rexy/GitHub/postiz-app` with `origin` as the fork and `upstream` as `gitroomhq/postiz-app`.
+- Adjusted commit-time automation for documentation refreshes.
 
 ## Last Completed Task
 
-- docs: record Postiz fork creation
+- 59ff50f docs: record Postiz fork creation
 
 ## Recent Commits
 
-- docs: record Postiz fork creation
-- docs: add Postiz brand workspace validation notes
-- docs: add Postiz foundation runbook
-- docs: complete Postiz runtime feasibility proof
-- docs: add Postiz feasibility spike
+- 59ff50f docs: record Postiz fork creation
+- b5833e3 docs: add Postiz brand workspace validation notes
+- f2ff655 docs: add Postiz foundation runbook
+- 4e44e1f docs: complete Postiz feasibility spike
 - de9aa4d feat: add protected v2 workflow validation
-- b7ad4ae feat: add Postiz v2 workspace tracer
-- 5bc37c7 Enforce Corvo Labs MDX contract; fix editor scroll; ship publish flow to main (#36)
-- 2835656 chore: harden docs pre-commit workflow (#33)
 
 ## Local Working Tree
 
-- Clean after this documentation commit in Resonate.
-- The sibling upstream Postiz clone has an untracked local-only `docker-compose.local-runtime.yml` used to validate localhost cookies and Temporal config mounting.
+- M  scripts/install-git-hooks.sh
 
 ## Next Agent Pickup
 
-- Continue #41 only after real provider credentials are available, with YouTube as the recommended first connection.
-- Next non-provider-dependent implementation blocker is #42 Corvo Labs Blog custom channel planning/prototype in `jakebutler/resonate-postiz`.
-- Keep issue #38 open until real Postiz is functional alongside legacy Resonate.
+- Start by checking the living docs against the current code before making assumptions.
+- If the working set includes product changes, keep `docs/spec.md`, `docs/changelog.md`, and `docs/project-status.md` aligned in the same session.
 
 ## Branch
 
-- codex/postiz-feasibility-report
+- main

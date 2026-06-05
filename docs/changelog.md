@@ -1087,3 +1087,21 @@ Append-only session log for repository-level updates. Each documentation refresh
 ### Branch
 
 - codex/postiz-fork-created
+
+## 06/05/2026 08:39:11 PDT
+
+### Summary
+
+- Adjusted commit-time automation for documentation refreshes.
+
+### Staged Changes
+
+- M	scripts/install-git-hooks.sh
+
+### Working Tree Snapshot
+
+- M  scripts/install-git-hooks.sh
+
+### Branch
+
+- main
