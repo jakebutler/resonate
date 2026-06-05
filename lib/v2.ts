@@ -344,6 +344,25 @@ export function buildFallbackDraft(params: {
   }
 }
 
+/** Severity classification for inbox/draft-management gap analysis (issue #51). */
+export type V2GapSeverity = "blocker" | "v1.1" | "later" | "acceptable";
+
+/**
+ * Filter the workspace post list for the drafts view.
+ * When allBrands is true, all brands are shown together (cross-brand view).
+ * An optional statusFilter narrows to one status.
+ */
+export function filterPostsForView(
+  posts: V2Post[],
+  activeBrandId: V2BrandId,
+  allBrands: boolean,
+  statusFilter?: V2Post["status"]
+): V2Post[] {
+  let result = allBrands ? posts : posts.filter((p) => p.brandId === activeBrandId);
+  if (statusFilter) result = result.filter((p) => p.status === statusFilter);
+  return result;
+}
+
 export function makeId(prefix: string): string {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }

@@ -7,6 +7,7 @@ import {
   buildFallbackDraft,
   buildIdeaSeedText,
   DEFAULT_V2_STATE,
+  filterPostsForView,
   makeId,
   normalizeIdeaSourceUrl,
   V2_BRANDS,
@@ -74,6 +75,8 @@ export function V2ResonateApp() {
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [scheduleDates, setScheduleDates] = useState<Record<string, string>>({});
+  const [allBrandsDrafts, setAllBrandsDrafts] = useState(false);
+  const [draftStatusFilter, setDraftStatusFilter] = useState<V2Post["status"] | "">("");
 
   useEffect(() => {
     setState(loadState());
@@ -87,7 +90,12 @@ export function V2ResonateApp() {
   const ideas = state.ideas.filter((idea) => idea.brandId === brandId);
   const selectedIdea =
     ideas.find((idea) => idea.id === selectedIdeaId) ?? ideas[0] ?? null;
-  const posts = state.posts.filter((post) => post.brandId === brandId);
+  const visiblePosts = filterPostsForView(
+    state.posts,
+    brandId,
+    allBrandsDrafts,
+    draftStatusFilter || undefined
+  );
   const voicePack =
     state.voicePacks.find((pack) => pack.brandId === brandId && pack.isDefault) ??
     state.voicePacks.find((pack) => pack.brandId === brandId) ??
@@ -743,15 +751,41 @@ export function V2ResonateApp() {
           </section>
 
           <section className="rounded-lg border border-black/10 bg-white p-5">
-            <h2 className="text-lg font-semibold">Drafts and Publishing Handoff</h2>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-lg font-semibold">Drafts and Publishing Handoff</h2>
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="flex cursor-pointer items-center gap-1.5 text-sm">
+                  <input
+                    checked={allBrandsDrafts}
+                    className="accent-[#15616d]"
+                    onChange={(e) => setAllBrandsDrafts(e.target.checked)}
+                    type="checkbox"
+                  />
+                  All brands
+                </label>
+                <select
+                  className="rounded-md border border-black/15 px-2 py-1 text-xs"
+                  onChange={(e) => setDraftStatusFilter(e.target.value as V2Post["status"] | "")}
+                  value={draftStatusFilter}
+                >
+                  <option value="">All statuses</option>
+                  <option value="draft">Draft</option>
+                  <option value="scheduled">Scheduled</option>
+                  <option value="pr-created">PR Created</option>
+                </select>
+              </div>
+            </div>
             <div className="mt-4 grid gap-4">
-              {posts.length === 0 && (
+              {visiblePosts.length === 0 && (
                 <p className="text-sm text-gray-600">
-                  No v2 drafts yet. Accept a variant from an Idea to create a draft.
+                  No drafts match the current filter. Accept a variant from an Idea to create a draft.
                 </p>
               )}
-              {posts.map((post) => {
+              {visiblePosts.map((post) => {
                 const ideaTitle = state.ideas.find((i) => i.id === post.ideaId)?.title;
+                const postBrand = allBrandsDrafts
+                  ? V2_BRANDS.find((b) => b.id === post.brandId)?.name
+                  : null;
                 return (
                   <article className="rounded-lg border border-black/10 p-4" key={post.id}>
                     <div className="flex flex-wrap items-start justify-between gap-3">
@@ -769,6 +803,11 @@ export function V2ResonateApp() {
                             {STATUS_LABELS[post.status]}
                           </span>
                         </p>
+                        {postBrand && (
+                          <p className="mt-0.5 text-xs font-medium text-[#15616d]">
+                            {postBrand}
+                          </p>
+                        )}
                         {ideaTitle && (
                           <p className="mt-0.5 text-xs text-gray-400">
                             From idea: {ideaTitle}
