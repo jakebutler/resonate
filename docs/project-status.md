@@ -1,6 +1,6 @@
 # Project Status
 
-Last updated: 06/05/2026 13:08:33 PDT
+Last updated: 06/05/2026 13:22:05 PDT
 
 ## State
 
@@ -16,21 +16,20 @@ Maintain the living documentation and preserve a handoff-quality snapshot of the
 
 ## Last Completed Task
 
-- 473630d docs: refresh Postiz production validation status
+- 0ee43ea feat(v2): multi-platform variant review and scheduling handoff (#49)
 
 ## Recent Commits
 
+- 0ee43ea feat(v2): multi-platform variant review and scheduling handoff (#49)
 - 473630d docs: refresh Postiz production validation status
 - 84b6e9a fix: skip git hook install outside worktrees
 - 59ff50f docs: record Postiz fork creation
 - b5833e3 docs: add Postiz brand workspace validation notes
-- f2ff655 docs: add Postiz foundation runbook
 
 ## Local Working Tree
 
-- M  app/api/v2/generate-draft/__tests__/route.test.ts
-- M  app/api/v2/generate-draft/route.ts
 - M  components/V2ResonateApp.tsx
+- A  docs/plans/2026-06-05-inbox-draft-management-validation.md
 - M  lib/__tests__/v2.test.ts
 - M  lib/v2.ts
 - ?? CONTEXT.md
@@ -43,4 +42,4 @@ Maintain the living documentation and preserve a handoff-quality snapshot of the
 
 ## Branch
 
-- feat/49-multi-platform-variants
+- feat/51-inbox-draft-validation

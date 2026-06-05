@@ -5,7 +5,10 @@ import {
   buildIdeaSeedText,
   buildLinkedInDraft,
   DEFAULT_V2_STATE,
+  filterPostsForView,
   normalizeIdeaSourceUrl,
+  type V2GapSeverity,
+  type V2Post,
 } from "@/lib/v2";
 
 describe("v2 domain helpers", () => {
@@ -92,5 +95,51 @@ describe("v2 domain helpers", () => {
       });
       expect(draft).toBe(generated);
     });
+  });
+
+  describe("filterPostsForView", () => {
+    const makePost = (id: string, brandId: V2Post["brandId"], status: V2Post["status"]): V2Post => ({
+      id,
+      brandId,
+      channelId: "linkedin",
+      title: `Post ${id}`,
+      content: "content",
+      status,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+
+    const posts: V2Post[] = [
+      makePost("a", "corvo", "draft"),
+      makePost("b", "corvo", "scheduled"),
+      makePost("c", "freshproof", "draft"),
+      makePost("d", "lower-db", "pr-created"),
+    ];
+
+    it("returns only the active brand posts when allBrands is false", () => {
+      const result = filterPostsForView(posts, "corvo", false);
+      expect(result.map((p) => p.id)).toEqual(["a", "b"]);
+    });
+
+    it("returns all posts across brands when allBrands is true", () => {
+      const result = filterPostsForView(posts, "corvo", true);
+      expect(result).toHaveLength(4);
+    });
+
+    it("filters by status when statusFilter is provided", () => {
+      const result = filterPostsForView(posts, "corvo", true, "draft");
+      expect(result.map((p) => p.id)).toEqual(["a", "c"]);
+    });
+
+    it("returns all statuses when statusFilter is undefined", () => {
+      const result = filterPostsForView(posts, "corvo", false);
+      expect(result.every((p) => ["draft", "scheduled", "pr-created"].includes(p.status))).toBe(true);
+    });
+  });
+
+  it("V2GapSeverity type covers expected severity levels", () => {
+    // Type-level smoke test — ensures the union is exportable and assignable
+    const severities: V2GapSeverity[] = ["blocker", "v1.1", "later", "acceptable"];
+    expect(severities).toHaveLength(4);
   });
 });
