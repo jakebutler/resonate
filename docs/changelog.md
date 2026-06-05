@@ -967,3 +967,51 @@ Append-only session log for repository-level updates. Each documentation refresh
 ### Branch
 
 - codex/prod-v2-workflow-validation
+
+## 06/05/2026 02:14:05 PDT
+
+### Summary
+
+- Added the Postiz feasibility spike report for issue #39.
+- Recorded successful Postiz dependency installation under Node 22.
+- Documented that Docker or a hosted container runtime is still required for vanilla app runtime proof.
+
+### Staged Changes
+
+- A	docs/plans/2026-06-05-postiz-feasibility-spike.md
+- M	docs/changelog.md
+- M	docs/project-status.md
+
+### Working Tree Snapshot
+
+- A  docs/plans/2026-06-05-postiz-feasibility-spike.md
+- M  docs/changelog.md
+- M  docs/project-status.md
+
+### Branch
+
+- codex/postiz-feasibility-report
+
+## 06/05/2026 02:36:30 PDT
+
+### Summary
+
+- Completed local vanilla Postiz runtime validation for issue #39 with Colima/QEMU and Docker Compose.
+- Verified the Postiz register page, backend health via `can-register`, Temporal startup, local account creation, auth cookie issuance, authenticated redirect, and persisted Corvo Labs placeholder organization.
+- Documented the VZ bind-mount failure and the QEMU/external-volume workaround used for this local proof.
+
+### Staged Changes
+
+- M	docs/changelog.md
+- M	docs/plans/2026-06-05-postiz-feasibility-spike.md
+- M	docs/project-status.md
+
+### Working Tree Snapshot
+
+- M  docs/changelog.md
+- M  docs/plans/2026-06-05-postiz-feasibility-spike.md
+- M  docs/project-status.md
+
+### Branch
+
+- codex/postiz-feasibility-report
