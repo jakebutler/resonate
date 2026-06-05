@@ -6,14 +6,14 @@ Date: 2026-06-05
 
 ## Executive Decision
 
-Proceed with the Postiz rebuild, but treat Postiz as a separate self-hosted application/fork until the vanilla runtime has been proven locally or in a staging host. The current `/v2` Resonate workflow is useful as a tracer and production proof for the Corvo Labs idea-to-blog path, but it is not a replacement for running and customizing Postiz itself.
+Proceed with the Postiz rebuild, treating Postiz as a separate self-hosted application/fork for the first implementation phase. The current `/v2` Resonate workflow is useful as a tracer and production proof for the Corvo Labs idea-to-blog path, but it is not a replacement for running and customizing Postiz itself.
 
 The lowest-risk path is:
 
 1. Keep legacy Resonate running.
 2. Keep the current `/v2` tracer available for production workflow validation.
-3. Run vanilla Postiz from upstream and document the exact deployment shape.
-4. Fork/customize Postiz only after vanilla auth, workspace creation, scheduling, media storage, and one platform integration are proven.
+3. Keep the vanilla Postiz runtime runbook close to upstream Docker Compose.
+4. Fork/customize Postiz after the first custom channel and idea-to-draft flow are scoped against the running app.
 5. Integrate the Corvo Labs Blog channel as a custom channel from day one because it is not a native Postiz provider.
 
 ## Upstream Snapshot
@@ -30,13 +30,56 @@ Local machine status:
 - Current `node --version`: `v24.4.1`
 - Node 22 available via `~/.nvm/versions/node/v22.22.3`.
 - `pnpm --version`: `10.6.1`
-- `docker` was not found on PATH during this spike.
+- `docker` and `docker compose` are now available via Homebrew.
+- Local Docker runtime: Colima on QEMU with Docker runtime, `4` CPUs, `6GiB` memory, and `60GiB` disk.
+- Colima/Lima storage was moved under `/Volumes/rexy/GitHub/.runtime` via local symlinks so the Docker VM and image layers do not consume the small system data volume.
+- Explicit Colima mounts were required for both `/Users/jacobbutler` and `/Volumes/rexy`.
 - `pnpm install --frozen-lockfile` completed successfully under Node `v22.22.3` in `30m 40.8s`.
 - Prisma Client generation completed during postinstall.
 - pnpm reported ignored build scripts for native/tooling packages such as Prisma, Sharp, Canvas, SWC, Sentry, and esbuild; this may need explicit `pnpm approve-builds` handling before a full local app run.
-- Homebrew can install `colima`, `docker`, and `docker-compose`, but the system data volume had only about `8.1Gi` free while `/Volumes/rexy` had about `228Gi` free. A local container-runtime install should either free system disk first or deliberately place VM/container storage on `/Volumes/rexy`.
+- Homebrew also installed `qemu` because Colima's default VZ driver rejected the external raw disk attachment after a forced reset.
 
-That means vanilla Postiz has been cloned, source-inspected, and dependency-installed under the required Node major version, but not yet run locally in this environment. The next validation step needs Docker or an equivalent hosted container environment for Postgres, Redis, Temporal, and related services.
+That means vanilla Postiz has now been cloned, source-inspected, dependency-installed under the required Node major version, and run locally through the upstream Docker Compose stack.
+
+## Runtime Proof
+
+Local production-compose run:
+
+- Command: `docker compose -f docker-compose.yaml -f docker-compose.local-runtime.yml up -d`
+- URL: `http://localhost:4007`
+- Upstream app image: `ghcr.io/gitroomhq/postiz-app:latest`
+- Local-only override:
+  - `NOT_SECURED=true` for localhost HTTP cookies.
+  - Temporal dynamic config mounted from a host path Docker can read.
+
+Validated services:
+
+- `postiz`: running on `0.0.0.0:4007->5000/tcp`.
+- `postiz-postgres`: running and healthy.
+- `postiz-redis`: running and healthy.
+- `temporal`: running with `7233` exposed.
+- `temporal-postgresql`: running.
+- `temporal-elasticsearch`: running.
+- `temporal-admin-tools`: running.
+- `temporal-ui`: running on `8080`.
+- `spotlight`: running and healthy.
+
+Validated app behavior:
+
+- `GET http://localhost:4007/auth` returned `200 OK` and rendered the Postiz Register page.
+- `GET http://localhost:4007/api/auth/can-register` returned `200 OK` with `{"register":true}`.
+- `POST http://localhost:4007/api/auth/register` returned `200 OK`, set an `auth` cookie, and returned `{"register":true}`.
+- Authenticated `GET http://localhost:4007/` redirected to `/launches`, proving the local session was accepted.
+- Direct Postgres verification found the created user and organization:
+  - User: `codex-postiz-20260605023601@example.com`, `activated=true`.
+  - Organization: `Corvo Labs Local Proof`.
+
+Runtime caveats:
+
+- The first Colima attempt used the default VZ driver. It could boot Docker, but bind mounts from `/Volumes/rexy` appeared empty inside containers, which caused Temporal to fail because `development-sql.yaml` was missing in the container.
+- Recreating Colima with `--vm-type qemu --mount /Users/jacobbutler:w --mount /Volumes/rexy:w` fixed the bind-mount issue.
+- QEMU is slower than VZ for image extraction, but it produced the reliable runtime proof needed for this spike.
+- The upstream Postiz clone has a local-only untracked `docker-compose.local-runtime.yml` used for this proof; it should not be treated as a project commit until we decide the production deployment shape.
 
 ## Architecture Observed
 
@@ -64,7 +107,7 @@ The production Docker compose stack includes:
 - Optional Sentry Spotlight container.
 - Local upload volume at `/uploads`.
 
-This is not a simple route-level embed into the current Next/Convex/Clerk Resonate app. It should be deployed and tested as its own app, then bridged into the `resonate.corvolabs.com/v2/*` routing model once the operational shape is clear.
+This is not a simple route-level embed into the current Next/Convex/Clerk Resonate app. It should be deployed as its own app/service, then bridged into the `resonate.corvolabs.com/v2/*` routing model once the operational shape is clear.
 
 ## Required Runtime And Env
 
@@ -211,7 +254,7 @@ Use a staged architecture:
 
 1. Keep the existing Resonate app in place.
 2. Keep the current `/v2` tracer on Vercel for production workflow validation.
-3. Run upstream Postiz as a separate self-hosted service first.
+3. Run upstream Postiz as a separate self-hosted service first. Local proof now supports this direction.
 4. Once vanilla Postiz is proven, decide between:
    - Reverse proxying `resonate.corvolabs.com/v2/*` to a Postiz service.
    - Keeping a sibling Postiz fork repo and integrating through API/SDK.
@@ -232,20 +275,20 @@ This matches the production tracer proof already achieved while leaving room to 
 
 ## Remaining Acceptance Gaps
 
-This spike is not complete against every acceptance criterion yet.
+This spike completed vanilla runtime and account-creation proof. Remaining gaps are now integration and customization gaps, not basic runtime feasibility gaps.
 
 Open gaps:
 
-- Vanilla Postiz has not been run locally or in staging.
-- Admin/account setup has not been verified.
 - No real provider OAuth flow has been completed.
 - Provider attempts are source-code and env-feasibility inspections only, except the Resonate placeholder YouTube validation.
+- A production deployment target has not been selected.
+- The production reverse proxy/routing plan for `resonate.corvolabs.com/v2/*` has not been implemented.
+- The Postiz fork strategy and upstream cherry-pick/update workflow still need to be written down.
 
 Known local blockers:
 
 - Use Node 22.x for all Postiz work because upstream requires `>=22.12.0 <23.0.0`.
-- Install or expose Docker on PATH, or choose a hosted/container staging target.
-- If using local Colima/Docker, configure container VM/image storage on `/Volumes/rexy` or free system disk first.
+- If using local Colima/Docker, keep the QEMU VM profile and explicit mounts, or re-test VZ before relying on `/Volumes/rexy` bind mounts.
 - Decide whether to run `pnpm approve-builds` for ignored native/tooling package build scripts before first app run.
 - Supply actual dev app credentials for at least YouTube.
 
@@ -276,7 +319,7 @@ Alternative all-in-one container run:
 
 ```bash
 cd /Volumes/rexy/GitHub/postiz-app
-docker compose up -d
+docker compose -f docker-compose.yaml -f docker-compose.local-runtime.yml up -d
 ```
 
 Expected local production-compose URL:
@@ -287,4 +330,4 @@ http://localhost:4007
 
 ## Issue Status
 
-Issue #39 should remain open until vanilla Postiz is actually accessible and at least organization/workspace creation is verified. This report completes the source and architecture inspection portion of the spike, but not the runtime proof.
+Issue #39 now has enough evidence to close once the GitHub issue is updated with this runtime proof. The follow-on work should move to the open implementation issues for production deployment, fork maintenance, real provider OAuth, the Corvo Labs Blog custom channel, and the idea-to-draft customization layer.

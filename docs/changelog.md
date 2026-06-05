@@ -991,3 +991,27 @@ Append-only session log for repository-level updates. Each documentation refresh
 ### Branch
 
 - codex/postiz-feasibility-report
+
+## 06/05/2026 02:36:30 PDT
+
+### Summary
+
+- Completed local vanilla Postiz runtime validation for issue #39 with Colima/QEMU and Docker Compose.
+- Verified the Postiz register page, backend health via `can-register`, Temporal startup, local account creation, auth cookie issuance, authenticated redirect, and persisted Corvo Labs placeholder organization.
+- Documented the VZ bind-mount failure and the QEMU/external-volume workaround used for this local proof.
+
+### Staged Changes
+
+- M	docs/changelog.md
+- M	docs/plans/2026-06-05-postiz-feasibility-spike.md
+- M	docs/project-status.md
+
+### Working Tree Snapshot
+
+- M  docs/changelog.md
+- M  docs/plans/2026-06-05-postiz-feasibility-spike.md
+- M  docs/project-status.md
+
+### Branch
+
+- codex/postiz-feasibility-report
