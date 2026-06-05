@@ -1,6 +1,6 @@
 # Project Status
 
-Last updated: 06/05/2026 02:36:30 PDT
+Last updated: 06/05/2026 02:45:00 PDT
 
 ## State
 
@@ -13,14 +13,15 @@ Track the Postiz rebuild against issue #38 and its related implementation issues
 ## Session Focus
 
 - Completed the vanilla Postiz feasibility spike with local Docker runtime proof under Colima/QEMU.
-- Verified Postiz frontend, backend, Temporal, Postgres, Redis, local registration, auth cookie issuance, authenticated redirect, and persisted Corvo Labs placeholder organization.
+- Added the #40 foundation runbook for custom fork strategy, side-by-side deployment, local runtime commands, upstream sync, customization boundaries, secrets, and smoke testing.
 
 ## Last Completed Task
 
-- docs: complete Postiz runtime feasibility proof
+- docs: add Postiz foundation runbook
 
 ## Recent Commits
 
+- docs: add Postiz foundation runbook
 - docs: complete Postiz runtime feasibility proof
 - docs: add Postiz feasibility spike
 - de9aa4d feat: add protected v2 workflow validation
@@ -35,8 +36,8 @@ Track the Postiz rebuild against issue #38 and its related implementation issues
 
 ## Next Agent Pickup
 
-- Update and close issue #39 with the Colima/QEMU runtime evidence.
-- Continue production deployment and fork-maintenance planning from the related Postiz implementation issues.
+- Update and close issue #40 with the foundation runbook evidence once pushed.
+- Next likely implementation blockers are #41 brand/workspace setup and #42 Corvo Labs Blog custom channel, depending on whether the custom fork repository is created first.
 - Keep issue #38 open until real Postiz is functional alongside legacy Resonate.
 
 ## Branch

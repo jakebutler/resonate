@@ -1015,3 +1015,27 @@ Append-only session log for repository-level updates. Each documentation refresh
 ### Branch
 
 - codex/postiz-feasibility-report
+
+## 06/05/2026 02:45:00 PDT
+
+### Summary
+
+- Added the Postiz rebuild foundation runbook for issue #40.
+- Chose a sibling customized Postiz fork/service strategy while keeping this repository as the transition control plane and legacy Resonate app.
+- Documented local runtime commands, side-by-side `/v2` deployment routing, environment/secret requirements, upstream sync workflow, customization boundaries, and smoke-test checklist.
+
+### Staged Changes
+
+- A	docs/plans/2026-06-05-postiz-foundation-runbook.md
+- M	docs/changelog.md
+- M	docs/project-status.md
+
+### Working Tree Snapshot
+
+- A  docs/plans/2026-06-05-postiz-foundation-runbook.md
+- M  docs/changelog.md
+- M  docs/project-status.md
+
+### Branch
+
+- codex/postiz-foundation-runbook
