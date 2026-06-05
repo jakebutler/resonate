@@ -523,6 +523,103 @@ export function makeResearchBrief(input: MakeResearchBriefInput): V2ResearchBrie
   };
 }
 
+// ─── Claim Map Types (issue #53) ────────────────────────────────────────────
+
+export type V2ClaimStatus =
+  | "unreviewed"
+  | "accepted"
+  | "needs-revision"
+  | "unsupported"
+  | "too-risky"
+  | "out-of-scope";
+
+export const CLAIM_STATUSES: V2ClaimStatus[] = [
+  "unreviewed",
+  "accepted",
+  "needs-revision",
+  "unsupported",
+  "too-risky",
+  "out-of-scope",
+];
+
+export const CLAIM_STATUS_LABELS: Record<V2ClaimStatus, string> = {
+  unreviewed: "Unreviewed",
+  accepted: "Accepted",
+  "needs-revision": "Needs Revision",
+  unsupported: "Unsupported",
+  "too-risky": "Too Risky",
+  "out-of-scope": "Out of Scope",
+};
+
+export type V2ClaimConfidence = "high" | "medium" | "low";
+
+export type V2Claim = {
+  id: string;
+  text: string;
+  sourceIds: string[];
+  evidenceLabel: V2EvidenceLabel;
+  confidence: V2ClaimConfidence;
+  caveats?: string;
+  reviewerNotes?: string;
+  status: V2ClaimStatus;
+};
+
+export type V2ClaimMapStatus = "building" | "review-ready" | "reviewed";
+
+export type V2ClaimMap = {
+  id: string;
+  brandId: V2BrandId;
+  topic: string;
+  thesis: string;
+  claims: V2Claim[];
+  status: V2ClaimMapStatus;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type MakeClaimInput = {
+  text: string;
+  sourceIds: string[];
+  evidenceLabel: V2EvidenceLabel;
+  confidence: V2ClaimConfidence;
+  caveats?: string;
+  reviewerNotes?: string;
+  status?: V2ClaimStatus;
+};
+
+export function makeClaim(input: MakeClaimInput): V2Claim {
+  return {
+    id: makeId("claim"),
+    status: input.status ?? "unreviewed",
+    text: input.text,
+    sourceIds: input.sourceIds,
+    evidenceLabel: input.evidenceLabel,
+    confidence: input.confidence,
+    caveats: input.caveats,
+    reviewerNotes: input.reviewerNotes,
+  };
+}
+
+type MakeClaimMapInput = {
+  brandId: V2BrandId;
+  topic: string;
+  thesis: string;
+};
+
+export function makeClaimMap(input: MakeClaimMapInput): V2ClaimMap {
+  const now = new Date().toISOString();
+  return {
+    id: makeId("cmap"),
+    brandId: input.brandId,
+    topic: input.topic,
+    thesis: input.thesis,
+    claims: [],
+    status: "building",
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
 // ─── Seed research brief for FreshProof spike (issue #52) ───────────────────
 
 export const FRESHPROOF_SEED_BRIEF: Omit<V2ResearchBrief, "id" | "createdAt" | "updatedAt"> = {
