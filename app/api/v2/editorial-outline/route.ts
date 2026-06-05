@@ -4,7 +4,6 @@ import {
   makeOutlineSection,
   makeTakeawayRow,
   type V2Claim,
-  type V2EvidenceLabel,
   type V2OutlineSection,
   type V2TakeawayRow,
 } from "@/lib/v2";

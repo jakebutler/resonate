@@ -24,6 +24,7 @@ export default defineConfig({
         '.worktrees/**',
         '**/*.d.ts',
         '**/node_modules/**',
+        'components/kibo-ui/**',
         'app/layout.tsx',
         'components/ConvexClientProvider.tsx',
         'app/sign-in/**',

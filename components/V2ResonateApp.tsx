@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
-  buildCorvoBlogDraft,
   buildFallbackDraft,
   buildIdeaSeedText,
   CLAIM_STATUS_LABELS,
@@ -631,7 +630,6 @@ export function V2ResonateApp() {
   }
 
   const pendingVariants = variants.filter((v) => v.status === "pending");
-  const reviewedVariants = variants.filter((v) => v.status !== "pending");
   const isGenerating = generatingChannels.size > 0;
 
   return (
@@ -1236,9 +1234,7 @@ export function V2ResonateApp() {
                                 className={`rounded-full px-2.5 py-1 text-xs font-medium ${
                                   claim.status === "accepted"
                                     ? "bg-[#e8f3f4] text-[#15616d]"
-                                    : claim.status === "needs-revision"
-                                      ? "bg-yellow-100 text-yellow-800"
-                                      : "bg-black/5 text-gray-500"
+                                    : "bg-black/5 text-gray-500"
                                 }`}
                               >
                                 {CLAIM_STATUS_LABELS[claim.status]}

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import { IdeasPage } from "@/components/IdeasPage/IdeasPage";
+import type { Id } from "@/convex/_generated/dataModel";
 
 vi.mock("convex/react", () => ({
   useConvexAuth: vi.fn(),
@@ -40,14 +41,12 @@ describe("IdeasPage", () => {
     vi.mocked(useConvexAuth).mockReturnValue({
       isLoading: false,
       isAuthenticated: true,
-    } as any);
+    });
     vi.mocked(useQuery)
-      .mockReturnValueOnce([] as any)
-      .mockReturnValueOnce(undefined as any)
-      .mockReturnValueOnce([] as any);
-    vi.mocked(useMutation).mockReturnValue(
-      vi.fn().mockResolvedValue(undefined) as any
-    );
+      .mockReturnValueOnce([])
+      .mockReturnValueOnce(undefined)
+      .mockReturnValueOnce([]);
+    vi.mocked(useMutation).mockReturnValue(vi.fn().mockResolvedValue(undefined));
   });
 
   it("requires a note before saving", async () => {
@@ -60,15 +59,15 @@ describe("IdeasPage", () => {
 
   it("shows duplicate matches inline when source URL matches an existing idea", () => {
     vi.mocked(useQuery)
-      .mockReturnValueOnce([] as any)
-      .mockReturnValueOnce(undefined as any)
+      .mockReturnValueOnce([])
+      .mockReturnValueOnce(undefined)
       .mockReturnValueOnce([
         {
-          _id: "idea_1",
+          _id: "idea_1" as Id<"ideas">,
           latestEntryPreview: "Existing idea",
           sourceTitle: "Episode 12",
         },
-      ] as any);
+      ]);
 
     render(<IdeasPage />);
 
@@ -83,7 +82,7 @@ describe("IdeasPage", () => {
     vi.mocked(useConvexAuth).mockReturnValue({
       isLoading: true,
       isAuthenticated: false,
-    } as any);
+    });
 
     render(<IdeasPage />);
 
@@ -94,7 +93,7 @@ describe("IdeasPage", () => {
     vi.mocked(useConvexAuth).mockReturnValue({
       isLoading: false,
       isAuthenticated: false,
-    } as any);
+    });
 
     render(<IdeasPage />);
 

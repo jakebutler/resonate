@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
-  classifySourceQuality,
-  makeId,
   makeSourceRecord,
   type V2EvidenceLabel,
   type V2SourceRecord,

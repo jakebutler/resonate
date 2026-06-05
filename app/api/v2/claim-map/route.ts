@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { makeClaim, makeId, type V2ClaimConfidence, type V2EvidenceLabel, type V2SourceRecord } from "@/lib/v2";
+import { makeClaim, type V2ClaimConfidence, type V2EvidenceLabel, type V2SourceRecord } from "@/lib/v2";
 
 export const runtime = "nodejs";
 
