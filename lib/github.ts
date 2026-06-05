@@ -1,6 +1,6 @@
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN!;
-const REPO_OWNER = process.env.BLOG_REPO_OWNER!;
-const REPO_NAME = process.env.BLOG_REPO_NAME!;
+const REPO_OWNER = process.env.BLOG_REPO_OWNER || "jakebutler";
+const REPO_NAME = process.env.BLOG_REPO_NAME || "corvo-labs-dot-com";
 const BLOG_APP_ROOT = process.env.BLOG_APP_ROOT || "corvo-labs-enhanced";
 const CONTENT_PATH =
   process.env.BLOG_CONTENT_PATH || `${BLOG_APP_ROOT}/content/blog`;
@@ -330,6 +330,10 @@ export async function createBlogPostPR(params: {
   coverImageAlt?: string;
   images?: PublishImageAsset[];
 }): Promise<{ prUrl: string; branchName: string }> {
+  if (!GITHUB_TOKEN) {
+    throw new Error("Missing required environment variable: GITHUB_TOKEN");
+  }
+
   // Validate up front so we never create a remote branch that can't be
   // completed — callers must supply at least one image so we have a hero
   // for the frontmatter and card thumbnail.
@@ -428,8 +432,24 @@ export async function createBlogPostPR(params: {
   );
   if (!createBranchRes.ok) {
     const err = await createBranchRes.json();
-    throw new Error(`GitHub create branch failed: ${JSON.stringify(err)}`);
+    const branchAlreadyExists =
+      createBranchRes.status === 422 &&
+      typeof err?.message === "string" &&
+      err.message.toLowerCase().includes("reference already exists");
+
+    if (!branchAlreadyExists) {
+      throw new Error(`GitHub create branch failed: ${JSON.stringify(err)}`);
+    }
   }
+
+  const existingFileRes = await fetch(
+    `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${filePath}?ref=${encodeURIComponent(
+      branchName
+    )}`,
+    { headers }
+  );
+  const existingFile =
+    existingFileRes.ok ? ((await existingFileRes.json()) as { sha?: string }) : null;
 
   const createFileRes = await fetch(
     `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${filePath}`,
@@ -440,6 +460,7 @@ export async function createBlogPostPR(params: {
         message: `feat: add blog post "${params.title}"`,
         content: fileContent,
         branch: branchName,
+        ...(existingFile?.sha ? { sha: existingFile.sha } : {}),
       }),
     }
   );
@@ -467,6 +488,31 @@ export async function createBlogPostPR(params: {
   );
   if (!prRes.ok) {
     const err = await prRes.json();
+    const prAlreadyExists =
+      prRes.status === 422 &&
+      Array.isArray(err?.errors) &&
+      err.errors.some(
+        (issue: { message?: string }) =>
+          typeof issue.message === "string" &&
+          issue.message.toLowerCase().includes("pull request already exists")
+      );
+
+    if (prAlreadyExists) {
+      const existingPrRes = await fetch(
+        `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls?state=open&head=${encodeURIComponent(
+          `${REPO_OWNER}:${branchName}`
+        )}&base=${encodeURIComponent(defaultBranch)}`,
+        { headers }
+      );
+      if (existingPrRes.ok) {
+        const existingPrs = (await existingPrRes.json()) as Array<{ html_url?: string }>;
+        const existingPr = existingPrs.find((pr) => pr.html_url);
+        if (existingPr?.html_url) {
+          return { prUrl: existingPr.html_url, branchName };
+        }
+      }
+    }
+
     throw new Error(`GitHub create PR failed: ${JSON.stringify(err)}`);
   }
   const prData = await prRes.json();

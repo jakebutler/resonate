@@ -27,7 +27,71 @@ type Filter = "all" | "blog" | "linkedin";
 type View = "calendar" | "library" | "workflow";
 type TimePeriod = "all" | "this-month" | "last-3-months" | "this-year";
 
-export default function Dashboard() {
+const bypassAuthForE2E = process.env.NEXT_PUBLIC_E2E_BYPASS_AUTH === "1";
+
+function HeaderUserControl() {
+  if (bypassAuthForE2E) {
+    return (
+      <div className="rounded-full border border-gray-200 px-3 py-1 text-xs text-gray-500">
+        Auth bypass
+      </div>
+    );
+  }
+
+  return <UserButton afterSignOutUrl="/sign-in" />;
+}
+
+function BypassDashboardShell() {
+  return (
+    <div className="min-h-screen bg-[#fafafa]">
+      <header className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-100 bg-white px-6 py-3">
+        <div className="flex items-center gap-2">
+          <AudioWaveform size={20} className="text-[#001524]" />
+          <span className="font-forum text-lg font-semibold text-[#001524]">Resonate</span>
+        </div>
+        <div className="flex items-center gap-4">
+          <Link
+            href="/v2"
+            className="flex items-center gap-1.5 text-sm text-gray-500 transition-colors hover:text-[#001524]"
+          >
+            <Layers3 size={15} />
+            Open v2
+          </Link>
+          <HeaderUserControl />
+        </div>
+      </header>
+      <main className="mx-auto flex max-w-[960px] flex-col gap-4 px-5 py-10 md:px-6">
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-500">
+          Local verification shell
+        </p>
+        <h1 className="font-forum text-[2.5rem] leading-none text-[#001524] md:text-[3rem]">
+          Legacy Resonate is still routed.
+        </h1>
+        <p className="max-w-2xl text-base leading-7 text-gray-600">
+          The production app keeps its Clerk and Convex-backed dashboard. This local E2E bypass
+          shell lets the side-by-side build prove that legacy Resonate and the new v2 surface both
+          remain reachable without requiring live auth credentials.
+        </p>
+        <div className="flex flex-wrap gap-3 pt-2">
+          <Link
+            href="/v2"
+            className="rounded-[18px] bg-[#001524] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#122b3b]"
+          >
+            Open v2 workspace
+          </Link>
+          <Link
+            href="/ideas"
+            className="rounded-[18px] border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-[#001524] transition-colors hover:bg-gray-50"
+          >
+            Check legacy ideas route
+          </Link>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+function DashboardApp() {
   const router = useRouter();
   const allPosts = useQuery(api.posts.list, {});
 
@@ -102,7 +166,7 @@ export default function Dashboard() {
             <Settings size={15} />
             Reconfigure
           </Link>
-          <UserButton afterSignOutUrl="/sign-in" />
+          <HeaderUserControl />
         </div>
       </header>
 
@@ -236,4 +300,12 @@ export default function Dashboard() {
       />
     </div>
   );
+}
+
+export default function Dashboard() {
+  if (bypassAuthForE2E) {
+    return <BypassDashboardShell />;
+  }
+
+  return <DashboardApp />;
 }
