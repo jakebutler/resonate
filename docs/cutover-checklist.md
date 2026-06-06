@@ -132,7 +132,7 @@ If V2 is not ready for full cutover:
 
 | Step | Mechanism | Verified |
 |---|---|---|
-| Run source discovery | /api/v2/research-brief | ✅ Mock sources (6 GLP-1 sources) |
+| Run source discovery | /api/v2/research-brief | ✅ Seeded GLP-1 sources, including recent discontinuation evidence |
 | Accept sources | Human source review panel | ✅ |
 | Generate claim map | /api/v2/claim-map | ✅ Mock claims |
 | Review/accept claims | Human claim review panel | ✅ |

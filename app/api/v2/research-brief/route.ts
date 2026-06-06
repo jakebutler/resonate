@@ -23,6 +23,17 @@ const FRESHPROOF_MOCK_SOURCES: Omit<
   "addedBy"
 >[] = [
   {
+    url: "https://pubmed.ncbi.nlm.nih.gov/41816857/",
+    title:
+      "Obesity Treatments and Weight Changes in Clinical Practice After Discontinuation of Semaglutide or Tirzepatide",
+    evidenceLabel: "primary-source",
+    relevanceScore: 5,
+    useCase:
+      "Recent real-world cohort evidence on post-discontinuation treatment patterns and weight changes after semaglutide or tirzepatide; essential freshness check for the GLP-1 regain topic.",
+    publishedYear: 2026,
+    domain: "pubmed.ncbi.nlm.nih.gov",
+  },
+  {
     url: "https://www.nejm.org/doi/10.1056/NEJMoa2206038",
     title: "Semaglutide and Cardiovascular Outcomes in Obesity without Diabetes (SELECT trial)",
     evidenceLabel: "rct-meta-analysis",
@@ -86,6 +97,11 @@ const FRESHPROOF_MOCK_SOURCES: Omit<
   },
 ];
 
+const FRESHPROOF_FRESHNESS_SUPPLEMENTS: Omit<
+  Parameters<typeof makeSourceRecord>[0],
+  "addedBy"
+>[] = [FRESHPROOF_MOCK_SOURCES[0]];
+
 const AUTOMATION_NOTES = {
   requiresHumanReview: true,
   humanReviewSteps: [
@@ -110,6 +126,8 @@ function buildDiscoveryPrompt(body: RequestBody): string {
     "You are a rigorous research assistant. Return a JSON array of source records for the research brief below.",
     "Each record must be a real, verifiable source (no invented URLs or authors).",
     "Prioritize RCTs, meta-analyses, primary sources, and authoritative practice guidelines.",
+    "Actively look for newly published PubMed, DOI, and journal-page results from the last 24 months before older background sources.",
+    "For GLP-1 discontinuation topics, include searches for: semaglutide discontinuation weight change, tirzepatide discontinuation weight regain, obesity treatments after discontinuation, and Diabetes Obesity and Metabolism discontinuation.",
     "Return only the JSON array — no prose, no markdown fences.",
     "",
     `Topic: ${body.topic}`,
@@ -122,6 +140,33 @@ function buildDiscoveryPrompt(body: RequestBody): string {
   ]
     .filter(Boolean)
     .join("\n");
+}
+
+function isFreshProofGlp1DiscontinuationTopic(body: Partial<RequestBody>): boolean {
+  const haystack = [body.topic, body.thesis, body.audience].filter(Boolean).join(" ").toLowerCase();
+  return (
+    haystack.includes("glp") &&
+    (haystack.includes("discontinuation") || haystack.includes("stopping") || haystack.includes("withdrawal")) &&
+    (haystack.includes("weight") || haystack.includes("regain"))
+  );
+}
+
+function sourceKey(source: Pick<Parameters<typeof makeSourceRecord>[0], "url" | "title">): string {
+  const normalizedUrl = source.url.toLowerCase();
+  const doiMatch = normalizedUrl.match(/10\.\d{4,9}\/[-._;()/:a-z0-9]+/i);
+  if (doiMatch) return doiMatch[0].toLowerCase();
+  return normalizedUrl || source.title.toLowerCase();
+}
+
+function withFreshnessSupplements(
+  body: Partial<RequestBody>,
+  sources: Omit<Parameters<typeof makeSourceRecord>[0], "addedBy">[]
+): Omit<Parameters<typeof makeSourceRecord>[0], "addedBy">[] {
+  if (!isFreshProofGlp1DiscontinuationTopic(body)) return sources;
+
+  const seen = new Set(sources.map(sourceKey));
+  const supplements = FRESHPROOF_FRESHNESS_SUPPLEMENTS.filter((source) => !seen.has(sourceKey(source)));
+  return [...supplements, ...sources];
 }
 
 function sourcesFromPioneerContent(content: string): Omit<Parameters<typeof makeSourceRecord>[0], "addedBy">[] | null {
@@ -151,7 +196,7 @@ export async function POST(req: NextRequest) {
   const model = process.env.PIONEER_DRAFT_MODEL?.trim() || "claude-opus-4-7";
 
   if (!apiKey) {
-    const sources: V2SourceRecord[] = FRESHPROOF_MOCK_SOURCES.map((s) =>
+    const sources: V2SourceRecord[] = withFreshnessSupplements(body, FRESHPROOF_MOCK_SOURCES).map((s) =>
       makeSourceRecord({ ...s, addedBy: "agent" })
     );
     return NextResponse.json({
@@ -187,7 +232,7 @@ export async function POST(req: NextRequest) {
     if (!response.ok) {
       const detail = await response.text();
       console.error("Pioneer research-brief error [model=%s]: %s", model, detail);
-      const sources: V2SourceRecord[] = FRESHPROOF_MOCK_SOURCES.map((s) =>
+      const sources: V2SourceRecord[] = withFreshnessSupplements(body, FRESHPROOF_MOCK_SOURCES).map((s) =>
         makeSourceRecord({ ...s, addedBy: "agent" })
       );
       return NextResponse.json({
@@ -204,7 +249,7 @@ export async function POST(req: NextRequest) {
     const raw = sourcesFromPioneerContent(content);
 
     if (!raw) {
-      const sources: V2SourceRecord[] = FRESHPROOF_MOCK_SOURCES.map((s) =>
+      const sources: V2SourceRecord[] = withFreshnessSupplements(body, FRESHPROOF_MOCK_SOURCES).map((s) =>
         makeSourceRecord({ ...s, addedBy: "agent" })
       );
       return NextResponse.json({
@@ -216,7 +261,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const sources: V2SourceRecord[] = raw.map((s) =>
+    const sources: V2SourceRecord[] = withFreshnessSupplements(body, raw).map((s) =>
       makeSourceRecord({
         ...s,
         evidenceLabel: (s.evidenceLabel as V2EvidenceLabel) ?? "weaker-support",
@@ -231,7 +276,7 @@ export async function POST(req: NextRequest) {
       "Pioneer research-brief request failed:",
       error instanceof Error ? error.message : String(error)
     );
-    const sources: V2SourceRecord[] = FRESHPROOF_MOCK_SOURCES.map((s) =>
+    const sources: V2SourceRecord[] = withFreshnessSupplements(body, FRESHPROOF_MOCK_SOURCES).map((s) =>
       makeSourceRecord({ ...s, addedBy: "agent" })
     );
     return NextResponse.json({

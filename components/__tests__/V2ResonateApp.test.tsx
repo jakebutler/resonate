@@ -62,6 +62,44 @@ function mockFetch() {
       );
     }
 
+    if (url.endsWith("/api/v2/editorial-outline")) {
+      return new Response(
+        JSON.stringify({
+          provider: "mock",
+          outline: {
+            id: "outline-1",
+            claimMapId: "claim-map-1",
+            brandId: "freshproof",
+            thesis: "Weight regain after GLP-1 discontinuation needs recent real-world evidence.",
+            status: "draft",
+            createdAt: "2026-06-05T00:00:00.000Z",
+            updatedAt: "2026-06-05T00:00:00.000Z",
+            sections: [
+              {
+                heading: "Clinical practice after discontinuation",
+                notes: "Use real-world cohort evidence before older background sources.",
+                claimIds: ["claim-1"],
+                evidenceLabels: ["primary-source"],
+              },
+            ],
+            takeawayTable: [
+              {
+                finding: "Many patients restart or switch obesity treatments after stopping therapy.",
+                evidenceLabel: "primary-source",
+                source: {
+                  primarySources: ["Gasoyan et al. 2026"],
+                  secondarySources: ["Cleveland Clinic summary"],
+                  citationStrategy: "Lead with the DOI/PubMed record.",
+                },
+              },
+            ],
+            citationPlan: "Cite Gasoyan et al. before secondary summaries.",
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      );
+    }
+
     return new Response(JSON.stringify({}), {
       status: 200,
       headers: { "Content-Type": "application/json" },
@@ -122,5 +160,30 @@ describe("V2ResonateApp", () => {
     );
     expect(screen.getByText("confidence: high")).toBeInTheDocument();
     expect(screen.getByText("1 source")).toBeInTheDocument();
+  });
+
+  it("renders an editorial outline even when provider takeaway sources are object-shaped", async () => {
+    render(<V2ResonateApp />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Run Source Discovery" }));
+    await screen.findByText("STEP 4 semaglutide extension");
+
+    fireEvent.click(screen.getByRole("button", { name: "Accept" }));
+    fireEvent.click(screen.getByRole("button", { name: "Generate Claim Map" }));
+
+    const claim = await screen.findByText(
+      "Stopping semaglutide is associated with clinically meaningful weight regain."
+    );
+    expect(claim).toBeInTheDocument();
+    const claimReviewButtons = screen.getAllByRole("button", { name: "Accept" });
+    fireEvent.click(claimReviewButtons[claimReviewButtons.length - 1]);
+
+    const outlineButton = await screen.findByRole("button", { name: "Generate Editorial Outline" });
+    await waitFor(() => expect(outlineButton).not.toBeDisabled());
+    fireEvent.click(outlineButton);
+
+    expect(await screen.findByText(/Clinical practice after discontinuation/)).toBeInTheDocument();
+    expect(screen.getByText(/Gasoyan et al\. 2026/)).toBeInTheDocument();
+    expect(screen.getByText(/Lead with the DOI\/PubMed record/)).toBeInTheDocument();
   });
 });

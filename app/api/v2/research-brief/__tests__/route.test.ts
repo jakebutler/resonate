@@ -63,6 +63,22 @@ describe("POST /api/v2/research-brief", () => {
     }
   });
 
+  it("includes the 2026 clinical-practice discontinuation paper for GLP-1 regain topics", async () => {
+    const res = await POST(makeRequest(validBrief));
+    const data = await res.json();
+
+    expect(data.sources).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          url: "https://pubmed.ncbi.nlm.nih.gov/41816857/",
+          title:
+            "Obesity Treatments and Weight Changes in Clinical Practice After Discontinuation of Semaglutide or Tirzepatide",
+          publishedYear: 2026,
+        }),
+      ])
+    );
+  });
+
   it("includes a warning when returning mock data", async () => {
     const res = await POST(makeRequest(validBrief));
     const data = await res.json();
@@ -102,10 +118,21 @@ describe("POST /api/v2/research-brief", () => {
 
     expect(res.status).toBe(200);
     expect(data.provider).toBe("pioneer");
-    expect(data.sources).toHaveLength(1);
-    expect(data.sources[0].evidenceLabel).toBe("rct-meta-analysis");
-    expect(data.sources[0].qualityRating).toBe("strong");
-    expect(data.sources[0].status).toBe("unvetted");
+    expect(data.sources).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          url: "https://pubmed.ncbi.nlm.nih.gov/41816857/",
+          title:
+            "Obesity Treatments and Weight Changes in Clinical Practice After Discontinuation of Semaglutide or Tirzepatide",
+        }),
+        expect.objectContaining({
+          title: "SCALE trial: GLP-1 discontinuation outcomes",
+          evidenceLabel: "rct-meta-analysis",
+          qualityRating: "strong",
+          status: "unvetted",
+        }),
+      ])
+    );
   });
 
   it("falls back to mock sources when Pioneer returns an error", async () => {

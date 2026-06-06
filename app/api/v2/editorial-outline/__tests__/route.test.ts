@@ -114,6 +114,57 @@ describe("POST /api/v2/editorial-outline", () => {
     expect(data.outline.status).toBe("draft");
   });
 
+  it("normalizes object-shaped takeaway sources from Pioneer before returning UI data", async () => {
+    process.env.PIONEER_API_KEY = "test-key";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            choices: [
+              {
+                message: {
+                  content: JSON.stringify({
+                    thesis: "Weight regain evidence needs a real-world section.",
+                    sections: [
+                      {
+                        heading: "Clinical Practice Evidence",
+                        notes: "Cover real-world discontinuation patterns.",
+                        claimIds: [],
+                        evidenceLabels: ["primary-source"],
+                      },
+                    ],
+                    takeawayTable: [
+                      {
+                        finding: "Patients often restart or switch obesity treatments after discontinuation.",
+                        evidenceLabel: "primary-source",
+                        source: {
+                          primarySources: ["Gasoyan et al. 2026"],
+                          secondarySources: ["Cleveland Clinic summary"],
+                          citationStrategy: "Use PubMed DOI first.",
+                        },
+                      },
+                    ],
+                    citationPlan: "Cite Gasoyan et al. before summaries.",
+                  }),
+                },
+              },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )
+      )
+    );
+
+    const res = await POST(makeRequest(validBody));
+    const data = await res.json();
+
+    expect(data.provider).toBe("pioneer");
+    expect(data.outline.takeawayTable[0].source).toBe(
+      "Gasoyan et al. 2026; Cleveland Clinic summary; Use PubMed DOI first."
+    );
+  });
+
   it("falls back to mock when Pioneer fails", async () => {
     process.env.PIONEER_API_KEY = "test-key";
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("bad", { status: 502 })));
