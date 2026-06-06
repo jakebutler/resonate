@@ -165,6 +165,52 @@ describe("POST /api/v2/editorial-outline", () => {
     );
   });
 
+  it("normalizes object-shaped citation plans from Pioneer before returning UI data", async () => {
+    process.env.PIONEER_API_KEY = "test-key";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            choices: [
+              {
+                message: {
+                  content: JSON.stringify({
+                    thesis: "Weight regain evidence needs citation discipline.",
+                    sections: [
+                      {
+                        heading: "Citation Standards",
+                        notes: "Use primary sources before summaries.",
+                        claimIds: [],
+                        evidenceLabels: ["primary-source"],
+                      },
+                    ],
+                    takeawayTable: [],
+                    citationPlan: {
+                      primarySources: ["Gasoyan et al. 2026", "STEP 4 extension"],
+                      citationStyle: "Markdown footnotes",
+                      evidenceHierarchy: "Primary cohort and RCT evidence first",
+                      caveatsHandling: "Separate real-world variability from RCT regain averages",
+                    },
+                  }),
+                },
+              },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )
+      )
+    );
+
+    const res = await POST(makeRequest(validBody));
+    const data = await res.json();
+
+    expect(data.provider).toBe("pioneer");
+    expect(data.outline.citationPlan).toBe(
+      "Gasoyan et al. 2026; STEP 4 extension; Markdown footnotes; Primary cohort and RCT evidence first; Separate real-world variability from RCT regain averages"
+    );
+  });
+
   it("falls back to mock when Pioneer fails", async () => {
     process.env.PIONEER_API_KEY = "test-key";
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("bad", { status: 502 })));
