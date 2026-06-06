@@ -18,6 +18,37 @@ type RequestBody = {
   acceptedClaims: V2Claim[];
 };
 
+function displayText(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (Array.isArray(value)) {
+    return value.map(displayText).filter(Boolean).join("; ");
+  }
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    const likelyCitationFields = [
+      record.primarySources,
+      record.secondarySources,
+      record.citationStrategy,
+      record.title,
+      record.name,
+      record.url,
+    ];
+    const fromFields = likelyCitationFields.map(displayText).filter(Boolean).join("; ");
+    if (fromFields) return fromFields;
+    return JSON.stringify(value);
+  }
+  return "";
+}
+
+function normalizeTakeawayRow(input: V2TakeawayRow): V2TakeawayRow {
+  return makeTakeawayRow({
+    finding: displayText(input.finding),
+    evidenceLabel: input.evidenceLabel,
+    source: displayText(input.source),
+  });
+}
+
 function buildMockOutline(body: RequestBody) {
   const claims = body.acceptedClaims;
   return makeEditorialOutline({
@@ -167,7 +198,7 @@ export async function POST(req: NextRequest) {
       brandId: (body.brandId ?? "freshproof") as Parameters<typeof makeEditorialOutline>[0]["brandId"],
       thesis: raw.thesis,
       sections: (raw.sections ?? []).map(makeOutlineSection),
-      takeawayTable: (raw.takeawayTable ?? []).map(makeTakeawayRow),
+      takeawayTable: (raw.takeawayTable ?? []).map(normalizeTakeawayRow),
       citationPlan: raw.citationPlan ?? "",
     });
 

@@ -127,7 +127,7 @@ When configured, the `/api/v2/research-brief` endpoint calls PioneerAI with a st
 | Research brief capture UI | Done | In app as of this slice |
 | Source quality rubric | Done | `classifySourceQuality()` in lib/v2 |
 | Evidence labels | Done | 6 labels with descriptions |
-| Mock source discovery | Done | 6 FreshProof seed sources |
+| Mock source discovery | Done | FreshProof seed sources, including recent GLP-1 discontinuation evidence |
 | Live source discovery (Pioneer) | Done | `/api/v2/research-brief` endpoint |
 | Human source review UI | Done | Accept/Flag/Reject per source with notes |
 | Claim map artifact | Next — #53 | Requires accepted sources as input |

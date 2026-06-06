@@ -202,7 +202,7 @@ After deploying to production, run this sequence manually:
 7. Accept both variants
 8. Confirm drafts appear in the Drafts section
 9. Switch to FreshProof brand → Research Editorial Pipeline → click "Run Source Discovery"
-10. Confirm 6 mock sources appear (or real sources if Pioneer is configured)
+10. Confirm the seeded GLP-1 source set appears (or real sources plus freshness supplements if Pioneer is configured)
 11. Accept all sources → Generate Claim Map → accept claims → Generate Outline → Generate Draft
 12. Confirm long-form draft appears with footnotes
 

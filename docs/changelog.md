@@ -1334,3 +1334,39 @@ Append-only session log for repository-level updates. Each documentation refresh
 ### Branch
 
 - codex/fix-v2-validation-gates
+
+## 06/05/2026 17:53:10 PDT
+
+### Summary
+
+- Updated repository documentation and handoff records.
+
+### Staged Changes
+
+- M	app/api/v2/editorial-outline/__tests__/route.test.ts
+- M	app/api/v2/editorial-outline/route.ts
+- M	app/api/v2/research-brief/__tests__/route.test.ts
+- M	app/api/v2/research-brief/route.ts
+- M	components/V2ResonateApp.tsx
+- M	components/__tests__/V2ResonateApp.test.tsx
+- M	docs/cutover-checklist.md
+- M	docs/ops-runbook.md
+- M	docs/plans/2026-06-05-research-editorial-pipeline-spike.md
+
+### Working Tree Snapshot
+
+- M  app/api/v2/editorial-outline/__tests__/route.test.ts
+- M  app/api/v2/editorial-outline/route.ts
+- M  app/api/v2/research-brief/__tests__/route.test.ts
+- M  app/api/v2/research-brief/route.ts
+- M  components/V2ResonateApp.tsx
+- M  components/__tests__/V2ResonateApp.test.tsx
+- M  docs/cutover-checklist.md
+- M  docs/ops-runbook.md
+- M  docs/plans/2026-06-05-research-editorial-pipeline-spike.md
+- ?? CONTEXT.md
+- ?? docs/adr/
+
+### Branch
+
+- codex/fix-v2-outline-and-source-review

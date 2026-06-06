@@ -45,6 +45,28 @@ function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function renderableText(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (Array.isArray(value)) return value.map(renderableText).filter(Boolean).join("; ");
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    const preferred = [
+      record.primarySources,
+      record.secondarySources,
+      record.citationStrategy,
+      record.title,
+      record.name,
+      record.url,
+    ]
+      .map(renderableText)
+      .filter(Boolean)
+      .join("; ");
+    return preferred || JSON.stringify(value);
+  }
+  return "";
+}
+
 function loadState(): V2WorkspaceState {
   if (typeof window === "undefined") return DEFAULT_V2_STATE;
   const raw = window.localStorage.getItem(STORAGE_KEY);
@@ -1316,7 +1338,7 @@ export function V2ResonateApp() {
 
               <div className="mt-4 rounded-lg border border-black/10 bg-black/[0.02] p-4">
                 <p className="text-sm font-semibold">Thesis</p>
-                <p className="mt-1 text-sm text-gray-700">{editorialOutline.thesis}</p>
+                <p className="mt-1 text-sm text-gray-700">{renderableText(editorialOutline.thesis)}</p>
               </div>
 
               <div className="mt-4 space-y-3">
@@ -1326,9 +1348,9 @@ export function V2ResonateApp() {
                 {editorialOutline.sections.map((section, i) => (
                   <div key={i} className="rounded-lg border border-black/10 p-4">
                     <p className="text-sm font-medium">
-                      {i + 1}. {section.heading}
+                      {i + 1}. {renderableText(section.heading)}
                     </p>
-                    <p className="mt-1 text-xs text-gray-500">{section.notes}</p>
+                    <p className="mt-1 text-xs text-gray-500">{renderableText(section.notes)}</p>
                     {section.evidenceLabels.length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-1">
                         {section.evidenceLabels.map((label) => (
@@ -1360,9 +1382,9 @@ export function V2ResonateApp() {
                       <tbody>
                         {editorialOutline.takeawayTable.map((row, i) => (
                           <tr key={i} className="border-b border-black/5">
-                            <td className="py-2 pr-4 text-gray-700">{row.finding}</td>
-                            <td className="py-2 pr-4 text-[#8a4b00]">{row.evidenceLabel}</td>
-                            <td className="py-2 text-gray-500">{row.source}</td>
+                            <td className="py-2 pr-4 text-gray-700">{renderableText(row.finding)}</td>
+                            <td className="py-2 pr-4 text-[#8a4b00]">{renderableText(row.evidenceLabel)}</td>
+                            <td className="py-2 text-gray-500">{renderableText(row.source)}</td>
                           </tr>
                         ))}
                       </tbody>
