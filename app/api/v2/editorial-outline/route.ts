@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
+  EVIDENCE_LABELS,
   makeEditorialOutline,
   makeOutlineSection,
   makeTakeawayRow,
+  type V2EvidenceLabel,
   type V2Claim,
   type V2OutlineSection,
   type V2TakeawayRow,
@@ -30,6 +32,9 @@ function displayText(value: unknown): string {
       record.primarySources,
       record.secondarySources,
       record.citationStrategy,
+      record.citationStyle,
+      record.evidenceHierarchy,
+      record.caveatsHandling,
       record.title,
       record.name,
       record.url,
@@ -41,10 +46,29 @@ function displayText(value: unknown): string {
   return "";
 }
 
+function normalizeEvidenceLabels(value: unknown): V2EvidenceLabel[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map(displayText)
+    .filter((label): label is V2EvidenceLabel =>
+      EVIDENCE_LABELS.includes(label as V2EvidenceLabel)
+    );
+}
+
+function normalizeOutlineSection(input: V2OutlineSection): V2OutlineSection {
+  return makeOutlineSection({
+    heading: displayText(input.heading),
+    notes: displayText(input.notes),
+    claimIds: Array.isArray(input.claimIds) ? input.claimIds.map(displayText).filter(Boolean) : [],
+    evidenceLabels: normalizeEvidenceLabels(input.evidenceLabels),
+  });
+}
+
 function normalizeTakeawayRow(input: V2TakeawayRow): V2TakeawayRow {
+  const evidenceLabels = normalizeEvidenceLabels([input.evidenceLabel]);
   return makeTakeawayRow({
     finding: displayText(input.finding),
-    evidenceLabel: input.evidenceLabel,
+    evidenceLabel: evidenceLabels[0] ?? "weaker-support",
     source: displayText(input.source),
   });
 }
@@ -181,7 +205,7 @@ export async function POST(req: NextRequest) {
     const data = await response.json();
     const content: string = data?.choices?.[0]?.message?.content ?? "";
 
-    let raw: { thesis?: string; sections?: V2OutlineSection[]; takeawayTable?: V2TakeawayRow[]; citationPlan?: string } | null = null;
+    let raw: { thesis?: unknown; sections?: V2OutlineSection[]; takeawayTable?: V2TakeawayRow[]; citationPlan?: unknown } | null = null;
     try {
       raw = JSON.parse(content);
     } catch {
@@ -196,10 +220,10 @@ export async function POST(req: NextRequest) {
     const outline = makeEditorialOutline({
       claimMapId: body.claimMapId ?? "cmap-unknown",
       brandId: (body.brandId ?? "freshproof") as Parameters<typeof makeEditorialOutline>[0]["brandId"],
-      thesis: raw.thesis,
-      sections: (raw.sections ?? []).map(makeOutlineSection),
+      thesis: displayText(raw.thesis),
+      sections: (raw.sections ?? []).map(normalizeOutlineSection),
       takeawayTable: (raw.takeawayTable ?? []).map(normalizeTakeawayRow),
-      citationPlan: raw.citationPlan ?? "",
+      citationPlan: displayText(raw.citationPlan),
     });
 
     return NextResponse.json({ outline, provider: "pioneer", model });

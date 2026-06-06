@@ -93,7 +93,12 @@ function mockFetch() {
                 },
               },
             ],
-            citationPlan: "Cite Gasoyan et al. before secondary summaries.",
+            citationPlan: {
+              primarySources: ["Gasoyan et al. 2026", "STEP 4 extension"],
+              citationStyle: "Markdown footnotes",
+              evidenceHierarchy: "Primary cohort and RCT evidence first",
+              caveatsHandling: "Separate real-world variability from RCT regain averages",
+            },
           },
         }),
         { status: 200, headers: { "Content-Type": "application/json" } }
@@ -183,7 +188,9 @@ describe("V2ResonateApp", () => {
     fireEvent.click(outlineButton);
 
     expect(await screen.findByText(/Clinical practice after discontinuation/)).toBeInTheDocument();
-    expect(screen.getByText(/Gasoyan et al\. 2026/)).toBeInTheDocument();
+    expect(screen.getAllByText(/Gasoyan et al\. 2026/).length).toBeGreaterThan(0);
     expect(screen.getByText(/Lead with the DOI\/PubMed record/)).toBeInTheDocument();
+    expect(screen.getByText(/Markdown footnotes/)).toBeInTheDocument();
+    expect(screen.getByText(/Separate real-world variability/)).toBeInTheDocument();
   });
 });

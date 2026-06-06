@@ -55,6 +55,9 @@ function renderableText(value: unknown): string {
       record.primarySources,
       record.secondarySources,
       record.citationStrategy,
+      record.citationStyle,
+      record.evidenceHierarchy,
+      record.caveatsHandling,
       record.title,
       record.name,
       record.url,
@@ -1355,10 +1358,10 @@ export function V2ResonateApp() {
                       <div className="mt-2 flex flex-wrap gap-1">
                         {section.evidenceLabels.map((label) => (
                           <span
-                            key={label}
+                            key={renderableText(label)}
                             className="rounded-full bg-[#fff4e6] px-2 py-0.5 text-xs text-[#8a4b00]"
                           >
-                            {label}
+                            {renderableText(label)}
                           </span>
                         ))}
                       </div>
@@ -1396,7 +1399,7 @@ export function V2ResonateApp() {
               {editorialOutline.citationPlan && (
                 <div className="mt-4 rounded-lg border border-black/10 bg-black/[0.02] p-3">
                   <p className="text-xs font-semibold text-gray-500">Citation plan</p>
-                  <p className="mt-1 text-xs text-gray-600">{editorialOutline.citationPlan}</p>
+                  <p className="mt-1 text-xs text-gray-600">{renderableText(editorialOutline.citationPlan)}</p>
                 </div>
               )}
 

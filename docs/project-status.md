@@ -1,6 +1,6 @@
 # Project Status
 
-Last updated: 06/05/2026 17:53:10 PDT
+Last updated: 06/05/2026 18:14:37 PDT
 
 ## State
 
@@ -16,27 +16,22 @@ Maintain the living documentation and preserve a handoff-quality snapshot of the
 
 ## Last Completed Task
 
-- bc73d20 fix(v2): restore validation gates
+- a8be1b2 fix(v2): harden outline and GLP-1 source review
 
 ## Recent Commits
 
+- a8be1b2 fix(v2): harden outline and GLP-1 source review
 - bc73d20 fix(v2): restore validation gates
 - 0d10127 Merge pull request #71 from jakebutler/feat/56-e2e-hardening
 - b460448 Merge pull request #64 from jakebutler/feat/49-multi-platform-variants
 - 28bdf54 feat(v2): E2E integration tests covering full MVP pipeline
-- d95a853 feat(v2): cutover checklist and ops runbook
 
 ## Local Working Tree
 
 - M  app/api/v2/editorial-outline/__tests__/route.test.ts
 - M  app/api/v2/editorial-outline/route.ts
-- M  app/api/v2/research-brief/__tests__/route.test.ts
-- M  app/api/v2/research-brief/route.ts
 - M  components/V2ResonateApp.tsx
 - M  components/__tests__/V2ResonateApp.test.tsx
-- M  docs/cutover-checklist.md
-- M  docs/ops-runbook.md
-- M  docs/plans/2026-06-05-research-editorial-pipeline-spike.md
 - ?? CONTEXT.md
 - ?? docs/adr/
 
@@ -47,4 +42,4 @@ Maintain the living documentation and preserve a handoff-quality snapshot of the
 
 ## Branch
 
-- codex/fix-v2-outline-and-source-review
+- codex/fix-v2-citation-plan-object
